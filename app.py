@@ -1,3 +1,6 @@
+import gspread
+from google.oauth2.service_account import Credentials
+import json
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -18,84 +21,103 @@ from scipy import stats
 # INIZIALIZZAZIONE SESSION STATE E PERSISTENZA
 # =============================================================================
 
-def load_user_database():
-    """Carica il database utenti da file JSON"""
+# =============================================================================
+# GOOGLE SHEETS DATABASE - SOSTITUISCE IL JSON
+# =============================================================================
+
+def setup_google_sheets():
+    """Configura la connessione a Google Sheets"""
     try:
-        if os.path.exists('user_database.json'):
-            with open('user_database.json', 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                # Convert string dates back to datetime objects
-                for user_key, user_data in data.items():
-                    # Converti la data di nascita - CORREZIONE FORMATO DATA
-                    if user_data['profile'].get('birth_date'):
-                        try:
-                            # Prova prima il formato DD/MM/YYYY
-                            user_data['profile']['birth_date'] = datetime.strptime(
-                                user_data['profile']['birth_date'], '%d/%m/%Y'
-                            ).date()
-                        except ValueError:
-                            # Fallback al formato YYYY-MM-DD
-                            user_data['profile']['birth_date'] = datetime.strptime(
-                                user_data['profile']['birth_date'], '%Y-%m-%d'
-                            ).date()
-                    
-                    for analysis in user_data.get('analyses', []):
-                        analysis['timestamp'] = datetime.fromisoformat(analysis['timestamp'])
-                        analysis['start_datetime'] = datetime.fromisoformat(analysis['start_datetime'])
-                        analysis['end_datetime'] = datetime.fromisoformat(analysis['end_datetime'])
-                        
-                        # Converti daily analyses
-                        for day_analysis in analysis.get('daily_analyses', []):
-                            day_analysis['start_time'] = datetime.fromisoformat(day_analysis['start_time'])
-                            day_analysis['end_time'] = datetime.fromisoformat(day_analysis['end_time'])
-                            if day_analysis.get('date'):
-                                day_analysis['date'] = datetime.fromisoformat(day_analysis['date']).date()
-                return data
-        return {}
+        # Configurazione per Streamlit Cloud (no file credentials)
+        scope = ['https://www.googleapis.com/auth/spreadsheets']
+        
+        # Crea credentials direttamente da environment variables
+        credentials_dict = {
+            "type": "service_account",
+            "project_id": "hrv-analytics",
+            "private_key_id": st.secrets["GOOGLE_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GOOGLE_PRIVATE_KEY"].replace('\\n', '\n'),
+            "client_email": st.secrets["GOOGLE_CLIENT_EMAIL"],
+            "client_id": st.secrets["GOOGLE_CLIENT_ID"],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+        
+        creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        
+        # Apri il foglio (sostituisci con il tuo ID)
+        sheet_id = "1y60EPD453xYG8nqb8m4-Xyo6npHZh0ELSh_X4TGRVAw"  # SOSTITUISCI CON IL TUO!
+        spreadsheet = client.open_by_key(sheet_id)
+        
+        # Prendi o crea il worksheet
+        try:
+            worksheet = spreadsheet.worksheet("HRV_Data")
+        except:
+            worksheet = spreadsheet.add_worksheet(title="HRV_Data", rows=1000, cols=20)
+            # Intestazioni
+            worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
+        
+        return worksheet
     except Exception as e:
-        st.error(f"Errore nel caricamento database: {e}")
+        st.error(f"Errore configurazione Google Sheets: {e}")
+        return None
+
+def load_user_database():
+    """Carica il database da Google Sheets"""
+    try:
+        worksheet = setup_google_sheets()
+        if not worksheet:
+            return {}
+        
+        records = worksheet.get_all_records()
+        user_database = {}
+        
+        for record in records:
+            if record['User Key']:  # Skip empty rows
+                user_database[record['User Key']] = {
+                    'profile': {
+                        'name': record['Name'],
+                        'surname': record['Surname'],
+                        'birth_date': record['Birth Date'],
+                        'gender': record['Gender'],
+                        'age': record['Age']
+                    },
+                    'analyses': json.loads(record['Analyses']) if record['Analyses'] else []
+                }
+        
+        return user_database
+    except Exception as e:
+        st.error(f"Errore caricamento database: {e}")
         return {}
 
 def save_user_database():
-    """Salva il database utenti su file JSON"""
+    """Salva il database su Google Sheets"""
     try:
-        serializable_db = {}
-        for user_key, user_data in st.session_state.user_database.items():
-            serializable_db[user_key] = {
-                'profile': user_data['profile'].copy(),
-                'analyses': []
-            }
-            
-            # Converti la data di nascita in stringa - CORREZIONE: usa formato DD/MM/YYYY
-            if serializable_db[user_key]['profile'].get('birth_date'):
-                serializable_db[user_key]['profile']['birth_date'] = serializable_db[user_key]['profile']['birth_date'].strftime('%d/%m/%Y')
-            
-            for analysis in user_data.get('analyses', []):
-                serializable_analysis = {
-                    'timestamp': analysis['timestamp'].isoformat(),
-                    'start_datetime': analysis['start_datetime'].isoformat(),
-                    'end_datetime': analysis['end_datetime'].isoformat(),
-                    'analysis_type': analysis['analysis_type'],
-                    'selected_range': analysis['selected_range'],
-                    'metrics': analysis['metrics'],
-                    'daily_analyses': []
-                }
-                
-                # Converti daily analyses
-                for day_analysis in analysis.get('daily_analyses', []):
-                    serializable_day = day_analysis.copy()
-                    serializable_day['start_time'] = day_analysis['start_time'].isoformat()
-                    serializable_day['end_time'] = day_analysis['end_time'].isoformat()
-                    serializable_day['date'] = day_analysis['date'].isoformat() if day_analysis.get('date') else None
-                    serializable_analysis['daily_analyses'].append(serializable_day)
-                
-                serializable_db[user_key]['analyses'].append(serializable_analysis)
+        worksheet = setup_google_sheets()
+        if not worksheet:
+            return False
         
-        with open('user_database.json', 'w', encoding='utf-8') as f:
-            json.dump(serializable_db, f, indent=2, ensure_ascii=False)
+        # Pulisci il foglio (tranne l'intestazione)
+        worksheet.clear()
+        worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
+        
+        # Salva tutti gli utenti
+        for user_key, user_data in st.session_state.user_database.items():
+            profile = user_data['profile']
+            worksheet.append_row([
+                user_key,
+                profile['name'],
+                profile['surname'],
+                profile['birth_date'].strftime('%d/%m/%Y') if hasattr(profile['birth_date'], 'strftime') else str(profile['birth_date']),
+                profile['gender'],
+                profile['age'],
+                json.dumps(user_data.get('analyses', []), default=str)
+            ])
+        
         return True
     except Exception as e:
-        st.error(f"Errore nel salvataggio database: {e}")
+        st.error(f"Errore salvataggio database: {e}")
         return False
 
 def save_current_user():
