@@ -18,6 +18,224 @@ import os
 from scipy import stats
 
 # =============================================================================
+# SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
+# =============================================================================
+
+import hashlib
+import smtplib
+from email.mime.text import MimeText
+import secrets
+import time
+
+def get_user_accounts_worksheet():
+    """Accede al foglio Google Sheets per gli account utenti"""
+    try:
+        # Riutilizza la connessione esistente
+        scope = ['https://www.googleapis.com/auth/spreadsheets']
+        credentials_dict = {
+            "type": "service_account",
+            "project_id": "hrv-analytics-476306",
+            "private_key_id": st.secrets["GOOGLE_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GOOGLE_PRIVATE_KEY"].replace('\\n', '\n'),
+            "client_email": st.secrets["GOOGLE_CLIENT_EMAIL"],
+            "client_id": st.secrets["GOOGLE_CLIENT_ID"],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+        creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        
+        sheet_id = "1y60EPD453xYG8nqb8m4-Xyo6npHZh0ELSh_X4TGRVAw"
+        spreadsheet = client.open_by_key(sheet_id)
+        
+        try:
+            users_worksheet = spreadsheet.worksheet("Foglio1")
+            # Verifica se ha le colonne giuste
+            records = users_worksheet.get_all_records()
+            if not records or len(records) == 0:
+                # Aggiungi intestazioni se foglio vuoto
+                users_worksheet.append_row(["Email", "PasswordHash", "Name", "Verified", "CreatedAt", "LastLogin"])
+        except:
+            # Crea il worksheet se non esiste
+            users_worksheet = spreadsheet.add_worksheet(title="Foglio1", rows=1000, cols=10)
+            users_worksheet.append_row(["Email", "PasswordHash", "Name", "Verified", "CreatedAt", "LastLogin"])
+        
+        return users_worksheet
+    except Exception as e:
+        st.error(f"Errore accesso database utenti: {e}")
+        return None
+
+def authenticate_user(email, password):
+    """Autentica l'utente da Google Sheets"""
+    worksheet = get_user_accounts_worksheet()
+    if not worksheet:
+        return False, "Errore di connessione al database"
+    
+    try:
+        records = worksheet.get_all_records()
+        for user in records:
+            if user.get('Email') == email:
+                password_hash = hashlib.sha256(password.encode()).hexdigest()
+                if user.get('PasswordHash') == password_hash:
+                    # Aggiorna last login
+                    row_index = records.index(user) + 2  # +2 per header e 1-based index
+                    worksheet.update_cell(row_index, 6, datetime.now().isoformat())
+                    return True, f"Benvenuto {user.get('Name', '')}!"
+        
+        return False, "Email o password non validi"
+    except Exception as e:
+        return False, f"Errore durante l'autenticazione: {str(e)}"
+
+def register_user(email, password, name):
+    """Registra un nuovo utente su Google Sheets"""
+    worksheet = get_user_accounts_worksheet()
+    if not worksheet:
+        return False, "Errore di connessione al database"
+    
+    try:
+        records = worksheet.get_all_records()
+        # Controlla se l'email esiste già
+        for user in records:
+            if user.get('Email') == email:
+                return False, "Email già registrata"
+        
+        # Aggiungi nuovo utente
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        new_user = [
+            email,
+            password_hash,
+            name,
+            "True",
+            datetime.now().isoformat(),
+            datetime.now().isoformat()
+        ]
+        worksheet.append_row(new_user)
+        return True, "Utente registrato con successo!"
+    
+    except Exception as e:
+        return False, f"Errore durante la registrazione: {str(e)}"
+
+def send_password_reset_email(email):
+    """Invia email per reset password"""
+    worksheet = get_user_accounts_worksheet()
+    if not worksheet:
+        return False, "Errore di connessione al database"
+    
+    try:
+        records = worksheet.get_all_records()
+        user_exists = False
+        user_name = ""
+        
+        for user in records:
+            if user.get('Email') == email:
+                user_exists = True
+                user_name = user.get('Name', '')
+                break
+        
+        if not user_exists:
+            return False, "Email non trovata"
+        
+        # Genera token sicuro
+        token = secrets.token_urlsafe(32)
+        PASSWORD_RESET_TOKENS[token] = {
+            "email": email,
+            "expires_at": time.time() + 3600  # 1 ora
+        }
+        
+        # Crea il contenuto dell'email
+        reset_link = f"https://hrv-analytics.streamlit.app/?token={token}"
+        
+        message = f"""
+        Ciao {user_name},
+        
+        Hai richiesto il reset della password per il tuo account HRV Analytics.
+        
+        Clicca sul link seguente per reimpostare la password:
+        {reset_link}
+        
+        Questo link scadrà tra 1 ora.
+        
+        Se non hai richiesto il reset, ignora pure questa email.
+        
+        Saluti,
+        Team HRV Analytics
+        """
+        
+        try:
+            # Configura server SMTP
+            server = smtplib.SMTP(EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"])
+            server.starttls()
+            server.login(EMAIL_CONFIG["sender_email"], EMAIL_CONFIG["sender_password"])
+            
+            # Invia email
+            msg = MimeText(message)
+            msg["Subject"] = "Reset Password - HRV Analytics"
+            msg["From"] = EMAIL_CONFIG["sender_email"]
+            msg["To"] = email
+            
+            server.send_message(msg)
+            server.quit()
+            
+            return True, "Email di reset inviata con successo!"
+        
+        except Exception as e:
+            return False, f"Errore nell'invio dell'email: {str(e)}"
+    
+    except Exception as e:
+        return False, f"Errore durante il reset password: {str(e)}"
+
+# Configurazione email (per il reset password)
+EMAIL_CONFIG = {
+    "smtp_server": "smtp.libero.it",
+    "smtp_port": 587,
+    "sender_email": "robertocolucci@libero.it",
+    "sender_password": "Hrvanalytics2025@"  # In produzione usa variabili d'ambiente!
+}
+
+# Token per reset password
+PASSWORD_RESET_TOKENS = {}
+
+def reset_password(token, new_password):
+    """Reimposta la password con il token"""
+    if token not in PASSWORD_RESET_TOKENS:
+        return False, "Token non valido"
+    
+    token_data = PASSWORD_RESET_TOKENS[token]
+    
+    # Controlla scadenza
+    if time.time() > token_data["expires_at"]:
+        del PASSWORD_RESET_TOKENS[token]
+        return False, "Token scaduto"
+    
+    email = token_data["email"]
+    worksheet = get_user_accounts_worksheet()
+    
+    if not worksheet:
+        return False, "Errore di connessione al database"
+    
+    try:
+        records = worksheet.get_all_records()
+        for i, user in enumerate(records):
+            if user.get('Email') == email:
+                # Aggiorna password
+                password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+                worksheet.update_cell(i + 2, 2, password_hash)  # +2 per header e 1-based index
+                
+                # Rimuovi token usato
+                del PASSWORD_RESET_TOKENS[token]
+                
+                return True, "Password reimpostata con successo!"
+        
+        return False, "Utente non trovato"
+    
+    except Exception as e:
+        return False, f"Errore durante il reset: {str(e)}"
+
+# =============================================================================
+# MODIFICA GLI IMPORT E L'AVVIO
+# =============================================================================
+
+# =============================================================================
 # INIZIALIZZAZIONE SESSION STATE E PERSISTENZA
 # =============================================================================
 
@@ -66,8 +284,8 @@ def setup_google_sheets():
 # GOOGLE SHEETS DATABASE - SOSTITUISCE IL JSON
 # =============================================================================
 
-def setup_google_sheets():
-    """Configura la connessione a Google Sheets"""
+def setup_hrv_data_worksheet():  # ✅ RINOMINATA!
+    """Configura la connessione al foglio HRV_Data per i dati pazienti"""
     try:
         scope = ['https://www.googleapis.com/auth/spreadsheets']
         
@@ -96,8 +314,8 @@ def setup_google_sheets():
         
         return worksheet
     except Exception as e:
-        st.error(f"Errore configurazione Google Sheets: {e}")
-        return None        
+        st.error(f"Errore configurazione Google Sheets HRV_Data: {e}")
+        return None
 
 def test_google_sheets():
     """Funzione di test per verificare la connessione a Google Sheets"""
@@ -118,7 +336,7 @@ def test_google_sheets():
 def load_user_database():
     """Carica il database da Google Sheets con formato data italiano"""
     try:
-        worksheet = setup_google_sheets()
+        worksheet = setup_hrv_data_worksheet()
         if not worksheet:
             return {}
         
@@ -160,7 +378,7 @@ def load_user_database():
 def save_user_database():
     """Salva il database su Google Sheets con formato data italiano"""
     try:
-        worksheet = setup_google_sheets()
+        worksheet = setup_hrv_data_worksheet()
         if not worksheet:
             return False
         
@@ -1480,11 +1698,6 @@ def analyze_supplements_impact(activities):
 def generate_comprehensive_recommendations(activities, daily_metrics, user_profile):
     """Genera raccomandazioni complete basate su tutti i dati"""
 
-    # 🐛 DEBUG
-    st.info(f"🔍 DEBUG Ric: {len(activities)} attività totali")
-    for i, act in enumerate(activities):
-        st.info(f"🔍 DEBUG Attività {i}: {act['type']} - {act.get('food_items', 'no food')}")
-
     recommendations = []
     
     # Analizza tutti i pasti
@@ -2453,24 +2666,6 @@ def main():
                     
                     # Crea timeline dettagliata dai dati RR
                     if len(rr_intervals) > 0:
-                        
-                        # Calcola i timestamp per ogni battito
-                        timestamps = []
-                        current_time = start_time
-                        
-                        for rr in rr_intervals:
-                            timestamps.append(current_time)
-                            current_time += timedelta(milliseconds=rr)
-                        
-                        # Calcola HRV in finestre mobili (per SDNN e RMSSD)
-                        window_size = min(300, len(rr_intervals) // 10)  # Finestra adattiva
-                        if window_size < 30:
-                            window_size = min(30, len(rr_intervals))
-                        
-                        hr_instant = [60000 / rr for rr in rr_intervals]
-                        sdnn_moving = []
-                        rmssd_moving = []
-                        moving_timestamps = []
                     
                     with col2:
                         sleep_csv = sleep_df.to_csv(index=False, sep=';')
@@ -2730,5 +2925,93 @@ def main():
         - ✅ **Persistenza dati** - utenti salvati automaticamente
         """)
 
+def main_with_auth():
+    """Versione principale con sistema di autenticazione"""
+    
+    # Inizializza session state per auth
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'current_user' not in st.session_state:
+        st.session_state.current_user = None
+    
+    # Se non autenticato, mostra login/registrazione
+    if not st.session_state.authenticated:
+        show_auth_interface()
+    else:
+        # Se autenticato, mostra l'app principale
+        main()
+
+def show_auth_interface():
+    """Interfaccia di login/registrazione"""
+    st.title("🔐 HRV Analytics - Accesso")
+    
+    tab1, tab2, tab3 = st.tabs(["Login", "Registrazione", "Recupera Password"])
+    
+    with tab1:
+        st.subheader("Accedi al tuo account")
+        login_email = st.text_input("Email", key="login_email")
+        login_password = st.text_input("Password", type="password", key="login_password")
+        
+        if st.button("Accedi", key="login_btn"):
+            if login_email and login_password:
+                success, message = authenticate_user(login_email, login_password)
+                if success:
+                    st.session_state.authenticated = True
+                    st.session_state.current_user = login_email
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+            else:
+                st.error("Inserisci email e password")
+    
+    with tab2:
+        st.subheader("Crea nuovo account")
+        reg_name = st.text_input("Nome completo", key="reg_name")
+        reg_email = st.text_input("Email", key="reg_email")
+        reg_password = st.text_input("Password", type="password", key="reg_password")
+        reg_confirm = st.text_input("Conferma Password", type="password", key="reg_confirm")
+        
+        if st.button("Registrati", key="reg_btn"):
+            if reg_password != reg_confirm:
+                st.error("Le password non coincidono")
+            elif len(reg_password) < 6:
+                st.error("La password deve essere di almeno 6 caratteri")
+            elif reg_name and reg_email and reg_password:
+                success, message = register_user(reg_email, reg_password, reg_name)
+                if success:
+                    st.success(message)
+                else:
+                    st.error(message)
+            else:
+                st.error("Compila tutti i campi")
+    
+    with tab3:
+        st.subheader("Recupera Password")
+        reset_email = st.text_input("Inserisci la tua email", key="reset_email")
+        
+        if st.button("Invia link di reset", key="reset_btn"):
+            if reset_email:
+                success, message = send_password_reset_email(reset_email)
+                if success:
+                    st.success(message)
+                else:
+                    st.error(message)
+            else:
+                st.error("Inserisci la tua email")
+
+# Aggiungi anche un pulsante di logout nella sidebar nel main()
+def add_logout_button():
+    if st.session_state.authenticated:
+        st.sidebar.divider()
+        if st.sidebar.button("🚪 Logout", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.current_user = None
+            st.rerun()
+
+# E ALLA FINE CAMBIA:
 if __name__ == "__main__":
-    main()
+    main_with_auth()  # ✅ CAMBIATO QUI!
+
+if __name__ == "__main__":
+    main_with_auth()
