@@ -136,7 +136,7 @@ def test_google_sheets():
         return False
 
 def load_user_database():
-    """Carica il database da Google Sheets"""
+    """Carica il database da Google Sheets con formato data italiano"""
     try:
         worksheet = setup_google_sheets()
         if not worksheet:
@@ -147,11 +147,25 @@ def load_user_database():
         
         for record in records:
             if record['User Key']:  # Skip empty rows
+                # Converti la stringa della data in oggetto datetime
+                birth_date_str = record['Birth Date']
+                try:
+                    # Prova a parsare il formato italiano dd/mm/yyyy
+                    birth_date = datetime.strptime(birth_date_str, '%d/%m/%Y').date()
+                except ValueError:
+                    try:
+                        # Se fallisce, prova il formato yyyy-mm-dd (per compatibilità)
+                        birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        # Se fallisce ancora, usa una data di default
+                        st.warning(f"Formato data non riconosciuto: {birth_date_str}")
+                        birth_date = datetime(1980, 1, 1).date()
+                
                 user_database[record['User Key']] = {
                     'profile': {
                         'name': record['Name'],
                         'surname': record['Surname'],
-                        'birth_date': record['Birth Date'],
+                        'birth_date': birth_date,  # Ora è un oggetto date
                         'gender': record['Gender'],
                         'age': record['Age']
                     },
@@ -164,7 +178,7 @@ def load_user_database():
         return {}
 
 def save_user_database():
-    """Salva il database su Google Sheets"""
+    """Salva il database su Google Sheets con formato data italiano"""
     try:
         worksheet = setup_google_sheets()
         if not worksheet:
@@ -174,14 +188,21 @@ def save_user_database():
         worksheet.clear()
         worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
         
-        # Salva tutti gli utenti
+        # Salva tutti gli utenti con formato data italiano
         for user_key, user_data in st.session_state.user_database.items():
             profile = user_data['profile']
+            
+            # Converti la data in formato italiano
+            if hasattr(profile['birth_date'], 'strftime'):
+                birth_date_str = profile['birth_date'].strftime('%d/%m/%Y')
+            else:
+                birth_date_str = str(profile['birth_date'])
+            
             worksheet.append_row([
                 user_key,
                 profile['name'],
                 profile['surname'],
-                profile['birth_date'].strftime('%d/%m/%Y') if hasattr(profile['birth_date'], 'strftime') else str(profile['birth_date']),
+                birth_date_str,  # Ora in formato italiano!
                 profile['gender'],
                 profile['age'],
                 json.dumps(user_data.get('analyses', []), default=str)
@@ -215,10 +236,18 @@ def save_current_user():
     return success
 
 def get_user_key(user_profile):
-    """Crea una chiave univoca per l'utente"""
+    """Crea una chiave univoca per l'utente con formato data italiano"""
     if not user_profile['name'] or not user_profile['surname'] or not user_profile['birth_date']:
         return None
-    return f"{user_profile['name'].lower()}_{user_profile['surname'].lower()}_{user_profile['birth_date'].isoformat()}"
+    
+    # Converti la data in formato stringa italiano dd/mm/yyyy
+    if hasattr(user_profile['birth_date'], 'strftime'):
+        birth_date_str = user_profile['birth_date'].strftime('%d/%m/%Y')
+    else:
+        # Se già è una stringa, assumiamo sia già nel formato italiano
+        birth_date_str = str(user_profile['birth_date'])
+    
+    return f"{user_profile['name'].lower()}_{user_profile['surname'].lower()}_{birth_date_str}"
 
 def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
@@ -663,7 +692,14 @@ def create_user_selector():
     
     for user_key, user_data in st.session_state.user_database.items():
         profile = user_data['profile']
-        display_name = f"{profile['name']} {profile['surname']} - {profile['birth_date']} - {profile['age']} anni"
+        
+        # Formatta la data in italiano
+        if hasattr(profile['birth_date'], 'strftime'):
+            birth_date_display = profile['birth_date'].strftime('%d/%m/%Y')
+        else:
+            birth_date_display = str(profile['birth_date'])
+        
+        display_name = f"{profile['name']} {profile['surname']} - {birth_date_display} - {profile['age']} anni"
         user_list.append(display_name)
         user_keys.append(user_key)
     
