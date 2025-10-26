@@ -1330,53 +1330,145 @@ def main():
                         use_container_width=True
                     )
                     
-                    # Grafico andamento battito cardiaco
-                    st.subheader("📈 Andamento Giornaliero")
+                    # Grafico interattivo con selettore temporale
+                    st.subheader("📈 Andamento Temporale - HRV")
                     
-                    col1, col2 = st.columns(2)
+                    # Prepara i dati per il grafico temporale
+                    all_dates = []
+                    all_hr = []
+                    all_sdnn = []
+                    all_rmssd = []
                     
-                    with col1:
-                        # Grafico battito medio
-                        dates = [datetime.fromisoformat(day) for day in daily_metrics.keys()]
-                        hr_values = [day_metrics['hr_mean'] for day_metrics in daily_metrics.values()]
+                    for day_date, day_metrics in daily_metrics.items():
+                        day_dt = datetime.fromisoformat(day_date)
+                        all_dates.append(day_dt)
+                        all_hr.append(day_metrics.get('hr_mean', 0))
+                        all_sdnn.append(day_metrics.get('sdnn', 0))
+                        all_rmssd.append(day_metrics.get('rmssd', 0))
+                    
+                    # Selettore range date
+                    if len(all_dates) > 1:
+                        min_date = min(all_dates)
+                        max_date = max(all_dates)
                         
-                        fig_hr = go.Figure()
-                        fig_hr.add_trace(go.Scatter(
-                            x=dates, 
-                            y=hr_values,
-                            mode='lines+markers',
-                            name='Battito Medio',
-                            line=dict(color='#e74c3c', width=3),
-                            marker=dict(size=8)
-                        ))
-                        fig_hr.update_layout(
-                            title='Andamento Battito Cardiaco',
-                            xaxis_title='Data',
-                            yaxis_title='Battiti per minuto (bpm)',
-                            height=300
-                        )
-                        st.plotly_chart(fig_hr, use_container_width=True)
-                    
-                    with col2:
-                        # Grafico RMSSD (variabilità)
-                        rmssd_values = [day_metrics['rmssd'] for day_metrics in daily_metrics.values()]
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            start_date = st.date_input(
+                                "Data Inizio",
+                                value=min_date,
+                                min_value=min_date,
+                                max_value=max_date
+                            )
+                        with col2:
+                            end_date = st.date_input(
+                                "Data Fine", 
+                                value=max_date,
+                                min_value=min_date,
+                                max_value=max_date
+                            )
                         
-                        fig_rmssd = go.Figure()
-                        fig_rmssd.add_trace(go.Scatter(
-                            x=dates, 
-                            y=rmssd_values,
-                            mode='lines+markers',
-                            name='RMSSD',
-                            line=dict(color='#2ecc71', width=3),
-                            marker=dict(size=8)
-                        ))
-                        fig_rmssd.update_layout(
-                            title='Andamento Variabilità (RMSSD)',
-                            xaxis_title='Data',
-                            yaxis_title='RMSSD (ms)',
-                            height=300
-                        )
-                        st.plotly_chart(fig_rmssd, use_container_width=True)
+                        # Filtra i dati in base al range selezionato
+                        filtered_dates = []
+                        filtered_hr = []
+                        filtered_sdnn = []
+                        filtered_rmssd = []
+                        
+                        for i, date in enumerate(all_dates):
+                            if start_date <= date.date() <= end_date:
+                                filtered_dates.append(date)
+                                filtered_hr.append(all_hr[i])
+                                filtered_sdnn.append(all_sdnn[i])
+                                filtered_rmssd.append(all_rmssd[i])
+                    else:
+                        filtered_dates = all_dates
+                        filtered_hr = all_hr
+                        filtered_sdnn = all_sdnn
+                        filtered_rmssd = all_rmssd
+                    
+                    # Crea il grafico interattivo
+                    fig = go.Figure()
+                    
+                    # Aggiungi le tre metriche con scale diverse
+                    fig.add_trace(go.Scatter(
+                        x=filtered_dates, 
+                        y=filtered_hr,
+                        mode='lines+markers',
+                        name='Battito Medio (bpm)',
+                        line=dict(color='#e74c3c', width=3),
+                        marker=dict(size=8),
+                        yaxis='y1'
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=filtered_dates, 
+                        y=filtered_sdnn,
+                        mode='lines+markers',
+                        name='SDNN (ms)',
+                        line=dict(color='#3498db', width=3),
+                        marker=dict(size=8),
+                        yaxis='y2'
+                    ))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=filtered_dates, 
+                        y=filtered_rmssd,
+                        mode='lines+markers',
+                        name='RMSSD (ms)',
+                        line=dict(color='#2ecc71', width=3),
+                        marker=dict(size=8),
+                        yaxis='y3'
+                    ))
+                    
+                    # Layout con tre assi Y
+                    fig.update_layout(
+                        title='Andamento Metriche HRV nel Tempo',
+                        xaxis=dict(
+                            title='Data',
+                            tickformat='%d/%m/%Y'
+                        ),
+                        yaxis=dict(
+                            title='Battito (bpm)',
+                            titlefont=dict(color='#e74c3c'),
+                            tickfont=dict(color='#e74c3c'),
+                            side='left'
+                        ),
+                        yaxis2=dict(
+                            title='SDNN (ms)',
+                            titlefont=dict(color='#3498db'),
+                            tickfont=dict(color='#3498db'),
+                            overlaying='y',
+                            side='right',
+                            position=0.85
+                        ),
+                        yaxis3=dict(
+                            title='RMSSD (ms)',
+                            titlefont=dict(color='#2ecc71'),
+                            tickfont=dict(color='#2ecc71'),
+                            overlaying='y',
+                            side='right',
+                            position=0.15
+                        ),
+                        height=500,
+                        showlegend=True,
+                        hovermode='x unified'
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Statistiche del periodo selezionato
+                    if filtered_hr:
+                        st.subheader("📊 Statistiche Periodo Selezionato")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        
+                        with col1:
+                            st.metric("Battito Medio", f"{np.mean(filtered_hr):.1f} bpm")
+                        with col2:
+                            st.metric("SDNN Medio", f"{np.mean(filtered_sdnn):.1f} ms")
+                        with col3:
+                            st.metric("RMSSD Medio", f"{np.mean(filtered_rmssd):.1f} ms")
+                        with col4:
+                            st.metric("Giorni Analizzati", len(filtered_dates))
             
             # 5. SALVATAGGIO ANALISI
             if st.button("💾 Salva Analisi nel Database", type="primary"):
