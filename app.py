@@ -616,6 +616,145 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
         'sleep_awake': sleep_metrics['awake']
     }
 
+# =============================================================================
+# SISTEMA DI REPORT PDF
+# =============================================================================
+
+def generate_hrv_report(user_profile, timeline, daily_metrics, avg_metrics, activities, rr_intervals):
+    """Genera un report HRV completo per il paziente"""
+    
+    report = {
+        'patient_info': generate_patient_info(user_profile),
+        'recording_info': generate_recording_info(timeline, rr_intervals),
+        'daily_analysis': generate_daily_analysis(daily_metrics),
+        'critical_points': identify_critical_points(daily_metrics, user_profile),
+        'recommendations': generate_recommendations(daily_metrics, activities, user_profile),
+        'scientific_references': get_scientific_references()
+    }
+    
+    return report
+
+def generate_patient_info(user_profile):
+    """Informazioni paziente"""
+    return {
+        'Nome': user_profile['name'],
+        'Cognome': user_profile['surname'],
+        'Data di nascita': user_profile['birth_date'].strftime('%d/%m/%Y'),
+        'Età': user_profile['age'],
+        'Sesso': user_profile['gender']
+    }
+
+def generate_recording_info(timeline, rr_intervals):
+    """Informazioni registrazione"""
+    return {
+        'Data inizio': timeline['start_time'].strftime('%d/%m/%Y %H:%M'),
+        'Data fine': timeline['end_time'].strftime('%d/%m/%Y %H:%M'),
+        'Durata totale': f"{timeline['total_duration_hours']:.1f} ore",
+        'Battiti totali': len(rr_intervals),
+        'Giorni di registrazione': len(timeline['days_data'])
+    }
+
+def generate_daily_analysis(daily_metrics):
+    """Analisi giornaliera"""
+    daily_analysis = {}
+    
+    for day_date, metrics in daily_metrics.items():
+        day_dt = datetime.fromisoformat(day_date)
+        day_str = day_dt.strftime('%d/%m/%Y')
+        
+        daily_analysis[day_str] = {
+            'SDNN (ms)': f"{metrics.get('sdnn', 0):.1f}",
+            'RMSSD (ms)': f"{metrics.get('rmssd', 0):.1f}",
+            'Battito medio (bpm)': f"{metrics.get('hr_mean', 0):.1f}",
+            'Coerenza cardiaca (%)': f"{metrics.get('coherence', 0):.1f}",
+            'Rapporto LF/HF': f"{metrics.get('lf_hf_ratio', 0):.2f}",
+            'Potenza totale': f"{metrics.get('total_power', 0):.0f}",
+            'Durata sonno (h)': f"{metrics.get('sleep_duration', 0):.1f}" if has_night_data else "N/A"
+        }
+    
+    return daily_analysis
+
+def identify_critical_points(daily_metrics, user_profile):
+    """Identifica punti critici basati su standard scientifici"""
+    critical_points = []
+    
+    age = user_profile['age']
+    gender = user_profile['gender']
+    
+    # Standard scientifici per HRV (Task Force 1996)
+    sdnn_threshold = 50 if age < 30 else (40 if age < 50 else 30)
+    rmssd_threshold = 30 if age < 30 else (25 if age < 50 else 20)
+    
+    for day_date, metrics in daily_metrics.items():
+        day_dt = datetime.fromisoformat(day_date)
+        day_str = day_dt.strftime('%d/%m/%Y')
+        
+        # Controllo SDNN
+        if metrics.get('sdnn', 0) < sdnn_threshold:
+            critical_points.append(f"📉 {day_str}: SDNN basso ({metrics.get('sdnn', 0):.1f} ms) - Sotto la norma per l'età")
+        
+        # Controllo RMSSD
+        if metrics.get('rmssd', 0) < rmssd_threshold:
+            critical_points.append(f"🔄 {day_str}: RMSSD basso ({metrics.get('rmssd', 0):.1f} ms) - Recupero insufficiente")
+        
+        # Controllo battito cardiaco
+        if metrics.get('hr_mean', 0) > 80:
+            critical_points.append(f"💓 {day_str}: Battito elevato ({metrics.get('hr_mean', 0):.1f} bpm) - Possibile stress")
+        
+        # Controllo rapporto LF/HF
+        lf_hf = metrics.get('lf_hf_ratio', 1.0)
+        if lf_hf > 3.0:
+            critical_points.append(f"⚖️ {day_str}: Squilibrio autonomico (LF/HF: {lf_hf:.2f}) - Dominanza simpatica")
+        elif lf_hf < 0.5:
+            critical_points.append(f"⚖️ {day_str}: Squilibrio autonomico (LF/HF: {lf_hf:.2f}) - Dominanza parasimpatica")
+    
+    return critical_points if critical_points else ["✅ Nessun punto critico rilevato - HRV nella norma"]
+
+def generate_recommendations(daily_metrics, activities, user_profile):
+    """Genera raccomandazioni personalizzate"""
+    recommendations = []
+    
+    # Analizza metriche medie
+    avg_sdnn = np.mean([day.get('sdnn', 0) for day in daily_metrics.values()])
+    avg_rmssd = np.mean([day.get('rmssd', 0) for day in daily_metrics.values()])
+    avg_hr = np.mean([day.get('hr_mean', 0) for day in daily_metrics.values()])
+    
+    # Raccomandazioni basate su HRV
+    if avg_sdnn < 40:
+        recommendations.append("🎯 **Aumenta l'attività aerobica moderata** (camminata, ciclismo) per migliorare la variabilità cardiaca")
+    
+    if avg_rmssd < 25:
+        recommendations.append("😴 **Prioritizza il sonno e il recupero** - Considera tecniche di respirazione prima di dormire")
+    
+    if avg_hr > 75:
+        recommendations.append("🧘 **Pratica regolarmente tecniche di rilassamento** (meditazione, respirazione profonda)")
+    
+    # Raccomandazioni basate sulle attività
+    training_count = len([a for a in activities if a['type'] == 'Allenamento'])
+    recovery_count = len([a for a in activities if a['type'] == 'Riposo'])
+    
+    if training_count > 4 and recovery_count < 2:
+        recommendations.append("⚖️ **Bilancia allenamento e recupero** - Aggiungi 1-2 sessioni di yoga o stretching settimanali")
+    
+    # Raccomandazioni generali
+    recommendations.extend([
+        "💧 **Mantieni una buona idratazione** - Bere 2L di acqua al giorno",
+        "🥦 **Dieta mediterranea** - Ricca in omega-3, verdure e grassi buoni", 
+        "📱 **Riduci lo stress digitale** - Pause regolari dagli schermi",
+        "🌞 **Esposizione alla luce solare** - Almeno 15 minuti al giorno"
+    ])
+    
+    return recommendations
+
+def get_scientific_references():
+    """References scientifiche"""
+    return [
+        "**Task Force of the European Society of Cardiology (1996)** - Heart rate variability: standards of measurement, physiological interpretation, and clinical use",
+        "**Shaffer F. et al. (2017)** - A Healthy Heart is Not a Metronome: An Integrative Review of the Heart's Anatomy and Heart Rate Variability",
+        "**McCraty R. et al. (2014)** - The Coherent Heart: Heart–Brain Interactions, Psychophysiological Coherence, and the Emergence of System-Wide Order",
+        "**Laborde S. et al. (2017)** - Heart Rate Variability and Cardiac Vagal Tone in Psychophysiological Research"
+    ]
+
 def advanced_rr_filtering(rr_intervals):
     """Filtro avanzato basato su standard scientifici - SOSTITUISCE filter_rr_outliers"""
     if len(rr_intervals) < 10:
@@ -3010,6 +3149,122 @@ def main():
                     st.success("✅ Analisi salvata nel database!")
                 else:
                     st.error("❌ Salva prima il profilo utente!")
+
+            # 6. ESPORTAZIONE REPORT PDF
+            st.header("📄 Report Completo")
+            
+            if st.button("📊 Genera Report Completo", type="primary"):
+                with st.spinner("Generando report..."):
+                    report = generate_hrv_report(
+                        st.session_state.user_profile,
+                        timeline, 
+                        daily_metrics,
+                        avg_metrics,
+                        st.session_state.activities,
+                        rr_intervals
+                    )
+                    
+                    # Mostra anteprima report
+                    with st.expander("📋 Anteprima Report", expanded=True):
+                        display_report_preview(report)
+                    
+                    # Pulsante esportazione
+                    st.download_button(
+                        label="📥 Scarica Report (TXT)",
+                        data=generate_text_report(report),
+                        file_name=f"report_hrv_{st.session_state.user_profile['name']}_{datetime.now().strftime('%Y%m%d')}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+
+def display_report_preview(report):
+    """Mostra anteprima del report"""
+    
+    st.subheader("👤 Informazioni Paziente")
+    for key, value in report['patient_info'].items():
+        st.write(f"**{key}:** {value}")
+    
+    st.subheader("📊 Informazioni Registrazione")
+    for key, value in report['recording_info'].items():
+        st.write(f"**{key}:** {value}")
+    
+    st.subheader("📈 Analisi Giornaliera")
+    for day, metrics in report['daily_analysis'].items():
+        st.write(f"**{day}:**")
+        for metric, value in metrics.items():
+            st.write(f"  - {metric}: {value}")
+    
+    st.subheader("⚠️ Punti Critici")
+    for point in report['critical_points']:
+        st.write(point)
+    
+    st.subheader("💡 Raccomandazioni")
+    for rec in report['recommendations']:
+        st.write(f"• {rec}")
+    
+    st.subheader("📚 Riferimenti Scientifici")
+    for ref in report['scientific_references']:
+        st.write(f"• {ref}")
+
+def generate_text_report(report):
+    """Genera report in formato testo"""
+    text = "=" * 60 + "\n"
+    text += "           REPORT HRV - ANALISI VARIABILITÀ CARDIACA\n"
+    text += "=" * 60 + "\n\n"
+    
+    # Informazioni paziente
+    text += "👤 INFORMAZIONI PAZIENTE\n"
+    text += "-" * 30 + "\n"
+    for key, value in report['patient_info'].items():
+        text += f"{key}: {value}\n"
+    
+    text += "\n"
+    
+    # Informazioni registrazione
+    text += "📊 INFORMAZIONI REGISTRAZIONE\n"
+    text += "-" * 30 + "\n"
+    for key, value in report['recording_info'].items():
+        text += f"{key}: {value}\n"
+    
+    text += "\n"
+    
+    # Analisi giornaliera
+    text += "📈 ANALISI GIORNALIERA\n"
+    text += "-" * 30 + "\n"
+    for day, metrics in report['daily_analysis'].items():
+        text += f"\n{day}:\n"
+        for metric, value in metrics.items():
+            text += f"  • {metric}: {value}\n"
+    
+    text += "\n"
+    
+    # Punti critici
+    text += "⚠️ PUNTI CRITICI\n"
+    text += "-" * 30 + "\n"
+    for point in report['critical_points']:
+        text += f"• {point}\n"
+    
+    text += "\n"
+    
+    # Raccomandazioni
+    text += "💡 RACCOMANDAZIONI\n"
+    text += "-" * 30 + "\n"
+    for rec in report['recommendations']:
+        text += f"• {rec}\n"
+    
+    text += "\n"
+    
+    # Riferimenti scientifici
+    text += "📚 RIFERIMENTI SCIENTIFICI\n"
+    text += "-" * 30 + "\n"
+    for ref in report['scientific_references']:
+        text += f"• {ref}\n"
+    
+    text += "\n" + "=" * 60 + "\n"
+    text += f"Report generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+    text += "=" * 60
+    
+    return text
 
             # 🆕 NUOVA SEZIONE: ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
