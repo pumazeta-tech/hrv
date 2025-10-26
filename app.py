@@ -2903,16 +2903,6 @@ def main():
                             )
                         )
                         
-                        # Informazioni sul processing scientifico
-                        st.info(f"""
-                        **🔬 Processing Scientifico Applicato:**
-                        - **Filtro RR avanzato:** Rimossi artefatti e outliers
-                        - **Finestra mobile:** 5 minuti (standard scientifico)
-                        - **Overlap:** 50% per smoothing ottimale
-                        - **Smoothing:** Savitzky-Golay per preservare picchi reali
-                        - **Dati validi:** {len(sdnn_moving) if 'sdnn_moving' in locals() else 0} finestre SDNN, {len(rmssd_moving) if 'rmssd_moving' in locals() else 0} finestre RMSSD
-                        """)
-                        
                         # Informazioni sui dati
                         st.info(f"""
                         **📊 Informazioni Dati:**
