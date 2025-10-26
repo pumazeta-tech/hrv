@@ -2835,39 +2835,39 @@ def main():
                                     borderpad=2
                                 )
 
-                        # Aggiungi HR istantaneo (SMOOTH)
-                        fig_main.add_trace(go.Scatter(
-                            x=timestamps,
-                            y=hr_instant_smooth,
-                            mode='lines',
-                            name='Battito Istantaneo',
-                            line=dict(color='#e74c3c', width=1.5),
-                            opacity=0.9
-                        ))
+                                # Aggiungi HR istantaneo (SMOOTH)
+                                fig_main.add_trace(go.Scatter(
+                                    x=timestamps,
+                                    y=hr_instant_smooth,
+                                    mode='lines',
+                                    name='Battito Istantaneo',
+                                    line=dict(color='#e74c3c', width=1.5),
+                                    opacity=0.9
+                                ))
                         
-                        # Aggiungi SDNN mobile solo se ci sono dati
-                        if sdnn_moving and sdnn_timestamps and len(sdnn_moving) == len(sdnn_timestamps):
-                            fig_main.add_trace(go.Scatter(
-                                x=sdnn_timestamps,
-                                y=sdnn_moving,
-                                mode='lines',
-                                name='SDNN Mobile',
-                                line=dict(color='#3498db', width=2),
-                                yaxis='y2'
-                            ))
+                                # Aggiungi SDNN mobile solo se ci sono dati
+                                if sdnn_moving and sdnn_timestamps and len(sdnn_moving) == len(sdnn_timestamps):
+                                fig_main.add_trace(go.Scatter(
+                                    x=sdnn_timestamps,
+                                    y=sdnn_moving,
+                                    mode='lines',
+                                    name='SDNN Mobile',
+                                    line=dict(color='#3498db', width=2),
+                                    yaxis='y2'
+                                ))
                         else:
                             st.warning("❌ Dati SDNN insufficienti per il grafico")
 
-                        # Aggiungi RMSSD mobile solo se ci sono dati  
-                        if rmssd_moving and rmssd_timestamps and len(rmssd_moving) == len(rmssd_timestamps):
-                            fig_main.add_trace(go.Scatter(
-                                x=rmssd_timestamps,
-                                y=rmssd_moving,
-                                mode='lines',
-                                name='RMSSD Mobile',
-                                line=dict(color='#2ecc71', width=2),
-                                yaxis='y3'
-                            ))
+                                # Aggiungi RMSSD mobile solo se ci sono dati  
+                                if rmssd_moving and rmssd_timestamps and len(rmssd_moving) == len(rmssd_timestamps):
+                                fig_main.add_trace(go.Scatter(
+                                    x=rmssd_timestamps,
+                                    y=rmssd_moving,
+                                    mode='lines',
+                                    name='RMSSD Mobile',
+                                    line=dict(color='#2ecc71', width=2),
+                                    yaxis='y3'
+                                ))
                         else:
                             st.warning("❌ Dati RMSSD insufficienti per il grafico")
                         
