@@ -2785,6 +2785,10 @@ def main():
 
                         # Usa i timestamp corretti per ciascuna metrica
                         moving_timestamps = sdnn_timestamps  # Per compatibilità con codice esistente
+
+
+                        # DEBUG: Elimina qualsiasi riferimento a window_size
+                        window_size = 300  # Valore fisso per compatibilità
                         
                         # Crea il grafico principale con zoom interattivo
                         fig_main = go.Figure()
