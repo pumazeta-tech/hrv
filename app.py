@@ -1293,6 +1293,17 @@ def main():
                     
                     hrv_df = pd.DataFrame(hrv_table_data)
                     
+                    # Mostra prima tabella HRV
+                    st.dataframe(
+                        hrv_df,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(300, 50 + len(hrv_df) * 35)
+                    )
+                    
+                    # Aggiungi spazio tra le tabelle
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
                     # TABELLA 2: METRICHE SONNO
                     st.subheader("😴 Metriche Sonno")
                     
@@ -1317,36 +1328,7 @@ def main():
                     
                     sleep_df = pd.DataFrame(sleep_table_data)
                     
-                    # Styling per le tabelle
-                    st.markdown("""
-                    <style>
-                    .compact-table {
-                        font-size: 12px;
-                    }
-                    .compact-table thead th {
-                        background-color: #3498db;
-                        color: white;
-                        font-weight: bold;
-                        padding: 8px 4px;
-                    }
-                    .compact-table td {
-                        padding: 6px 4px;
-                    }
-                    .sleep-table thead th {
-                        background-color: #9b59b6;
-                        color: white;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-                    
-                    # Mostra le tabelle
-                    st.dataframe(
-                        hrv_df,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=min(300, 50 + len(hrv_df) * 35)
-                    )
-                    
+                    # Mostra seconda tabella Sonno
                     st.dataframe(
                         sleep_df,
                         use_container_width=True,
@@ -1355,6 +1337,7 @@ def main():
                     )
                     
                     # Download delle tabelle
+                    st.markdown("<br>", unsafe_allow_html=True)
                     col1, col2 = st.columns(2)
                     
                     with col1:
