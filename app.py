@@ -2661,12 +2661,6 @@ def main():
                             use_container_width=True
                         )
                     
-                    # Grafico dettagliato con zoom interattivo e attività
-                    st.subheader("📈 Andamento Dettagliato HRV con Attività")
-                    
-                    # Crea timeline dettagliata dai dati RR
-                    if len(rr_intervals) > 0:
-                    
                     with col2:
                         sleep_csv = sleep_df.to_csv(index=False, sep=';')
                         st.download_button(
