@@ -1230,6 +1230,8 @@ def main():
                     # Prepara i dati per la tabella
                     table_data = []
                     
+                    for day_date, day_metrics in daily_metrics.items():
+                        day_dt = datetime.fromisoformat(day_date)
                         row = {
                             'Data': day_dt.strftime('%d/%m/%Y'),
                             'Battito (bpm)': f"{day_metrics['hr_mean']:.1f}",
