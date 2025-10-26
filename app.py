@@ -1084,7 +1084,7 @@ def main():
             # Assicurati che avg_metrics esista sempre
             if not avg_metrics:
                 st.error("Impossibile calcolare le metriche HRV")
-                return
+                st.stop()  # Usa st.stop() invece di return
 
             # DEBUG: Controlla cosa contiene avg_metrics
             st.sidebar.write("🔍 DEBUG - Chiavi in avg_metrics:")
