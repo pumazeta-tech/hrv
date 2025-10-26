@@ -62,6 +62,38 @@ def setup_google_sheets():
     except Exception as e:
         st.error(f"Errore configurazione Google Sheets: {e}")
         return None
+# =============================================================================
+# GOOGLE SHEETS DATABASE - SOSTITUISCE IL JSON
+# =============================================================================
+
+def setup_google_sheets():
+    """Configura la connessione a Google Sheets"""
+    try:
+        # [il tuo codice esistente...]
+    except Exception as e:
+        st.error(f"Errore configurazione Google Sheets: {e}")
+        return None
+
+# 🔽🔽🔽 AGGIUNGI QUI QUESTA NUOVA FUNZIONE 🔽🔽🔽
+def test_google_sheets():
+    """Funzione di test per verificare la connessione a Google Sheets"""
+    try:
+        worksheet = setup_google_sheets()
+        if worksheet:
+            # Prova a leggere qualcosa
+            records = worksheet.get_all_records()
+            st.success(f"✅ Connesso a Google Sheets! Trovati {len(records)} record")
+            return True
+        else:
+            st.error("❌ Impossibile connettersi a Google Sheets")
+            return False
+    except Exception as e:
+        st.error(f"❌ Errore connessione Google Sheets: {e}")
+        return False
+# 🔼🔼🔼 FINE CODICE DA AGGIUNGERE 🔼🔼🔼
+
+def load_user_database():
+    """Carica il database da Google Sheets"""
 
 def load_user_database():
     """Carica il database da Google Sheets"""
@@ -675,6 +707,8 @@ def main():
         # DEBUG VISUALE
         st.divider()
         st.header("🔧 Debug")
+        if st.button("🧪 TEST GOOGLE SHEETS CONNECTION", use_container_width=True):
+            test_google_sheets()
         st.write(f"Nome: {st.session_state.user_profile['name']}")
         st.write(f"Cognome: {st.session_state.user_profile['surname']}")
         st.write(f"Data: {st.session_state.user_profile['birth_date']}")
