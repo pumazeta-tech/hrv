@@ -1265,34 +1265,59 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
             
-            # 4. METRICHE DETTAGLIATE PER GIORNO - IN TABELLA COMPATTA
+            # 4. METRICHE DETTAGLIATE PER GIORNO - TABELLE SEPARATE
             with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
                 if not daily_metrics:
                     st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
                 else:
-                    # Prepara i dati per la tabella COMPATTA
-                    table_data = []
+                    # TABELLA 1: METRICHE HRV E SPETTRALI
+                    st.subheader("🧮 Metriche HRV e Analisi Spettrale")
+                    
+                    hrv_table_data = []
                     
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
                         row = {
                             'Data': day_dt.strftime('%d/%m/%Y'),
-                            'Battito': f"{day_metrics.get('hr_mean', 0):.0f}",
-                            'SDNN': f"{day_metrics.get('sdnn', 0):.0f}",
-                            'RMSSD': f"{day_metrics.get('rmssd', 0):.0f}",
-                            'Coerenza': f"{day_metrics.get('coherence', 0):.0f}%",
+                            'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
+                            'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
+                            'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
+                            'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
+                            'Potenza Totale': f"{day_metrics.get('total_power', 0):.0f}",
+                            'LF (ms²)': f"{day_metrics.get('lf', 0):.0f}",
+                            'HF (ms²)': f"{day_metrics.get('hf', 0):.0f}",
                             'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}",
-                            'Sonno': f"{day_metrics.get('sleep_duration', 0):.1f}h",
-                            'Efficienza': f"{day_metrics.get('sleep_efficiency', 0):.0f}%",
-                            'Profondo': f"{day_metrics.get('sleep_deep', 0):.1f}h",
-                            'REM': f"{day_metrics.get('sleep_rem', 0):.1f}h"
+                            'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
                         }
-                        table_data.append(row)
+                        hrv_table_data.append(row)
                     
-                    # Converti in DataFrame
-                    df = pd.DataFrame(table_data)
+                    hrv_df = pd.DataFrame(hrv_table_data)
                     
-                    # Styling della tabella compatta
+                    # TABELLA 2: METRICHE SONNO
+                    st.subheader("😴 Metriche Sonno")
+                    
+                    sleep_table_data = []
+                    
+                    for day_date, day_metrics in daily_metrics.items():
+                        day_dt = datetime.fromisoformat(day_date)
+                        row = {
+                            'Data': day_dt.strftime('%d/%m/%Y'),
+                            'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                            'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                            'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
+                            'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
+                            'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                            'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                            'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}",
+                            'Leggero (%)': f"{(day_metrics.get('sleep_light', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
+                            'Profondo (%)': f"{(day_metrics.get('sleep_deep', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
+                            'REM (%)': f"{(day_metrics.get('sleep_rem', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}"
+                        }
+                        sleep_table_data.append(row)
+                    
+                    sleep_df = pd.DataFrame(sleep_table_data)
+                    
+                    # Styling per le tabelle
                     st.markdown("""
                     <style>
                     .compact-table {
@@ -1307,16 +1332,50 @@ def main():
                     .compact-table td {
                         padding: 6px 4px;
                     }
+                    .sleep-table thead th {
+                        background-color: #9b59b6;
+                        color: white;
+                    }
                     </style>
                     """, unsafe_allow_html=True)
                     
-                    # Mostra la tabella compatta
+                    # Mostra le tabelle
                     st.dataframe(
-                        df,
+                        hrv_df,
                         use_container_width=True,
                         hide_index=True,
-                        height=min(400, 50 + len(df) * 35)
+                        height=min(300, 50 + len(hrv_df) * 35)
                     )
+                    
+                    st.dataframe(
+                        sleep_df,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(300, 50 + len(sleep_df) * 35)
+                    )
+                    
+                    # Download delle tabelle
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        hrv_csv = hrv_df.to_csv(index=False, sep=';')
+                        st.download_button(
+                            label="📥 Scarica Metriche HRV",
+                            data=hrv_csv,
+                            file_name=f"hrv_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    
+                    with col2:
+                        sleep_csv = sleep_df.to_csv(index=False, sep=';')
+                        st.download_button(
+                            label="📥 Scarica Metriche Sonno",
+                            data=sleep_csv,
+                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
                     
                     # Download della tabella
                     csv = df.to_csv(index=False, sep=';')
