@@ -571,40 +571,105 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
         'sleep_awake': sleep_metrics['awake']
     }
 
-def filter_rr_outliers(rr_intervals):
-    """Filtra gli artefatti in modo conservativo"""
-    if len(rr_intervals) < 5:
+def advanced_rr_filtering(rr_intervals):
+    """Filtro avanzato basato su standard scientifici - SOSTITUISCE filter_rr_outliers"""
+    if len(rr_intervals) < 10:
         return rr_intervals
     
     rr_array = np.array(rr_intervals)
     
-    # Approccio conservativo per dati reali
-    q25, q75 = np.percentile(rr_array, [25, 75])
-    iqr = q75 - q25
+    # 1. Filtro fisiologico base (300ms - 1800ms)
+    physiological_mask = (rr_array >= 300) & (rr_array <= 1800)
+    rr_array = rr_array[physiological_mask]
     
-    lower_bound = max(400, q25 - 1.8 * iqr)
-    upper_bound = min(1800, q75 + 1.8 * iqr)
+    if len(rr_array) < 10:
+        return rr_array.tolist()
     
-    clean_indices = np.where((rr_array >= lower_bound) & (rr_array <= upper_bound))[0]
+    # 2. Filtro basato su differenze consecutive (metodo robusto)
+    rr_diff = np.diff(rr_array)
+    mad = np.median(np.abs(rr_diff - np.median(rr_diff)))
+    threshold = 4.0 * mad  # Soglia conservativa
     
-    return rr_array[clean_indices].tolist()
+    # 3. Identifica outliers
+    outlier_mask = np.zeros(len(rr_array), dtype=bool)
+    for i in range(1, len(rr_array)-1):
+        prev_diff = abs(rr_array[i] - rr_array[i-1])
+        next_diff = abs(rr_array[i] - rr_array[i+1])
+        if prev_diff > threshold or next_diff > threshold:
+            outlier_mask[i] = True
+    
+    # 4. Applica filtro combinato
+    clean_rr = rr_array[~outlier_mask]
+    
+    return clean_rr.tolist() if len(clean_rr) > 10 else rr_array.tolist()
 
-def adjust_for_age_gender(value, age, gender, metric_type):
-    """Adjust HRV values for age and gender basato su letteratura"""
-    age_norm = max(20, min(80, age))
+def calculate_robust_moving_hrv(rr_intervals, timestamps, method='sdnn'):
+    """Calcola HRV mobile con finestra scientifica - ELIMINA PICCHI A PETTINE"""
     
-    if metric_type == 'sdnn':
-        # SDNN diminuisce con l'età
-        age_factor = 1.0 - (age_norm - 20) * 0.008
-        gender_factor = 0.92 if gender == 'Donna' else 1.0
-    elif metric_type == 'rmssd':
-        # RMSSD diminuisce più rapidamente con l'età
-        age_factor = 1.0 - (age_norm - 20) * 0.012
-        gender_factor = 0.88 if gender == 'Donna' else 1.0
-    else:
-        return value
+    if len(rr_intervals) < 100:  # Troppo pochi dati per analisi mobile
+        return [], []
     
-    return value * age_factor * gender_factor
+    # Dimensione finestra: 5 minuti (standard scientifico)
+    target_window_seconds = 300
+    mean_rr = np.mean(rr_intervals)
+    window_size = int((target_window_seconds * 1000) / mean_rr)
+    
+    # Limiti ragionevoli per stabilità
+    window_size = max(120, min(400, window_size))  # 120-400 battiti
+    
+    # Overlap del 50% per smoothing
+    step_size = max(1, window_size // 2)
+    
+    hrv_values = []
+    window_timestamps = []
+    
+    for i in range(0, len(rr_intervals) - window_size, step_size):
+        window_rr = rr_intervals[i:i + window_size]
+        
+        # Filtra ogni finestra
+        clean_window = advanced_rr_filtering(window_rr)
+        
+        if len(clean_window) < 60:  # Troppi outliers, salta
+            continue
+            
+        if method.lower() == 'sdnn':
+            value = np.std(clean_window, ddof=1)
+        elif method.lower() == 'rmssd':
+            differences = np.diff(clean_window)
+            if len(differences) > 10:
+                value = np.sqrt(np.mean(np.square(differences)))
+            else:
+                continue  # Salta se non abbastanza dati
+        else:
+            continue
+            
+        hrv_values.append(value)
+        window_timestamps.append(timestamps[i + window_size // 2])
+    
+    return hrv_values, window_timestamps
+
+def apply_scientific_smoothing(values, window_length=7, polyorder=2):
+    """Applica smoothing Savitzky-Golay per curve più lisce"""
+    if len(values) < window_length:
+        return values
+    
+    try:
+        from scipy.signal import savgol_filter
+        smoothed = savgol_filter(values, window_length, polyorder)
+        return smoothed.tolist()
+    except:
+        # Fallback: media mobile semplice
+        if len(values) >= 3:
+            smoothed = []
+            for i in range(len(values)):
+                if i == 0:
+                    smoothed.append(values[i])
+                elif i == len(values)-1:
+                    smoothed.append(values[i])
+                else:
+                    smoothed.append(np.mean(values[i-1:i+2]))
+            return smoothed
+        return values
 
 def calculate_hrv_coherence(rr_intervals, hr_mean, age):
     """Calcola la coerenza cardiaca realistica"""
@@ -2313,12 +2378,6 @@ def main():
                 else:
                     st.error("❌ Inserisci nome, cognome e data di nascita")
         
-        import os
-        if os.path.exists('user_database.json'):
-            st.success("✅ user_database.json ESISTE")
-        else:
-            st.error("❌ user_database.json NON TROVATO")
-        
         # Solo le attività
         create_activity_tracker()
     
@@ -2684,28 +2743,27 @@ def main():
                             timestamps.append(current_time)
                             current_time += timedelta(milliseconds=rr)
                         
-                        # Calcola HRV in finestre mobili (per SDNN e RMSSD)
-                        window_size = min(300, len(rr_intervals) // 10)  # Finestra adattiva
-                        if window_size < 30:
-                            window_size = min(30, len(rr_intervals))
-                        
+                        # 🎯 NUOVO CALCOLO SCIENTIFICO - ELIMINA PICCHI A PETTINE
+                        st.info("🎯 Calcolo metriche HRV con algoritmi scientifici...")
+
+                        # Calcola HR istantaneo
                         hr_instant = [60000 / rr for rr in rr_intervals]
-                        sdnn_moving = []
-                        rmssd_moving = []
-                        moving_timestamps = []
-                        
-                        for i in range(len(rr_intervals) - window_size):
-                            window_rr = rr_intervals[i:i + window_size]
-                            window_hr = hr_instant[i:i + window_size]
-                            
-                            # Calcola SDNN e RMSSD per la finestra
-                            sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
-                            differences = np.diff(window_rr)
-                            rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
-                            
-                            sdnn_moving.append(sdnn)
-                            rmssd_moving.append(rmssd)
-                            moving_timestamps.append(timestamps[i + window_size // 2])
+
+                        # Calcola HRV mobile con metodo robusto
+                        sdnn_moving, sdnn_timestamps = calculate_robust_moving_hrv(rr_intervals, timestamps, 'sdnn')
+                        rmssd_moving, rmssd_timestamps = calculate_robust_moving_hrv(rr_intervals, timestamps, 'rmssd')
+
+                        # Applica smoothing scientifico per curve più lisce
+                        if len(sdnn_moving) > 7:
+                            sdnn_moving = apply_scientific_smoothing(sdnn_moving)
+                        if len(rmssd_moving) > 7:
+                            rmssd_moving = apply_scientific_smoothing(rmssd_moving)
+
+                        # Smoothing anche per HR istantaneo (riduce rumore)
+                        hr_instant_smooth = apply_scientific_smoothing(hr_instant, window_length=5, polyorder=2)
+
+                        # Usa i timestamp corretti per ciascuna metrica
+                        moving_timestamps = sdnn_timestamps  # Per compatibilità con codice esistente
                         
                         # Crea il grafico principale con zoom interattivo
                         fig_main = go.Figure()
@@ -2744,15 +2802,15 @@ def main():
                                     borderwidth=1,
                                     borderpad=2
                                 )
-                        
-                        # Aggiungi HR istantaneo (smooth)
+
+                        # Aggiungi HR istantaneo (SMOOTH)
                         fig_main.add_trace(go.Scatter(
                             x=timestamps,
-                            y=hr_instant,
+                            y=hr_instant_smooth,
                             mode='lines',
                             name='Battito Istantaneo',
-                            line=dict(color='#e74c3c', width=1),
-                            opacity=0.8
+                            line=dict(color='#e74c3c', width=1.5),
+                            opacity=0.9
                         ))
                         
                         # Aggiungi SDNN mobile
@@ -2824,15 +2882,14 @@ def main():
                             )
                         )
                         
-                        st.plotly_chart(fig_main, use_container_width=True)
-                        
-                        # Istruzioni per l'uso
-                        st.caption("""
-                        **🔍 Come zoommare:**
-                        - **Mouse:** Trascina per selezionare un'area da zoommare
-                        - **Doppio click:** Reset dello zoom
-                        - **Pulsanti sopra:** Zoom predefiniti (1h, 6h, 1 giorno, Tutto)
-                        - **Aree colorate:** Periodi di attività (Allenamento=🔴, Alimentazione=🟠, Stress=🟣, Riposo=🔵)
+                        # Informazioni sul processing scientifico
+                        st.info(f"""
+                        **🔬 Processing Scientifico Applicato:**
+                        - **Filtro RR avanzato:** Rimossi artefatti e outliers
+                        - **Finestra mobile:** 5 minuti ({window_size} battiti) - Standard scientifico
+                        - **Overlap:** 50% per smoothing ottimale
+                        - **Smoothing:** Savitzky-Golay per preservare picchi reali
+                        - **Dati validi:** {len(sdnn_moving)} finestre SDNN, {len(rmssd_moving)} finestre RMSSD
                         """)
                         
                         # Informazioni sui dati
