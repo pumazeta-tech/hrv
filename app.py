@@ -1465,6 +1465,12 @@ def analyze_supplements_impact(activities):
 
 def generate_comprehensive_recommendations(activities, daily_metrics, user_profile):
     """Genera raccomandazioni complete basate su tutti i dati"""
+
+    # 🐛 DEBUG
+    st.info(f"🔍 DEBUG Ric: {len(activities)} attività totali")
+    for i, act in enumerate(activities):
+        st.info(f"🔍 DEBUG Attività {i}: {act['type']} - {act.get('food_items', 'no food')}")
+
     recommendations = []
     
     # Analizza tutti i pasti
@@ -1798,8 +1804,6 @@ def parse_starttime_from_file(content):
                 # Estrai la stringa temporale
                 time_str = line.split('=')[1].strip()
                 
-                # DEBUG: mostra cosa sta leggendo
-                st.sidebar.info(f"Trovato STARTTIME: {time_str}")
                 
                 # Prova diversi formati di data IN ORDINE DI PRIORITÀ
                 formats_to_try = [
@@ -2082,15 +2086,6 @@ def main():
                 else:
                     st.error("❌ Inserisci nome, cognome e data di nascita")
         
-        # DEBUG VISUALE
-        st.divider()
-        st.header("🔧 Debug")
-        if st.button("🧪 TEST GOOGLE SHEETS CONNECTION", use_container_width=True):
-            test_google_sheets()
-        st.write(f"Nome: {st.session_state.user_profile['name']}")
-        st.write(f"Cognome: {st.session_state.user_profile['surname']}")
-        st.write(f"Data: {st.session_state.user_profile['birth_date']}")
-        
         import os
         if os.path.exists('user_database.json'):
             st.success("✅ user_database.json ESISTE")
@@ -2177,13 +2172,9 @@ def main():
                     'sleep_light': 3.6, 'sleep_deep': 1.4, 'sleep_rem': 1.4, 'sleep_awake': 0.8
                 }
 
-            # DEBUG: Controlla cosa contiene avg_metrics
-            st.sidebar.write("🔍 DEBUG - Chiavi in avg_metrics:")
             for key in sorted(avg_metrics.keys()):
                 st.sidebar.write(f" - {key}: {avg_metrics[key]}")
 
-            # DEBUG: Controlla daily_metrics
-            st.sidebar.write(f"🔍 DEBUG - Giorni in daily_metrics: {len(daily_metrics)}")
             if daily_metrics:
                 first_day = list(daily_metrics.values())[0]
                 st.sidebar.write("Chiavi primo giorno:")
@@ -2451,18 +2442,12 @@ def main():
                             mime="text/csv",
                             use_container_width=True
                         )
-
-                    # 🐛 DEBUG - Controlla dove arriva il codice
-                    st.success("🐛 DEBUG 1: Sono arrivato DOPO le tabelle")
                     
                     # Grafico dettagliato con zoom interattivo e attività
                     st.subheader("📈 Andamento Dettagliato HRV con Attività")
                     
-                    st.success("🐛 DEBUG 2: Sono arrivato PRIMA del grafico")
-                    
                     # Crea timeline dettagliata dai dati RR
                     if len(rr_intervals) > 0:
-                        st.success("🐛 DEBUG 3: Ci sono RR intervals")
                         
                         # Calcola i timestamp per ogni battito
                         timestamps = []
@@ -2471,8 +2456,6 @@ def main():
                         for rr in rr_intervals:
                             timestamps.append(current_time)
                             current_time += timedelta(milliseconds=rr)
-                        
-                        st.success(f"🐛 DEBUG 4: Timestamps calcolati: {len(timestamps)}")
                         
                         # Calcola HRV in finestre mobili (per SDNN e RMSSD)
                         window_size = min(300, len(rr_intervals) // 10)  # Finestra adattiva
