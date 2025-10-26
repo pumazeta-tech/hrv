@@ -755,6 +755,184 @@ def get_scientific_references():
         "**Laborde S. et al. (2017)** - Heart Rate Variability and Cardiac Vagal Tone in Psychophysiological Research"
     ]
 
+def display_report_preview(report):
+    """Mostra anteprima del report"""
+    
+    st.subheader("👤 Informazioni Paziente")
+    for key, value in report['patient_info'].items():
+        st.write(f"**{key}:** {value}")
+    
+    st.subheader("📊 Informazioni Registrazione")
+    for key, value in report['recording_info'].items():
+        st.write(f"**{key}:** {value}")
+    
+    st.subheader("📈 Analisi Giornaliera")
+    for day, metrics in report['daily_analysis'].items():
+        st.write(f"**{day}:**")
+        for metric, value in metrics.items():
+            st.write(f"  - {metric}: {value}")
+    
+    st.subheader("⚠️ Punti Critici")
+    for point in report['critical_points']:
+        st.write(point)
+    
+    st.subheader("💡 Raccomandazioni")
+    for rec in report['recommendations']:
+        st.write(f"• {rec}")
+    
+    st.subheader("📚 Riferimenti Scientifici")
+    for ref in report['scientific_references']:
+        st.write(f"• {ref}")
+
+def generate_text_report(report):
+    """Genera report in formato testo"""
+    text = "=" * 60 + "\n"
+    text += "           REPORT HRV - ANALISI VARIABILITÀ CARDIACA\n"
+    text += "=" * 60 + "\n\n"
+    
+    # Informazioni paziente
+    text += "👤 INFORMAZIONI PAZIENTE\n"
+    text += "-" * 30 + "\n"
+    for key, value in report['patient_info'].items():
+        text += f"{key}: {value}\n"
+    
+    text += "\n"
+    
+    # Informazioni registrazione
+    text += "📊 INFORMAZIONI REGISTRAZIONE\n"
+    text += "-" * 30 + "\n"
+    for key, value in report['recording_info'].items():
+        text += f"{key}: {value}\n"
+    
+    text += "\n"
+    
+    # Analisi giornaliera
+    text += "📈 ANALISI GIORNALIERA\n"
+    text += "-" * 30 + "\n"
+    for day, metrics in report['daily_analysis'].items():
+        text += f"\n{day}:\n"
+        for metric, value in metrics.items():
+            text += f"  • {metric}: {value}\n"
+    
+    text += "\n"
+    
+    # Punti critici
+    text += "⚠️ PUNTI CRITICI\n"
+    text += "-" * 30 + "\n"
+    for point in report['critical_points']:
+        text += f"• {point}\n"
+    
+    text += "\n"
+    
+    # Raccomandazioni
+    text += "💡 RACCOMANDAZIONI\n"
+    text += "-" * 30 + "\n"
+    for rec in report['recommendations']:
+        text += f"• {rec}\n"
+    
+    text += "\n"
+    
+    # Riferimenti scientifici
+    text += "📚 RIFERIMENTI SCIENTIFICI\n"
+    text += "-" * 30 + "\n"
+    for ref in report['scientific_references']:
+        text += f"• {ref}\n"
+    
+    text += "\n" + "=" * 60 + "\n"
+    text += f"Report generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+    text += "=" * 60
+    
+    return text
+
+def display_report_preview(report):
+    """Mostra anteprima del report"""
+    
+    st.subheader("👤 Informazioni Paziente")
+    for key, value in report['patient_info'].items():
+        st.write(f"**{key}:** {value}")
+    
+    st.subheader("📊 Informazioni Registrazione")
+    for key, value in report['recording_info'].items():
+        st.write(f"**{key}:** {value}")
+    
+    st.subheader("📈 Analisi Giornaliera")
+    for day, metrics in report['daily_analysis'].items():
+        st.write(f"**{day}:**")
+        for metric, value in metrics.items():
+            st.write(f"  - {metric}: {value}")
+    
+    st.subheader("⚠️ Punti Critici")
+    for point in report['critical_points']:
+        st.write(point)
+    
+    st.subheader("💡 Raccomandazioni")
+    for rec in report['recommendations']:
+        st.write(f"• {rec}")
+    
+    st.subheader("📚 Riferimenti Scientifici")
+    for ref in report['scientific_references']:
+        st.write(f"• {ref}")
+
+def generate_text_report(report):
+    """Genera report in formato testo"""
+    text = "=" * 60 + "\n"
+    text += "           REPORT HRV - ANALISI VARIABILITÀ CARDIACA\n"
+    text += "=" * 60 + "\n\n"
+    
+    # Informazioni paziente
+    text += "👤 INFORMAZIONI PAZIENTE\n"
+    text += "-" * 30 + "\n"
+    for key, value in report['patient_info'].items():
+        text += f"{key}: {value}\n"
+    
+    text += "\n"
+    
+    # Informazioni registrazione
+    text += "📊 INFORMAZIONI REGISTRAZIONE\n"
+    text += "-" * 30 + "\n"
+    for key, value in report['recording_info'].items():
+        text += f"{key}: {value}\n"
+    
+    text += "\n"
+    
+    # Analisi giornaliera
+    text += "📈 ANALISI GIORNALIERA\n"
+    text += "-" * 30 + "\n"
+    for day, metrics in report['daily_analysis'].items():
+        text += f"\n{day}:\n"
+        for metric, value in metrics.items():
+            text += f"  • {metric}: {value}\n"
+    
+    text += "\n"
+    
+    # Punti critici
+    text += "⚠️ PUNTI CRITICI\n"
+    text += "-" * 30 + "\n"
+    for point in report['critical_points']:
+        text += f"• {point}\n"
+    
+    text += "\n"
+    
+    # Raccomandazioni
+    text += "💡 RACCOMANDAZIONI\n"
+    text += "-" * 30 + "\n"
+    for rec in report['recommendations']:
+        text += f"• {rec}\n"
+    
+    text += "\n"
+    
+    # Riferimenti scientifici
+    text += "📚 RIFERIMENTI SCIENTIFICI\n"
+    text += "-" * 30 + "\n"
+    for ref in report['scientific_references']:
+        text += f"• {ref}\n"
+    
+    text += "\n" + "=" * 60 + "\n"
+    text += f"Report generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+    text += "=" * 60
+    
+    return text
+
 def advanced_rr_filtering(rr_intervals):
     """Filtro avanzato basato su standard scientifici - SOSTITUISCE filter_rr_outliers"""
     if len(rr_intervals) < 10:
@@ -3144,7 +3322,7 @@ def main():
                         'overall_metrics': avg_metrics,
                         'daily_metrics': daily_metrics
                     }
-                    st.session_state.user_database[user_key]['analyses'].append(analysis_data)
+            st.session_state.user_database[user_key]['analyses'].append(analysis_data)
                     save_user_database()
                     st.success("✅ Analisi salvata nel database!")
                 else:
@@ -3177,94 +3355,7 @@ def main():
                         use_container_width=True
                     )
 
-def display_report_preview(report):
-    """Mostra anteprima del report"""
-    
-    st.subheader("👤 Informazioni Paziente")
-    for key, value in report['patient_info'].items():
-        st.write(f"**{key}:** {value}")
-    
-    st.subheader("📊 Informazioni Registrazione")
-    for key, value in report['recording_info'].items():
-        st.write(f"**{key}:** {value}")
-    
-    st.subheader("📈 Analisi Giornaliera")
-    for day, metrics in report['daily_analysis'].items():
-        st.write(f"**{day}:**")
-        for metric, value in metrics.items():
-            st.write(f"  - {metric}: {value}")
-    
-    st.subheader("⚠️ Punti Critici")
-    for point in report['critical_points']:
-        st.write(point)
-    
-    st.subheader("💡 Raccomandazioni")
-    for rec in report['recommendations']:
-        st.write(f"• {rec}")
-    
-    st.subheader("📚 Riferimenti Scientifici")
-    for ref in report['scientific_references']:
-        st.write(f"• {ref}")
 
-def generate_text_report(report):
-    """Genera report in formato testo"""
-    text = "=" * 60 + "\n"
-    text += "           REPORT HRV - ANALISI VARIABILITÀ CARDIACA\n"
-    text += "=" * 60 + "\n\n"
-    
-    # Informazioni paziente
-    text += "👤 INFORMAZIONI PAZIENTE\n"
-    text += "-" * 30 + "\n"
-    for key, value in report['patient_info'].items():
-        text += f"{key}: {value}\n"
-    
-    text += "\n"
-    
-    # Informazioni registrazione
-    text += "📊 INFORMAZIONI REGISTRAZIONE\n"
-    text += "-" * 30 + "\n"
-    for key, value in report['recording_info'].items():
-        text += f"{key}: {value}\n"
-    
-    text += "\n"
-    
-    # Analisi giornaliera
-    text += "📈 ANALISI GIORNALIERA\n"
-    text += "-" * 30 + "\n"
-    for day, metrics in report['daily_analysis'].items():
-        text += f"\n{day}:\n"
-        for metric, value in metrics.items():
-            text += f"  • {metric}: {value}\n"
-    
-    text += "\n"
-    
-    # Punti critici
-    text += "⚠️ PUNTI CRITICI\n"
-    text += "-" * 30 + "\n"
-    for point in report['critical_points']:
-        text += f"• {point}\n"
-    
-    text += "\n"
-    
-    # Raccomandazioni
-    text += "💡 RACCOMANDAZIONI\n"
-    text += "-" * 30 + "\n"
-    for rec in report['recommendations']:
-        text += f"• {rec}\n"
-    
-    text += "\n"
-    
-    # Riferimenti scientifici
-    text += "📚 RIFERIMENTI SCIENTIFICI\n"
-    text += "-" * 30 + "\n"
-    for ref in report['scientific_references']:
-        text += f"• {ref}\n"
-    
-    text += "\n" + "=" * 60 + "\n"
-    text += f"Report generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
-    text += "=" * 60
-    
-    return text
 
             # 🆕 NUOVA SEZIONE: ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
