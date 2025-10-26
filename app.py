@@ -646,6 +646,69 @@ def delete_activity(index):
         st.session_state.activities.pop(index)
 
 # =============================================================================
+# SELEZIONE UTENTI REGISTRATI
+# =============================================================================
+
+def create_user_selector():
+    """Crea un selettore per gli utenti già registrati"""
+    if not st.session_state.user_database:
+        st.sidebar.info("📝 Nessun utente registrato nel database")
+        return None
+    
+    st.sidebar.header("👥 Utenti Registrati")
+    
+    # Crea lista di utenti per il dropdown
+    user_list = ["-- Seleziona un utente --"]
+    user_keys = []
+    
+    for user_key, user_data in st.session_state.user_database.items():
+        profile = user_data['profile']
+        display_name = f"{profile['name']} {profile['surname']} - {profile['birth_date']} - {profile['age']} anni"
+        user_list.append(display_name)
+        user_keys.append(user_key)
+    
+    # Dropdown per selezione utente
+    selected_user_display = st.sidebar.selectbox(
+        "Seleziona utente esistente:",
+        options=user_list,
+        key="user_selector"
+    )
+    
+    if selected_user_display != "-- Seleziona un utente --":
+        selected_index = user_list.index(selected_user_display) - 1
+        selected_user_key = user_keys[selected_index]
+        selected_user_data = st.session_state.user_database[selected_user_key]
+        
+        # Mostra info utente selezionato
+        st.sidebar.success(f"✅ {selected_user_display}")
+        
+        # Pulsante per caricare questo utente
+        if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
+            load_user_into_session(selected_user_data)
+            st.rerun()
+        
+        # Pulsante per eliminare utente
+        if st.sidebar.button("🗑️ Elimina questo utente", use_container_width=True):
+            delete_user_from_database(selected_user_key)
+            st.rerun()
+    
+    return selected_user_display
+
+def load_user_into_session(user_data):
+    """Carica i dati dell'utente selezionato nella sessione corrente"""
+    st.session_state.user_profile = user_data['profile'].copy()
+    st.success(f"✅ Utente {user_data['profile']['name']} {user_data['profile']['surname']} caricato!")
+
+def delete_user_from_database(user_key):
+    """Elimina un utente dal database"""
+    if user_key in st.session_state.user_database:
+        user_name = f"{st.session_state.user_database[user_key]['profile']['name']} {st.session_state.user_database[user_key]['profile']['surname']}"
+        del st.session_state.user_database[user_key]
+        save_user_database()
+        st.success(f"✅ Utente {user_name} eliminato dal database!")
+        st.rerun()
+
+# =============================================================================
 # FUNZIONE PRINCIPALE - SENZA NEUROKIT2
 # =============================================================================
 
@@ -699,6 +762,9 @@ def main():
     # SIDEBAR - VERSIONE PULITA
     # =============================================================================
     with st.sidebar:
+        # SELEZIONE UTENTI ESISTENTI - AGGIUNGI QUESTA SEZIONE
+        create_user_selector()
+        
         st.header("👤 Profilo Paziente")
         
         col1, col2 = st.columns(2)
@@ -738,11 +804,23 @@ def main():
         st.divider()
         st.header("💾 Salvataggio")
         
-        if st.button("💾 SALVA UTENTE NEL DATABASE", type="primary", use_container_width=True):
-            if save_current_user():
-                st.success("✅ Utente salvato!")
-            else:
-                st.error("❌ Inserisci nome, cognome e data di nascita")
+        # Aggiungi un controllo per evitare duplicati
+        user_key = get_user_key(st.session_state.user_profile)
+        user_exists = user_key and user_key in st.session_state.user_database
+        
+        if user_exists:
+            st.info("ℹ️ Utente già presente nel database")
+            if st.button("🔄 Aggiorna Utente", type="primary", use_container_width=True):
+                if save_current_user():
+                    st.success("✅ Utente aggiornato!")
+                else:
+                    st.error("❌ Inserisci nome, cognome e data di nascita")
+        else:
+            if st.button("💾 SALVA NUOVO UTENTE", type="primary", use_container_width=True):
+                if save_current_user():
+                    st.success("✅ Nuovo utente salvato!")
+                else:
+                    st.error("❌ Inserisci nome, cognome e data di nascita")
         
         # DEBUG VISUALE
         st.divider()
@@ -864,8 +942,6 @@ def main():
         - ✅ **Analisi alimentazione** con database nutrizionale ESPANSO
         - ✅ **Persistenza dati** - utenti salvati automaticamente
         """)
-        
-
 
 if __name__ == "__main__":
     main()
