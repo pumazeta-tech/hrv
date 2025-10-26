@@ -2768,14 +2768,25 @@ def main():
                         )
                     
                     with col2:
-                        sleep_csv = sleep_df.to_csv(index=False, sep=';')
-                        st.download_button(
-                            label="📥 Scarica Metriche Sonno",
-                            data=sleep_csv,
-                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
-                            mime="text/csv",
-                            use_container_width=True
-                        )
+                        # Solo se ci sono dati sonno
+                        if has_night_data(timeline, rr_intervals) and 'sleep_df' in locals():
+                            sleep_csv = sleep_df.to_csv(index=False, sep=';')
+                            st.download_button(
+                                label="📥 Scarica Metriche Sonno",
+                                data=sleep_csv,
+                                file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
+                                mime="text/csv",
+                                use_container_width=True
+                            )
+                        else:
+                            st.download_button(
+                                label="📥 Scarica Metriche Sonno",
+                                data="",  # Dati vuoti
+                                file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
+                                mime="text/csv",
+                                use_container_width=True,
+                                disabled=True  # Disabilita il pulsante
+                            )
                     
                     # Grafico dettagliato con zoom interattivo e attività
                     st.subheader("📈 Andamento Dettagliato HRV con Attività")
