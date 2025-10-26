@@ -495,6 +495,23 @@ def filter_rr_outliers(rr_intervals):
     """Funzione di compatibilità - usa il nuovo filtro avanzato"""
     return advanced_rr_filtering(rr_intervals)
 
+def adjust_for_age_gender(value, age, gender, metric_type):
+    """Adjust HRV values for age and gender basato su letteratura"""
+    age_norm = max(20, min(80, age))
+    
+    if metric_type == 'sdnn':
+        # SDNN diminuisce con l'età
+        age_factor = 1.0 - (age_norm - 20) * 0.008
+        gender_factor = 0.92 if gender == 'Donna' else 1.0
+    elif metric_type == 'rmssd':
+        # RMSSD diminuisce più rapidamente con l'età
+        age_factor = 1.0 - (age_norm - 20) * 0.012
+        gender_factor = 0.88 if gender == 'Donna' else 1.0
+    else:
+        return value
+    
+    return value * age_factor * gender_factor
+
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
