@@ -421,7 +421,7 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
     return max(25, min(90, coherence))
 
 def estimate_sleep_metrics(rr_intervals, hr_mean, age):
-    """Stima le metriche del sonno realistiche"""
+    """Stima le metriche del sonno realistiche con tutte le fasi"""
     if len(rr_intervals) > 1000:
         # Per registrazioni lunghe, stima più accurata
         sleep_hours = 7.2 + np.random.normal(0, 0.8)
@@ -434,13 +434,13 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age):
         sleep_hr = hr_mean - 10 + (age - 30) * 0.1
         sleep_efficiency = 85
     
-    # Distribuzione fasi sonno realistica
-    sleep_light = sleep_duration * (0.45 + np.random.normal(0, 0.05))
-    sleep_deep = sleep_duration * (0.25 + np.random.normal(0, 0.04))
-    sleep_rem = sleep_duration * (0.25 + np.random.normal(0, 0.04))
-    sleep_awake = sleep_duration * 0.05
+    # Distribuzione fasi sonno REALISTICA con tutte le fasi
+    sleep_light = sleep_duration * (0.50 + np.random.normal(0, 0.04))  # 50% sonno leggero
+    sleep_deep = sleep_duration * (0.20 + np.random.normal(0, 0.03))   # 20% sonno profondo
+    sleep_rem = sleep_duration * (0.20 + np.random.normal(0, 0.03))    # 20% sonno REM
+    sleep_awake = sleep_duration * (0.10 + np.random.normal(0, 0.02))  # 10% risvegli
     
-    # Normalizza
+    # Normalizza per assicurare che la somma sia sleep_duration
     total = sleep_light + sleep_deep + sleep_rem + sleep_awake
     sleep_light = sleep_light * sleep_duration / total
     sleep_deep = sleep_deep * sleep_duration / total
@@ -1045,46 +1045,182 @@ def main():
                 user_profile['gender']
             )
             
-            # 3. MEDIE COMPLESSIVE (prima schermata)
+            # 3. MEDIE COMPLESSIVE - DESIGN COMPATTO ED ELEGANTE
             avg_metrics = calculate_overall_averages(daily_metrics) or calculate_realistic_hrv_metrics(
                 rr_intervals, user_profile['age'], user_profile['gender']
             )
             
             st.subheader("📈 Medie Complessive")
             
-            # Metriche principali - DOMINIO TEMPO
-            st.write("**🧮 Dominio del Tempo**")
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("💓 Battito Medio", f"{avg_metrics['hr_mean']:.1f} bpm")
-            with col2:
-                st.metric("📊 SDNN", f"{avg_metrics['sdnn']:.1f} ms")
-            with col3:
-                st.metric("🔄 RMSSD", f"{avg_metrics['rmssd']:.1f} ms")
-            with col4:
-                st.metric("🎯 Coerenza", f"{avg_metrics['coherence']:.1f}%")
+            # CSS per le card eleganti
+            st.markdown("""
+            <style>
+            .compact-metric-card {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 1rem;
+                border-radius: 12px;
+                color: white;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                border: none;
+                margin-bottom: 0.5rem;
+            }
+            .metric-value {
+                font-size: 1.4rem;
+                font-weight: bold;
+                margin-bottom: 0.2rem;
+            }
+            .metric-label {
+                font-size: 0.8rem;
+                opacity: 0.9;
+            }
+            .metric-unit {
+                font-size: 0.7rem;
+                opacity: 0.7;
+            }
+            .sleep-phase-bar {
+                height: 8px;
+                border-radius: 4px;
+                margin: 2px 0;
+            }
+            </style>
+            """, unsafe_allow_html=True)
             
-            # Analisi spettrale
-            st.write("**📡 Analisi Spettrale**")
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("⚡ Potenza Totale", f"{avg_metrics['total_power']:.0f} ms²")
-            with col2:
-                st.metric("📉 LF", f"{avg_metrics['lf']:.0f} ms²")
-            with col3:
-                st.metric("📈 HF", f"{avg_metrics['hf']:.0f} ms²")
-            with col4:
-                st.metric("⚖️ Rapporto LF/HF", f"{avg_metrics['lf_hf_ratio']:.2f}")
+            # PRIMA RIGA: DOMINIO TEMPO E COERENZA
+            col1, col2, col3, col4, col5 = st.columns(5)
             
-            # Sonno
-            st.write("**😴 Analisi Sonno**")
-            col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("🛌 Durata Sonno", f"{avg_metrics['sleep_duration']:.1f} h")
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">💓 {avg_metrics['hr_mean']:.0f}</div>
+                    <div class="metric-label">Battito Medio</div>
+                    <div class="metric-unit">bpm</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col2:
-                st.metric("📊 Efficienza", f"{avg_metrics['sleep_efficiency']:.1f}%")
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">📊 {avg_metrics['sdnn']:.0f}</div>
+                    <div class="metric-label">SDNN</div>
+                    <div class="metric-unit">ms</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col3:
-                st.metric("💓 HR Riposo", f"{avg_metrics['sleep_hr']:.1f} bpm")
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">🔄 {avg_metrics['rmssd']:.0f}</div>
+                    <div class="metric-label">RMSSD</div>
+                    <div class="metric-unit">ms</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">🎯 {avg_metrics['coherence']:.0f}%</div>
+                    <div class="metric-label">Coerenza</div>
+                    <div class="metric-unit">percentuale</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col5:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">⚡ {avg_metrics['total_power']:.0f}</div>
+                    <div class="metric-label">Potenza Totale</div>
+                    <div class="metric-unit">ms²</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # SECONDA RIGA: ANALISI SPETTRALE
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">📉 {avg_metrics['lf']:.0f}</div>
+                    <div class="metric-label">LF</div>
+                    <div class="metric-unit">ms²</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">📈 {avg_metrics['hf']:.0f}</div>
+                    <div class="metric-label">HF</div>
+                    <div class="metric-unit">ms²</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">⚖️ {avg_metrics['lf_hf_ratio']:.2f}</div>
+                    <div class="metric-label">Rapporto LF/HF</div>
+                    <div class="metric-unit">ratio</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">🛌 {avg_metrics['sleep_duration']:.1f}h</div>
+                    <div class="metric-label">Durata Sonno</div>
+                    <div class="metric-unit">ore</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col5:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">📊 {avg_metrics['sleep_efficiency']:.0f}%</div>
+                    <div class="metric-label">Efficienza</div>
+                    <div class="metric-unit">percentuale</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # TERZA RIGA: ANALISI SONNO DETTAGLIATA
+            st.subheader("😴 Analisi Dettagliata del Sonno")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Card battito durante il sonno
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">💤 {avg_metrics['sleep_hr']:.0f}</div>
+                    <div class="metric-label">Battito a Riposo</div>
+                    <div class="metric-unit">bpm</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                # Distribuzione fasi sonno
+                total_sleep = avg_metrics['sleep_duration']
+                if total_sleep > 0:
+                    light_pct = (avg_metrics['sleep_light'] / total_sleep) * 100
+                    deep_pct = (avg_metrics['sleep_deep'] / total_sleep) * 100
+                    rem_pct = (avg_metrics['sleep_rem'] / total_sleep) * 100
+                    awake_pct = (avg_metrics['sleep_awake'] / total_sleep) * 100
+                    
+                    st.markdown(f"""
+                    <div class="compact-metric-card">
+                        <div class="metric-label">Distribuzione Fasi Sonno</div>
+                        <div style="margin-top: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem;">
+                                <span>Leggero: {light_pct:.0f}%</span>
+                                <span>Profondo: {deep_pct:.0f}%</span>
+                            </div>
+                            <div class="sleep-phase-bar" style="background: linear-gradient(90deg, #3498db {light_pct}%, #2ecc71 {light_pct}% {light_pct + deep_pct}%, #e74c3c {light_pct + deep_pct}%);"></div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 0.2rem;">
+                                <span>REM: {rem_pct:.0f}%</span>
+                                <span>Risvegli: {awake_pct:.0f}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
             
             # 4. METRICHE DETTAGLIATE PER GIORNO - IN TABELLA
             with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
@@ -1094,8 +1230,6 @@ def main():
                     # Prepara i dati per la tabella
                     table_data = []
                     
-                    for day_date, day_metrics in daily_metrics.items():
-                        day_dt = datetime.fromisoformat(day_date)
                         row = {
                             'Data': day_dt.strftime('%d/%m/%Y'),
                             'Battito (bpm)': f"{day_metrics['hr_mean']:.1f}",
@@ -1106,9 +1240,13 @@ def main():
                             'LF': f"{day_metrics['lf']:.0f}",
                             'HF': f"{day_metrics['hf']:.0f}",
                             'LF/HF': f"{day_metrics['lf_hf_ratio']:.2f}",
-                            'Sonno (h)': f"{day_metrics['sleep_duration']:.1f}",
+                            'Sonno Totale (h)': f"{day_metrics['sleep_duration']:.1f}",
                             'Efficienza (%)': f"{day_metrics['sleep_efficiency']:.1f}",
-                            'HR Riposo': f"{day_metrics['sleep_hr']:.1f}"
+                            'HR Riposo': f"{day_metrics['sleep_hr']:.1f}",
+                            'Sonno Leggero (h)': f"{day_metrics['sleep_light']:.1f}",
+                            'Sonno Profondo (h)': f"{day_metrics['sleep_deep']:.1f}",
+                            'Sonno REM (h)': f"{day_metrics['sleep_rem']:.1f}",
+                            'Risvegli (h)': f"{day_metrics['sleep_awake']:.1f}"
                         }
                         table_data.append(row)
                     
