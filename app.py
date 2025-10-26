@@ -3322,9 +3322,9 @@ def main():
                         'overall_metrics': avg_metrics,
                         'daily_metrics': daily_metrics
                     }
-            st.session_state.user_database[user_key]['analyses'].append(analysis_data)
-            save_user_database()
-            st.success("✅ Analisi salvata nel database!")
+                    st.session_state.user_database[user_key]['analyses'].append(analysis_data)
+                    save_user_database()
+                    st.success("✅ Analisi salvata nel database!")
                 else:
                     st.error("❌ Salva prima il profilo utente!")
 
