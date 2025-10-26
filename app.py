@@ -1419,7 +1419,7 @@ def main():
                         yaxis='y3'
                     ))
                     
-                    # Layout con tre assi Y
+                    # Layout con tre assi Y - VERSIONE CORRETTA
                     fig.update_layout(
                         title='Andamento Metriche HRV nel Tempo',
                         xaxis=dict(
@@ -1427,22 +1427,19 @@ def main():
                             tickformat='%d/%m/%Y'
                         ),
                         yaxis=dict(
-                            title='Battito (bpm)',
-                            titlefont=dict(color='#e74c3c'),
+                            title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
                             tickfont=dict(color='#e74c3c'),
                             side='left'
                         ),
                         yaxis2=dict(
-                            title='SDNN (ms)',
-                            titlefont=dict(color='#3498db'),
+                            title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
                             tickfont=dict(color='#3498db'),
                             overlaying='y',
                             side='right',
                             position=0.85
                         ),
                         yaxis3=dict(
-                            title='RMSSD (ms)',
-                            titlefont=dict(color='#2ecc71'),
+                            title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
                             tickfont=dict(color='#2ecc71'),
                             overlaying='y',
                             side='right',
