@@ -1467,6 +1467,16 @@ def generate_comprehensive_recommendations(activities, daily_metrics, user_profi
     """Genera raccomandazioni complete basate su tutti i dati"""
     recommendations = []
     
+    # Analizza tutti i pasti
+    all_food_items = ""
+    for activity in activities:
+        if activity['type'] == "Alimentazione" and activity.get('food_items'):
+            all_food_items += activity['food_items'] + ","
+    
+    if all_food_items:
+        food_analysis = analyze_food_impact(all_food_items)
+        recommendations.extend(food_analysis['recommendations'])
+    
     # Analizza pattern delle attività
     training_count = len([a for a in activities if a['type'] == 'Allenamento'])
     recovery_count = len([a for a in activities if a['type'] == 'Riposo'])
@@ -1480,15 +1490,61 @@ def generate_comprehensive_recommendations(activities, daily_metrics, user_profi
         if avg_rmssd < 25:
             recommendations.append("😴 Prioritizza il sonno e riduci lo stress per migliorare l'HRV")
     
-    # Raccomandazioni nutrizionali
-    nutrition_analysis = analyze_nutritional_impact(activities)
-    if nutrition_analysis['inflammatory_score'] > 5:
-        recommendations.append("🥗 Riduci cibi infiammatori e aumenta verdure e omega-3")
-    
     if not recommendations:
         recommendations.append("🎉 Ottimo stile di vita! Continua così mantenendo l'equilibrio")
     
     return recommendations
+
+def analyze_food_impact(food_items):
+    """Analizza l'impatto di specifici cibi sull'HRV"""
+    analysis = {
+        'inflammatory_foods': [],
+        'recovery_foods': [],
+        'inflammatory_score': 0,
+        'sleep_impact': 0,
+        'recommendations': []
+    }
+    
+    foods = [food.strip().lower() for food in food_items.split(',')]
+    
+    for food in foods:
+        food_data = NUTRITION_DB.get(food, {})
+        inflammatory_score = food_data.get('inflammatory_score', 0)
+        
+        if inflammatory_score > 2:
+            analysis['inflammatory_foods'].append(food)
+            analysis['inflammatory_score'] += inflammatory_score
+        elif inflammatory_score < -2:
+            analysis['recovery_foods'].append(food)
+        
+        # Impatto sul sonno
+        sleep_impact = food_data.get('sleep_impact', 'neutro')
+        if sleep_impact == "molto negativo":
+            analysis['sleep_impact'] -= 2
+        elif sleep_impact == "negativo":
+            analysis['sleep_impact'] -= 1
+        elif sleep_impact == "positivo":
+            analysis['sleep_impact'] += 1
+        elif sleep_impact == "molto positivo":
+            analysis['sleep_impact'] += 2
+    
+    # Genera raccomandazioni basate sui cibi
+    if analysis['inflammatory_score'] > 5:
+        analysis['recommendations'].append("🚨 Alto carico infiammatorio: riduci carboidrati raffinati e alcol")
+    
+    if "pasta" in foods and "pane" in foods and "patate" in foods:
+        analysis['recommendations'].append("🥗 Troppi carboidrati: bilancia con proteine e verdure")
+    
+    if "vino" in foods or "alcolici" in foods:
+        analysis['recommendations'].append("🍷 L'alcol riduce la qualità del sonno e l'HRV")
+    
+    if "torta alla crema" in foods:
+        analysis['recommendations'].append("🍰 Dolci industriali: picco glicemico e infiammazione")
+    
+    if not analysis['recommendations']:
+        analysis['recommendations'].append("🥦 Buona scelta alimentare!")
+    
+    return analysis
 
 def display_impact_analysis(impact_report):
     """Visualizza i risultati dell'analisi di impatto"""
