@@ -1068,18 +1068,27 @@ def main():
                 for key in first_day.keys():
                     st.sidebar.write(f" - {key}")
             
-            # 3. MEDIE COMPLESSIVE - VERSIONE SEMPLIFICATA
-            avg_metrics = calculate_realistic_hrv_metrics(
-                rr_intervals, user_profile['age'], user_profile['gender']
-            )
+            # 3. MEDIE COMPLESSIVE - VERSIONE SUPER SICURA
+            try:
+                avg_metrics = calculate_realistic_hrv_metrics(
+                    rr_intervals, user_profile['age'], user_profile['gender']
+                )
+            except Exception as e:
+                st.error(f"Errore nel calcolo delle metriche: {e}")
+                avg_metrics = None
+            
+            # Se avg_metrics è ancora None, usa metriche di default
+            if avg_metrics is None:
+                st.warning("Usando metriche di default")
+                avg_metrics = get_default_metrics(user_profile['age'], user_profile['gender'])
             
             # DEBUG: Controlla cosa contiene avg_metrics
             st.sidebar.write("🔍 DEBUG - Chiavi in avg_metrics:")
             if avg_metrics:
-                for key in avg_metrics.keys():
-                    st.sidebar.write(f" - {key}")
+                for key in sorted(avg_metrics.keys()):
+                    st.sidebar.write(f" - {key}: {avg_metrics[key]}")
             else:
-                st.sidebar.write("❌ avg_metrics è vuoto!")
+                st.sidebar.error("❌ avg_metrics è ancora vuoto!")
                 st.stop()
 
             st.subheader("📈 Medie Complessive")
