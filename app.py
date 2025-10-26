@@ -1265,59 +1265,57 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
             
-            # 4. METRICHE DETTAGLIATE PER GIORNO - IN TABELLA
+            # 4. METRICHE DETTAGLIATE PER GIORNO - IN TABELLA COMPATTA
             with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
                 if not daily_metrics:
                     st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
                 else:
-                    # Prepara i dati per la tabella
+                    # Prepara i dati per la tabella COMPATTA
                     table_data = []
                     
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
                         row = {
                             'Data': day_dt.strftime('%d/%m/%Y'),
-                            'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
-                            'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
-                            'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
-                            'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
-                            'Potenza Totale': f"{day_metrics.get('total_power', 0):.0f}",
-                            'LF': f"{day_metrics.get('lf', 0):.0f}",
-                            'HF': f"{day_metrics.get('hf', 0):.0f}",
+                            'Battito': f"{day_metrics.get('hr_mean', 0):.0f}",
+                            'SDNN': f"{day_metrics.get('sdnn', 0):.0f}",
+                            'RMSSD': f"{day_metrics.get('rmssd', 0):.0f}",
+                            'Coerenza': f"{day_metrics.get('coherence', 0):.0f}%",
                             'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}",
-                            'Sonno Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
-                            'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
-                            'HR Riposo': f"{day_metrics.get('sleep_hr', 0):.1f}",
-                            'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
-                            'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                            'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                            'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}"
+                            'Sonno': f"{day_metrics.get('sleep_duration', 0):.1f}h",
+                            'Efficienza': f"{day_metrics.get('sleep_efficiency', 0):.0f}%",
+                            'Profondo': f"{day_metrics.get('sleep_deep', 0):.1f}h",
+                            'REM': f"{day_metrics.get('sleep_rem', 0):.1f}h"
                         }
                         table_data.append(row)
                     
                     # Converti in DataFrame
                     df = pd.DataFrame(table_data)
                     
-                    # Styling della tabella
+                    # Styling della tabella compatta
                     st.markdown("""
                     <style>
-                    .metric-table {
-                        font-size: 14px;
+                    .compact-table {
+                        font-size: 12px;
                     }
-                    .metric-table thead th {
+                    .compact-table thead th {
                         background-color: #3498db;
                         color: white;
                         font-weight: bold;
+                        padding: 8px 4px;
+                    }
+                    .compact-table td {
+                        padding: 6px 4px;
                     }
                     </style>
                     """, unsafe_allow_html=True)
                     
-                    # Mostra la tabella
+                    # Mostra la tabella compatta
                     st.dataframe(
                         df,
                         use_container_width=True,
                         hide_index=True,
-                        height=min(400, 50 + len(df) * 35)  # Altezza dinamica
+                        height=min(400, 50 + len(df) * 35)
                     )
                     
                     # Download della tabella
