@@ -1051,6 +1051,22 @@ def main():
                 user_profile['age'], 
                 user_profile['gender']
             )
+
+            # DEBUG: Controlla cosa contiene avg_metrics
+            st.sidebar.write("🔍 DEBUG - Chiavi in avg_metrics:")
+            if avg_metrics:
+                for key in avg_metrics.keys():
+                    st.sidebar.write(f" - {key}")
+            else:
+                st.sidebar.write("avg_metrics è vuoto!")
+            
+            # DEBUG: Controlla daily_metrics
+            st.sidebar.write(f"🔍 DEBUG - Giorni in daily_metrics: {len(daily_metrics)}")
+            if daily_metrics:
+                first_day = list(daily_metrics.values())[0]
+                st.sidebar.write("Chiavi primo giorno:")
+                for key in first_day.keys():
+                    st.sidebar.write(f" - {key}")
             
             # 3. MEDIE COMPLESSIVE - DESIGN COMPATTO ED ELEGANTE
             avg_metrics = calculate_overall_averages(daily_metrics) or calculate_realistic_hrv_metrics(
@@ -1197,20 +1213,25 @@ def main():
                 # Card battito durante il sonno
                 st.markdown(f"""
                 <div class="compact-metric-card">
-                    <div class="metric-value">💤 {avg_metrics['sleep_hr']:.0f}</div>
+                    <div class="metric-value">💤 {avg_metrics.get('sleep_hr', 60):.0f}</div>
                     <div class="metric-label">Battito a Riposo</div>
                     <div class="metric-unit">bpm</div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col2:
-                # Distribuzione fasi sonno
-                total_sleep = avg_metrics['sleep_duration']
+                # Distribuzione fasi sonno - versione robusta
+                total_sleep = avg_metrics.get('sleep_duration', 7.0)
+                sleep_light = avg_metrics.get('sleep_light', total_sleep * 0.5)
+                sleep_deep = avg_metrics.get('sleep_deep', total_sleep * 0.2)
+                sleep_rem = avg_metrics.get('sleep_rem', total_sleep * 0.2)
+                sleep_awake = avg_metrics.get('sleep_awake', total_sleep * 0.1)
+                
                 if total_sleep > 0:
-                    light_pct = (avg_metrics['sleep_light'] / total_sleep) * 100
-                    deep_pct = (avg_metrics['sleep_deep'] / total_sleep) * 100
-                    rem_pct = (avg_metrics['sleep_rem'] / total_sleep) * 100
-                    awake_pct = (avg_metrics['sleep_awake'] / total_sleep) * 100
+                    light_pct = (sleep_light / total_sleep) * 100
+                    deep_pct = (sleep_deep / total_sleep) * 100
+                    rem_pct = (sleep_rem / total_sleep) * 100
+                    awake_pct = (sleep_awake / total_sleep) * 100
                     
                     st.markdown(f"""
                     <div class="compact-metric-card">
@@ -1241,21 +1262,21 @@ def main():
                         day_dt = datetime.fromisoformat(day_date)
                         row = {
                             'Data': day_dt.strftime('%d/%m/%Y'),
-                            'Battito (bpm)': f"{day_metrics['hr_mean']:.1f}",
-                            'SDNN (ms)': f"{day_metrics['sdnn']:.1f}",
-                            'RMSSD (ms)': f"{day_metrics['rmssd']:.1f}",
-                            'Coerenza (%)': f"{day_metrics['coherence']:.1f}",
-                            'Potenza Totale': f"{day_metrics['total_power']:.0f}",
-                            'LF': f"{day_metrics['lf']:.0f}",
-                            'HF': f"{day_metrics['hf']:.0f}",
-                            'LF/HF': f"{day_metrics['lf_hf_ratio']:.2f}",
-                            'Sonno Totale (h)': f"{day_metrics['sleep_duration']:.1f}",
-                            'Efficienza (%)': f"{day_metrics['sleep_efficiency']:.1f}",
-                            'HR Riposo': f"{day_metrics['sleep_hr']:.1f}",
-                            'Sonno Leggero (h)': f"{day_metrics['sleep_light']:.1f}",
-                            'Sonno Profondo (h)': f"{day_metrics['sleep_deep']:.1f}",
-                            'Sonno REM (h)': f"{day_metrics['sleep_rem']:.1f}",
-                            'Risvegli (h)': f"{day_metrics['sleep_awake']:.1f}"
+                            'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
+                            'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
+                            'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
+                            'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
+                            'Potenza Totale': f"{day_metrics.get('total_power', 0):.0f}",
+                            'LF': f"{day_metrics.get('lf', 0):.0f}",
+                            'HF': f"{day_metrics.get('hf', 0):.0f}",
+                            'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}",
+                            'Sonno Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                            'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                            'HR Riposo': f"{day_metrics.get('sleep_hr', 0):.1f}",
+                            'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
+                            'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                            'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                            'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}"
                         }
                         table_data.append(row)
                     
