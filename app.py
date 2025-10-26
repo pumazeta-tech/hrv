@@ -2794,6 +2794,9 @@ def main():
                         st.write(f"Timestamps SDNN: {len(sdnn_timestamps)} punti")
                         st.write(f"Timestamps RMSSD: {len(rmssd_timestamps)} punti")
 
+                        # Definisci window_size per le statistiche
+                        window_size = 300  # Finestra fissa di 5 minuti
+
                         # Crea il grafico principale con zoom interattivo
                         fig_main = go.Figure()
                         
