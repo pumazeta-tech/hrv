@@ -2933,6 +2933,7 @@ def main_with_auth():
         show_auth_interface()
     else:
         # Se autenticato, mostra l'app principale
+        add_logout_button()
         main()
 
 def show_auth_interface():
@@ -2943,10 +2944,10 @@ def show_auth_interface():
     
     with tab1:
         st.subheader("Accedi al tuo account")
-        login_email = st.text_input("Email", key="login_email")
-        login_password = st.text_input("Password", type="password", key="login_password")
+        login_email = st.text_input("Email", key="login_email_auth")
+        login_password = st.text_input("Password", type="password", key="login_password_auth")
         
-        if st.button("Accedi", key="login_btn"):
+        if st.button("Accedi", key="login_btn_auth"):
             if login_email and login_password:
                 success, message = authenticate_user(login_email, login_password)
                 if success:
@@ -2961,12 +2962,12 @@ def show_auth_interface():
     
     with tab2:
         st.subheader("Crea nuovo account")
-        reg_name = st.text_input("Nome completo", key="reg_name")
-        reg_email = st.text_input("Email", key="reg_email")
-        reg_password = st.text_input("Password", type="password", key="reg_password")
-        reg_confirm = st.text_input("Conferma Password", type="password", key="reg_confirm")
+        reg_name = st.text_input("Nome completo", key="reg_name_auth")
+        reg_email = st.text_input("Email", key="reg_email_auth")
+        reg_password = st.text_input("Password", type="password", key="reg_password_auth")
+        reg_confirm = st.text_input("Conferma Password", type="password", key="reg_confirm_auth")
         
-        if st.button("Registrati", key="reg_btn"):
+        if st.button("Registrati", key="reg_btn_auth"):
             if reg_password != reg_confirm:
                 st.error("Le password non coincidono")
             elif len(reg_password) < 6:
@@ -2982,9 +2983,9 @@ def show_auth_interface():
     
     with tab3:
         st.subheader("Recupera Password")
-        reset_email = st.text_input("Inserisci la tua email", key="reset_email")
+        reset_email = st.text_input("Inserisci la tua email", key="reset_email_auth")
         
-        if st.button("Invia link di reset", key="reset_btn"):
+        if st.button("Invia link di reset", key="reset_btn_auth"):
             if reset_email:
                 success, message = send_password_reset_email(reset_email)
                 if success:
@@ -2994,18 +2995,14 @@ def show_auth_interface():
             else:
                 st.error("Inserisci la tua email")
 
-# Aggiungi anche un pulsante di logout nella sidebar nel main()
 def add_logout_button():
+    """Aggiunge il pulsante di logout nella sidebar"""
     if st.session_state.authenticated:
         st.sidebar.divider()
-        if st.sidebar.button("🚪 Logout", use_container_width=True):
+        if st.sidebar.button("🚪 Logout", key="logout_btn_auth", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.current_user = None
             st.rerun()
-
-# E ALLA FINE CAMBIA:
-if __name__ == "__main__":
-    main_with_auth()  # ✅ CAMBIATO QUI!
 
 if __name__ == "__main__":
     main_with_auth()
