@@ -491,13 +491,17 @@ def init_session_state():
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
 # =============================================================================
 
+def filter_rr_outliers(rr_intervals):
+    """Funzione di compatibilità - usa il nuovo filtro avanzato"""
+    return advanced_rr_filtering(rr_intervals)
+
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
     
     # Filtraggio outliers più conservativo
-    clean_rr = filter_rr_outliers(rr_intervals)
+    clean_rr = advanced_rr_filtering(rr_intervals)
     
     if len(clean_rr) < 10:
         return get_default_metrics(user_age, user_gender)
