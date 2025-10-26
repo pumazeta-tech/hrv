@@ -350,7 +350,7 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     # Coerenza cardiaca realistica
     coherence = calculate_hrv_coherence(clean_rr, hr_mean, user_age)
     
-    # Analisi sonno realistica
+    # Analisi sonno realistica CON TUTTE LE FASI
     sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age)
     
     return {
@@ -458,7 +458,7 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age):
     }
 
 def get_default_metrics(age, gender):
-    """Metriche di default realistiche basate su età e genere"""
+    """Metriche di default realistiche basate su età e genere con tutte le fasi sonno"""
     age_norm = max(20, min(80, age))
     
     if gender == 'Uomo':
@@ -469,6 +469,13 @@ def get_default_metrics(age, gender):
         base_sdnn = 48 - (age_norm - 20) * 0.4
         base_rmssd = 35 - (age_norm - 20) * 0.3
         base_hr = 72 + (age_norm - 20) * 0.15
+    
+    # Distribuzione fasi sonno di default
+    sleep_duration = 7.2
+    sleep_light = sleep_duration * 0.50  # 50% sonno leggero
+    sleep_deep = sleep_duration * 0.20   # 20% sonno profondo  
+    sleep_rem = sleep_duration * 0.20    # 20% sonno REM
+    sleep_awake = sleep_duration * 0.10  # 10% risvegli
     
     return {
         'sdnn': max(28, base_sdnn),
@@ -481,13 +488,13 @@ def get_default_metrics(age, gender):
         'lf': 1000 - (age_norm - 20) * 15,
         'hf': 1400 - (age_norm - 20) * 20,
         'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01,
-        'sleep_duration': 7.2,
+        'sleep_duration': sleep_duration,
         'sleep_efficiency': 87,
         'sleep_hr': base_hr - 8,
-        'sleep_light': 3.6,
-        'sleep_deep': 1.8,
-        'sleep_rem': 1.6,
-        'sleep_awake': 0.2
+        'sleep_light': sleep_light,
+        'sleep_deep': sleep_deep,
+        'sleep_rem': sleep_rem,
+        'sleep_awake': sleep_awake
     }
 
 # =============================================================================
