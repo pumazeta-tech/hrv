@@ -679,28 +679,50 @@ def delete_activity(index):
 # =============================================================================
 
 def parse_starttime_from_file(content):
-    """Cerca STARTTIME nel contenuto del file"""
+    """Cerca STARTTIME nel contenuto del file con più formati"""
     lines = content.split('\n')
     starttime = None
     
     for line in lines:
         if line.strip().upper().startswith('STARTTIME'):
             try:
-                # Formati comuni: STARTTIME=2024-01-15T08:30:00
+                # Estrai la stringa temporale
                 time_str = line.split('=')[1].strip()
-                # Prova diversi formati di data
-                for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S']:
+                
+                # DEBUG: mostra cosa sta leggendo
+                st.sidebar.info(f"Trovato STARTTIME: {time_str}")
+                
+                # Prova diversi formati di data IN ORDINE DI PRIORITÀ
+                formats_to_try = [
+                    '%d.%m.%Y %H:%M.%S',  # IL TUO FORMATO: 13.10.2025 19:46.16
+                    '%d.%m.%Y %H:%M:%S',  # Formato con punti ma secondi normali
+                    '%d/%m/%Y %H:%M:%S',  # Formato italiano con slash
+                    '%Y-%m-%dT%H:%M:%S',  # Formato ISO
+                    '%Y-%m-%d %H:%M:%S',  # Formato internazionale
+                ]
+                
+                for fmt in formats_to_try:
                     try:
                         starttime = datetime.strptime(time_str, fmt)
+                        st.sidebar.success(f"Formato riconosciuto: {fmt}")
                         break
                     except ValueError:
                         continue
+                
                 if starttime:
                     break
-            except (IndexError, ValueError):
+                else:
+                    st.sidebar.warning(f"Formato non riconosciuto: {time_str}")
+                    
+            except (IndexError, ValueError, Exception) as e:
+                st.sidebar.error(f"Errore parsing STARTTIME: {e}")
                 continue
     
-    return starttime or datetime.now()  # Default a ora corrente se non trovato
+    if not starttime:
+        st.sidebar.warning("STARTTIME non trovato o non riconosciuto, uso ora corrente")
+        starttime = datetime.now()
+    
+    return starttime
 
 def calculate_recording_timeline(rr_intervals, start_time):
     """Calcola la timeline della registrazione"""
