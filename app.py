@@ -2451,6 +2451,38 @@ def main():
                             mime="text/csv",
                             use_container_width=True
                         )
+
+                    # 🐛 DEBUG - Controlla dove arriva il codice
+                    st.success("🐛 DEBUG 1: Sono arrivato DOPO le tabelle")
+                    
+                    # Grafico dettagliato con zoom interattivo e attività
+                    st.subheader("📈 Andamento Dettagliato HRV con Attività")
+                    
+                    st.success("🐛 DEBUG 2: Sono arrivato PRIMA del grafico")
+                    
+                    # Crea timeline dettagliata dai dati RR
+                    if len(rr_intervals) > 0:
+                        st.success("🐛 DEBUG 3: Ci sono RR intervals")
+                        
+                        # Calcola i timestamp per ogni battito
+                        timestamps = []
+                        current_time = start_time
+                        
+                        for rr in rr_intervals:
+                            timestamps.append(current_time)
+                            current_time += timedelta(milliseconds=rr)
+                        
+                        st.success(f"🐛 DEBUG 4: Timestamps calcolati: {len(timestamps)}")
+                        
+                        # Calcola HRV in finestre mobili (per SDNN e RMSSD)
+                        window_size = min(300, len(rr_intervals) // 10)  # Finestra adattiva
+                        if window_size < 30:
+                            window_size = min(30, len(rr_intervals))
+                        
+                        hr_instant = [60000 / rr for rr in rr_intervals]
+                        sdnn_moving = []
+                        rmssd_moving = []
+                        moving_timestamps = []
                     
                     with col2:
                         sleep_csv = sleep_df.to_csv(index=False, sep=';')
