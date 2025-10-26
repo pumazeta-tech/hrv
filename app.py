@@ -23,7 +23,7 @@ from scipy import stats
 
 import hashlib
 import smtplib
-from email.mime.text import MimeText
+from email.mime.text import MIMEText
 import secrets
 import time
 
@@ -168,7 +168,7 @@ def send_password_reset_email(email):
             server.login(EMAIL_CONFIG["sender_email"], EMAIL_CONFIG["sender_password"])
             
             # Invia email
-            msg = MimeText(message)
+            msg = MIMEText(message)
             msg["Subject"] = "Reset Password - HRV Analytics"
             msg["From"] = EMAIL_CONFIG["sender_email"]
             msg["To"] = email
