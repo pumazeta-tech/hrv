@@ -512,6 +512,30 @@ def adjust_for_age_gender(value, age, gender, metric_type):
     
     return value * age_factor * gender_factor
 
+def has_night_data(timeline, rr_intervals):
+    """Verifica se la registrazione include periodo notturno (22:00-06:00)"""
+    start_time = timeline['start_time']
+    end_time = timeline['end_time']
+    
+    # Crea un range di ore notturne
+    night_hours = list(range(22, 24)) + list(range(0, 6))
+    
+    # Verifica se la registrazione copre almeno 2 ore notturne
+    night_data_points = 0
+    current_time = start_time
+    
+    for rr in rr_intervals:
+        if current_time.hour in night_hours:
+            night_data_points += 1
+        current_time += timedelta(milliseconds=rr)
+        
+        # Interrompi se superiamo la fine
+        if current_time > end_time:
+            break
+    
+    # Considera notte se almeno 30 minuti di dati notturni
+    return night_data_points > 180  # ~30 minuti a 60 bpm
+
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
@@ -2130,7 +2154,6 @@ def parse_starttime_from_file(content):
                 for fmt in formats_to_try:
                     try:
                         starttime = datetime.strptime(time_str, fmt)
-                        st.sidebar.success(f"Formato riconosciuto: {fmt}")
                         break
                     except ValueError:
                         continue
@@ -2610,51 +2633,54 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
-            # TERZA RIGA: ANALISI SONNO DETTAGLIATA
-            st.subheader("😴 Analisi Dettagliata del Sonno")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Card battito durante il sonno
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">💤 {avg_metrics.get('sleep_hr', 60):.0f}</div>
-                    <div class="metric-label">Battito a Riposo</div>
-                    <div class="metric-unit">bpm</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                # Distribuzione fasi sonno - versione robusta
-                total_sleep = avg_metrics.get('sleep_duration', 7.0)
-                sleep_light = avg_metrics.get('sleep_light', total_sleep * 0.5)
-                sleep_deep = avg_metrics.get('sleep_deep', total_sleep * 0.2)
-                sleep_rem = avg_metrics.get('sleep_rem', total_sleep * 0.2)
-                sleep_awake = avg_metrics.get('sleep_awake', total_sleep * 0.1)
+            # TERZA RIGA: ANALISI SONNO DETTAGLIATA - SOLO SE C'È NOTTE
+            if has_night_data(timeline, rr_intervals):
+                st.subheader("😴 Analisi Dettagliata del Sonno")
                 
-                if total_sleep > 0:
-                    light_pct = (sleep_light / total_sleep) * 100
-                    deep_pct = (sleep_deep / total_sleep) * 100
-                    rem_pct = (sleep_rem / total_sleep) * 100
-                    awake_pct = (sleep_awake / total_sleep) * 100
-                    
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Card battito durante il sonno
                     st.markdown(f"""
                     <div class="compact-metric-card">
-                        <div class="metric-label">Distribuzione Fasi Sonno</div>
-                        <div style="margin-top: 0.5rem;">
-                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem;">
-                                <span>Leggero: {light_pct:.0f}%</span>
-                                <span>Profondo: {deep_pct:.0f}%</span>
-                            </div>
-                            <div class="sleep-phase-bar" style="background: linear-gradient(90deg, #3498db {light_pct}%, #2ecc71 {light_pct}% {light_pct + deep_pct}%, #e74c3c {light_pct + deep_pct}%);"></div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 0.2rem;">
-                                <span>REM: {rem_pct:.0f}%</span>
-                                <span>Risvegli: {awake_pct:.0f}%</span>
-                            </div>
-                        </div>
+                        <div class="metric-value">💤 {avg_metrics.get('sleep_hr', 60):.0f}</div>
+                        <div class="metric-label">Battito a Riposo</div>
+                        <div class="metric-unit">bpm</div>
                     </div>
                     """, unsafe_allow_html=True)
+                
+                with col2:
+                    # Distribuzione fasi sonno
+                    total_sleep = avg_metrics.get('sleep_duration', 7.0)
+                    sleep_light = avg_metrics.get('sleep_light', total_sleep * 0.5)
+                    sleep_deep = avg_metrics.get('sleep_deep', total_sleep * 0.2)
+                    sleep_rem = avg_metrics.get('sleep_rem', total_sleep * 0.2)
+                    sleep_awake = avg_metrics.get('sleep_awake', total_sleep * 0.1)
+                    
+                    if total_sleep > 0:
+                        light_pct = (sleep_light / total_sleep) * 100
+                        deep_pct = (sleep_deep / total_sleep) * 100
+                        rem_pct = (sleep_rem / total_sleep) * 100
+                        awake_pct = (sleep_awake / total_sleep) * 100
+                        
+                        st.markdown(f"""
+                        <div class="compact-metric-card">
+                            <div class="metric-label">Distribuzione Fasi Sonno</div>
+                            <div style="margin-top: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem;">
+                                    <span>Leggero: {light_pct:.0f}%</span>
+                                    <span>Profondo: {deep_pct:.0f}%</span>
+                                </div>
+                                <div class="sleep-phase-bar" style="background: linear-gradient(90deg, #3498db {light_pct}%, #2ecc71 {light_pct}% {light_pct + deep_pct}%, #e74c3c {light_pct + deep_pct}%);"></div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 0.2rem;">
+                                    <span>REM: {rem_pct:.0f}%</span>
+                                    <span>Risvegli: {awake_pct:.0f}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("🌞 Registrazione diurna - Dati sul sonno non disponibili")
             
             # 4. METRICHE DETTAGLIATE PER GIORNO - TABELLE SEPARATE
             with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
@@ -2695,37 +2721,37 @@ def main():
                     # Aggiungi spazio tra le tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # TABELLA 2: METRICHE SONNO
-                    st.subheader("😴 Metriche Sonno")
-                    
-                    sleep_table_data = []
-                    
-                    for day_date, day_metrics in daily_metrics.items():
-                        day_dt = datetime.fromisoformat(day_date)
-                        row = {
-                            'Data': day_dt.strftime('%d/%m/%Y'),
-                            'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
-                            'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
-                            'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
-                            'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
-                            'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                            'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                            'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}",
-                            'Leggero (%)': f"{(day_metrics.get('sleep_light', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
-                            'Profondo (%)': f"{(day_metrics.get('sleep_deep', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
-                            'REM (%)': f"{(day_metrics.get('sleep_rem', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}"
-                        }
-                        sleep_table_data.append(row)
-                    
-                    sleep_df = pd.DataFrame(sleep_table_data)
-                    
-                    # Mostra seconda tabella Sonno
-                    st.dataframe(
-                        sleep_df,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=min(300, 50 + len(sleep_df) * 35)
-                    )
+                    # TABELLA 2: METRICHE SONNO - SOLO SE C'È NOTTE
+                    if has_night_data(timeline, rr_intervals):
+                        st.subheader("😴 Metriche Sonno")
+                        
+                        sleep_table_data = []
+                        
+                        for day_date, day_metrics in daily_metrics.items():
+                            day_dt = datetime.fromisoformat(day_date)
+                            row = {
+                                'Data': day_dt.strftime('%d/%m/%Y'),
+                                'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                                'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                                'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
+                                'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
+                                'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                                'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                                'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}",
+                            }
+                            sleep_table_data.append(row)
+                        
+                        sleep_df = pd.DataFrame(sleep_table_data)
+                        
+                        # Mostra seconda tabella Sonno
+                        st.dataframe(
+                            sleep_df,
+                            use_container_width=True,
+                            hide_index=True,
+                            height=min(300, 50 + len(sleep_df) * 35)
+                        )
+                    else:
+                        st.info("🌞 Registrazione diurna - Dettagli sonno non disponibili")
                     
                     # Download delle tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -2835,7 +2861,9 @@ def main():
                                     borderpad=2
                                 )
 
-                        # Aggiungi HR istantaneo (SMOOTH) - FUORI dal loop attività!
+                        # ⭐⭐⭐ QUESTE TRACCE DEVONO ESSERE FUORI DAL LOOP! ⭐⭐⭐
+                        
+                        # Aggiungi HR istantaneo (SMOOTH)
                         fig_main.add_trace(go.Scatter(
                             x=timestamps,
                             y=hr_instant_smooth,
@@ -2845,8 +2873,8 @@ def main():
                             opacity=0.9
                         ))
                 
-                        # Aggiungi SDNN mobile solo se ci sono dati
-                        if sdnn_moving and sdnn_timestamps and len(sdnn_moving) == len(sdnn_timestamps):
+                        # Aggiungi SDNN mobile
+                        if sdnn_moving and sdnn_timestamps:
                             fig_main.add_trace(go.Scatter(
                                 x=sdnn_timestamps,
                                 y=sdnn_moving,
@@ -2855,11 +2883,9 @@ def main():
                                 line=dict(color='#3498db', width=2),
                                 yaxis='y2'
                             ))
-                        else:
-                            st.warning("❌ Dati SDNN insufficienti per il grafico")
 
-                        # Aggiungi RMSSD mobile solo se ci sono dati  
-                        if rmssd_moving and rmssd_timestamps and len(rmssd_moving) == len(rmssd_timestamps):
+                        # Aggiungi RMSSD mobile
+                        if rmssd_moving and rmssd_timestamps:
                             fig_main.add_trace(go.Scatter(
                                 x=rmssd_timestamps,
                                 y=rmssd_moving,
@@ -2868,8 +2894,6 @@ def main():
                                 line=dict(color='#2ecc71', width=2),
                                 yaxis='y3'
                             ))
-                        else:
-                            st.warning("❌ Dati RMSSD insufficienti per il grafico")
                             
                         # Layout del grafico principale con zoom
                         fig_main.update_layout(
