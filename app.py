@@ -136,7 +136,9 @@ def setup_google_sheets():
         
     except Exception as e:
         st.error(f"❌ Errore configurazione Google Sheets: {e}")
-        return Nonedef test_google_sheets():
+        return None
+
+def test_google_sheets():
     """Funzione di test per verificare la connessione a Google Sheets"""
     try:
         worksheet = setup_google_sheets()
