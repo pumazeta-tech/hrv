@@ -633,19 +633,19 @@ def calculate_robust_moving_hrv(rr_intervals, timestamps, method='sdnn'):
     # Dimensione finestra: 5 minuti (standard scientifico)
     target_window_seconds = 300
     mean_rr = np.mean(rr_intervals)
-    window_size = int((target_window_seconds * 1000) / mean_rr)
+    calculated_window_size = int((target_window_seconds * 1000) / mean_rr)
     
     # Limiti ragionevoli per stabilità
-    window_size = max(120, min(400, window_size))  # 120-400 battiti
+    calculated_window_size = max(120, min(400, calculated_window_size))  # 120-400 battiti
     
     # Overlap del 50% per smoothing
-    step_size = max(1, window_size // 2)
+    step_size = max(1, calculated_window_size // 2)
     
     hrv_values = []
     window_timestamps = []
     
-    for i in range(0, len(rr_intervals) - window_size, step_size):
-        window_rr = rr_intervals[i:i + window_size]
+    for i in range(0, len(rr_intervals) - calculated_window_size, step_size):
+        window_rr = rr_intervals[i:i + calculated_window_size]
         
         # Filtra ogni finestra
         clean_window = advanced_rr_filtering(window_rr)
@@ -665,7 +665,7 @@ def calculate_robust_moving_hrv(rr_intervals, timestamps, method='sdnn'):
             continue
             
         hrv_values.append(value)
-        window_timestamps.append(timestamps[i + window_size // 2])
+        window_timestamps.append(timestamps[i + calculated_window_size // 2])
     
     return hrv_values, window_timestamps
 
