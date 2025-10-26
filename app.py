@@ -1068,39 +1068,19 @@ def main():
                 for key in first_day.keys():
                     st.sidebar.write(f" - {key}")
             
-            # 3. MEDIE COMPLESSIVE - CALCOLO ROBUSTO
-            try:
-                avg_metrics = calculate_overall_averages(daily_metrics)
-                if not avg_metrics:
-                    avg_metrics = calculate_realistic_hrv_metrics(
-                        rr_intervals, user_profile['age'], user_profile['gender']
-                    )
-            except Exception as e:
-                st.sidebar.error(f"Errore calcolo medie: {e}")
-                avg_metrics = calculate_realistic_hrv_metrics(
-                    rr_intervals, user_profile['age'], user_profile['gender']
-                )
-
-            # Assicurati che avg_metrics esista sempre
-            if not avg_metrics:
-                st.error("Impossibile calcolare le metriche HRV")
-                st.stop()  # Usa st.stop() invece di return
-
+            # 3. MEDIE COMPLESSIVE - VERSIONE SEMPLIFICATA
+            avg_metrics = calculate_realistic_hrv_metrics(
+                rr_intervals, user_profile['age'], user_profile['gender']
+            )
+            
             # DEBUG: Controlla cosa contiene avg_metrics
             st.sidebar.write("🔍 DEBUG - Chiavi in avg_metrics:")
             if avg_metrics:
                 for key in avg_metrics.keys():
                     st.sidebar.write(f" - {key}")
             else:
-                st.sidebar.write("❌ avg_metrics è ancora vuoto!")
-
-            # DEBUG: Controlla daily_metrics
-            st.sidebar.write(f"🔍 DEBUG - Giorni in daily_metrics: {len(daily_metrics)}")
-            if daily_metrics:
-                first_day = list(daily_metrics.values())[0]
-                st.sidebar.write("Chiavi primo giorno:")
-                for key in first_day.keys():
-                    st.sidebar.write(f" - {key}")
+                st.sidebar.write("❌ avg_metrics è vuoto!")
+                st.stop()
 
             st.subheader("📈 Medie Complessive")
             
