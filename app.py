@@ -1086,41 +1086,114 @@ def main():
             with col3:
                 st.metric("💓 HR Riposo", f"{avg_metrics['sleep_hr']:.1f} bpm")
             
-            # 4. METRICHE DETTAGLIATE PER GIORNO
+            # 4. METRICHE DETTAGLIATE PER GIORNO - IN TABELLA
             with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
                 if not daily_metrics:
                     st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
                 else:
+                    # Prepara i dati per la tabella
+                    table_data = []
+                    
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
-                        st.write(f"### 📅 {day_dt.strftime('%d/%m/%Y')}")
+                        row = {
+                            'Data': day_dt.strftime('%d/%m/%Y'),
+                            'Battito (bpm)': f"{day_metrics['hr_mean']:.1f}",
+                            'SDNN (ms)': f"{day_metrics['sdnn']:.1f}",
+                            'RMSSD (ms)': f"{day_metrics['rmssd']:.1f}",
+                            'Coerenza (%)': f"{day_metrics['coherence']:.1f}",
+                            'Potenza Totale': f"{day_metrics['total_power']:.0f}",
+                            'LF': f"{day_metrics['lf']:.0f}",
+                            'HF': f"{day_metrics['hf']:.0f}",
+                            'LF/HF': f"{day_metrics['lf_hf_ratio']:.2f}",
+                            'Sonno (h)': f"{day_metrics['sleep_duration']:.1f}",
+                            'Efficienza (%)': f"{day_metrics['sleep_efficiency']:.1f}",
+                            'HR Riposo': f"{day_metrics['sleep_hr']:.1f}"
+                        }
+                        table_data.append(row)
+                    
+                    # Converti in DataFrame
+                    df = pd.DataFrame(table_data)
+                    
+                    # Styling della tabella
+                    st.markdown("""
+                    <style>
+                    .metric-table {
+                        font-size: 14px;
+                    }
+                    .metric-table thead th {
+                        background-color: #3498db;
+                        color: white;
+                        font-weight: bold;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # Mostra la tabella
+                    st.dataframe(
+                        df,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(400, 50 + len(df) * 35)  # Altezza dinamica
+                    )
+                    
+                    # Download della tabella
+                    csv = df.to_csv(index=False, sep=';')
+                    st.download_button(
+                        label="📥 Scarica Tabella come CSV",
+                        data=csv,
+                        file_name=f"hrv_analisi_giornaliera_{datetime.now().strftime('%Y%m%d')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+                    # Grafico andamento battito cardiaco
+                    st.subheader("📈 Andamento Giornaliero")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Grafico battito medio
+                        dates = [datetime.fromisoformat(day) for day in daily_metrics.keys()]
+                        hr_values = [day_metrics['hr_mean'] for day_metrics in daily_metrics.values()]
                         
-                        col1, col2 = st.columns(2)
+                        fig_hr = go.Figure()
+                        fig_hr.add_trace(go.Scatter(
+                            x=dates, 
+                            y=hr_values,
+                            mode='lines+markers',
+                            name='Battito Medio',
+                            line=dict(color='#e74c3c', width=3),
+                            marker=dict(size=8)
+                        ))
+                        fig_hr.update_layout(
+                            title='Andamento Battito Cardiaco',
+                            xaxis_title='Data',
+                            yaxis_title='Battiti per minuto (bpm)',
+                            height=300
+                        )
+                        st.plotly_chart(fig_hr, use_container_width=True)
+                    
+                    with col2:
+                        # Grafico RMSSD (variabilità)
+                        rmssd_values = [day_metrics['rmssd'] for day_metrics in daily_metrics.values()]
                         
-                        with col1:
-                            st.write("**Dominio del Tempo:**")
-                            st.write(f"• Battito Medio: {day_metrics['hr_mean']:.1f} bpm")
-                            st.write(f"• SDNN: {day_metrics['sdnn']:.1f} ms")
-                            st.write(f"• RMSSD: {day_metrics['rmssd']:.1f} ms")
-                            st.write(f"• Coerenza: {day_metrics['coherence']:.1f}%")
-                        
-                        with col2:
-                            st.write("**Analisi Spettrale:**")
-                            st.write(f"• Potenza Totale: {day_metrics['total_power']:.0f} ms²")
-                            st.write(f"• LF: {day_metrics['lf']:.0f} ms²")
-                            st.write(f"• HF: {day_metrics['hf']:.0f} ms²")
-                            st.write(f"• Rapporto LF/HF: {day_metrics['lf_hf_ratio']:.2f}")
-                        
-                        st.write("**Sonno:**")
-                        col_s1, col_s2, col_s3 = st.columns(3)
-                        with col_s1:
-                            st.write(f"• Durata: {day_metrics['sleep_duration']:.1f} h")
-                        with col_s2:
-                            st.write(f"• Efficienza: {day_metrics['sleep_efficiency']:.1f}%")
-                        with col_s3:
-                            st.write(f"• HR: {day_metrics['sleep_hr']:.1f} bpm")
-                        
-                        st.divider()
+                        fig_rmssd = go.Figure()
+                        fig_rmssd.add_trace(go.Scatter(
+                            x=dates, 
+                            y=rmssd_values,
+                            mode='lines+markers',
+                            name='RMSSD',
+                            line=dict(color='#2ecc71', width=3),
+                            marker=dict(size=8)
+                        ))
+                        fig_rmssd.update_layout(
+                            title='Andamento Variabilità (RMSSD)',
+                            xaxis_title='Data',
+                            yaxis_title='RMSSD (ms)',
+                            height=300
+                        )
+                        st.plotly_chart(fig_rmssd, use_container_width=True)
             
             # 5. SALVATAGGIO ANALISI
             if st.button("💾 Salva Analisi nel Database", type="primary"):
