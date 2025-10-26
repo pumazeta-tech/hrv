@@ -75,7 +75,7 @@ def setup_google_sheets():
         # Crea credentials direttamente da environment variables
         credentials_dict = {
             "type": "service_account",
-            "project_id": "hrv-analytics",
+            "project_id": "hrv-analytics-476306",
             "private_key_id": st.secrets["GOOGLE_PRIVATE_KEY_ID"],
             "private_key": st.secrets["GOOGLE_PRIVATE_KEY"].replace('\\n', '\n'),
             "client_email": st.secrets["GOOGLE_CLIENT_EMAIL"],
