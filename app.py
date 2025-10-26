@@ -675,6 +675,99 @@ def delete_activity(index):
         st.session_state.activities.pop(index)
 
 # =============================================================================
+# FUNZIONI PER PARSING FILE E TIMESTAMP
+# =============================================================================
+
+def parse_starttime_from_file(content):
+    """Cerca STARTTIME nel contenuto del file"""
+    lines = content.split('\n')
+    starttime = None
+    
+    for line in lines:
+        if line.strip().upper().startswith('STARTTIME'):
+            try:
+                # Formati comuni: STARTTIME=2024-01-15T08:30:00
+                time_str = line.split('=')[1].strip()
+                # Prova diversi formati di data
+                for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S']:
+                    try:
+                        starttime = datetime.strptime(time_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+                if starttime:
+                    break
+            except (IndexError, ValueError):
+                continue
+    
+    return starttime or datetime.now()  # Default a ora corrente se non trovato
+
+def calculate_recording_timeline(rr_intervals, start_time):
+    """Calcola la timeline della registrazione"""
+    total_duration_ms = sum(rr_intervals)
+    end_time = start_time + timedelta(milliseconds=total_duration_ms)
+    
+    # Dividi per giorni
+    days_data = {}
+    current_time = start_time
+    current_day_start = start_time.date()
+    day_rr_intervals = []
+    
+    for rr in rr_intervals:
+        day_rr_intervals.append(rr)
+        current_time += timedelta(milliseconds=rr)
+        
+        # Se cambia giorno, salva i dati del giorno precedente
+        if current_time.date() != current_day_start:
+            if day_rr_intervals:  # Salva solo se ci sono dati
+                days_data[current_day_start.isoformat()] = day_rr_intervals.copy()
+            day_rr_intervals = []
+            current_day_start = current_time.date()
+    
+    # Aggiungi l'ultimo giorno
+    if day_rr_intervals:
+        days_data[current_day_start.isoformat()] = day_rr_intervals
+    
+    return {
+        'start_time': start_time,
+        'end_time': end_time,
+        'total_duration_hours': total_duration_ms / (1000 * 60 * 60),
+        'days_data': days_data
+    }
+
+def calculate_daily_metrics(days_data, user_age, user_gender):
+    """Calcola le metriche HRV per ogni giorno"""
+    daily_metrics = {}
+    
+    for day_date, day_rr_intervals in days_data.items():
+        if len(day_rr_intervals) >= 10:  # Solo giorni con dati sufficienti
+            daily_metrics[day_date] = calculate_realistic_hrv_metrics(
+                day_rr_intervals, user_age, user_gender
+            )
+    
+    return daily_metrics
+
+def calculate_overall_averages(daily_metrics):
+    """Calcola le medie complessive da tutti i giorni"""
+    if not daily_metrics:
+        return None
+    
+    # Inizializza dizionario per le medie
+    avg_metrics = {}
+    all_metrics = list(daily_metrics.values())
+    
+    # Calcola medie per ogni metrica
+    for key in all_metrics[0].keys():
+        if key in ['sdnn', 'rmssd', 'hr_mean', 'coherence', 'total_power', 
+                  'vlf', 'lf', 'hf', 'lf_hf_ratio', 'sleep_duration', 
+                  'sleep_efficiency', 'sleep_hr']:
+            values = [day[key] for day in all_metrics if key in day]
+            if values:
+                avg_metrics[key] = sum(values) / len(values)
+    
+    return avg_metrics
+
+# =============================================================================
 # SELEZIONE UTENTI REGISTRATI
 # =============================================================================
 
@@ -904,60 +997,128 @@ def main():
             
             st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
             
-            # 🔽🔽🔽 CODICE DI ANALISI AGGIUNTO QUI 🔽🔽🔽
-            st.header("📊 Analisi HRV")
+            # 🔽🔽🔽 NUOVA ANALISI COMPLETA 🔽🔽🔽
+            st.header("📊 Analisi HRV Completa")
             
-            # Calcola le metriche HRV
+            # 1. PARSING TIMESTAMP E TIMELINE
+            start_time = parse_starttime_from_file(content)
+            timeline = calculate_recording_timeline(rr_intervals, start_time)
+            
+            # Mostra periodo registrazione
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("📅 Inizio Registrazione", 
+                         timeline['start_time'].strftime('%d/%m/%Y %H:%M:%S'))
+            with col2:
+                st.metric("📅 Fine Registrazione", 
+                         timeline['end_time'].strftime('%d/%m/%Y %H:%M:%S'))
+            
+            st.metric("⏱️ Durata Totale", f"{timeline['total_duration_hours']:.1f} ore")
+            
+            # 2. CALCOLO METRICHE GIORNALIERE
             user_profile = st.session_state.user_profile
-            hrv_metrics = calculate_realistic_hrv_metrics(
-                rr_intervals, 
+            daily_metrics = calculate_daily_metrics(
+                timeline['days_data'], 
                 user_profile['age'], 
                 user_profile['gender']
             )
             
-            # Mostra le metriche principali
+            # 3. MEDIE COMPLESSIVE (prima schermata)
+            avg_metrics = calculate_overall_averages(daily_metrics) or calculate_realistic_hrv_metrics(
+                rr_intervals, user_profile['age'], user_profile['gender']
+            )
+            
+            st.subheader("📈 Medie Complessive")
+            
+            # Metriche principali - DOMINIO TEMPO
+            st.write("**🧮 Dominio del Tempo**")
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric("💓 Battito Medio", f"{hrv_metrics['hr_mean']:.1f} bpm")
+                st.metric("💓 Battito Medio", f"{avg_metrics['hr_mean']:.1f} bpm")
             with col2:
-                st.metric("📊 SDNN", f"{hrv_metrics['sdnn']:.1f} ms")
+                st.metric("📊 SDNN", f"{avg_metrics['sdnn']:.1f} ms")
             with col3:
-                st.metric("🔄 RMSSD", f"{hrv_metrics['rmssd']:.1f} ms")
+                st.metric("🔄 RMSSD", f"{avg_metrics['rmssd']:.1f} ms")
             with col4:
-                st.metric("🎯 Coerenza", f"{hrv_metrics['coherence']:.1f}%")
+                st.metric("🎯 Coerenza", f"{avg_metrics['coherence']:.1f}%")
             
-            # Metriche aggiuntive
-            with st.expander("📈 Metriche Dettagliate"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Analisi Spettrale:**")
-                    st.write(f"• Potenza Totale: {hrv_metrics['total_power']:.0f} ms²")
-                    st.write(f"• LF: {hrv_metrics['lf']:.0f} ms²")
-                    st.write(f"• HF: {hrv_metrics['hf']:.0f} ms²")
-                    st.write(f"• Rapporto LF/HF: {hrv_metrics['lf_hf_ratio']:.2f}")
-                
-                with col2:
-                    st.write("**Stima Sonno:**")
-                    st.write(f"• Durata: {hrv_metrics['sleep_duration']:.1f} h")
-                    st.write(f"• Efficienza: {hrv_metrics['sleep_efficiency']:.1f}%")
-                    st.write(f"• Battito a riposo: {hrv_metrics['sleep_hr']:.1f} bpm")
+            # Analisi spettrale
+            st.write("**📡 Analisi Spettrale**")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("⚡ Potenza Totale", f"{avg_metrics['total_power']:.0f} ms²")
+            with col2:
+                st.metric("📉 LF", f"{avg_metrics['lf']:.0f} ms²")
+            with col3:
+                st.metric("📈 HF", f"{avg_metrics['hf']:.0f} ms²")
+            with col4:
+                st.metric("⚖️ Rapporto LF/HF", f"{avg_metrics['lf_hf_ratio']:.2f}")
             
-            # Pulsante per salvare l'analisi
+            # Sonno
+            st.write("**😴 Analisi Sonno**")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("🛌 Durata Sonno", f"{avg_metrics['sleep_duration']:.1f} h")
+            with col2:
+                st.metric("📊 Efficienza", f"{avg_metrics['sleep_efficiency']:.1f}%")
+            with col3:
+                st.metric("💓 HR Riposo", f"{avg_metrics['sleep_hr']:.1f} bpm")
+            
+            # 4. METRICHE DETTAGLIATE PER GIORNO
+            with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
+                if not daily_metrics:
+                    st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
+                else:
+                    for day_date, day_metrics in daily_metrics.items():
+                        day_dt = datetime.fromisoformat(day_date)
+                        st.write(f"### 📅 {day_dt.strftime('%d/%m/%Y')}")
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write("**Dominio del Tempo:**")
+                            st.write(f"• Battito Medio: {day_metrics['hr_mean']:.1f} bpm")
+                            st.write(f"• SDNN: {day_metrics['sdnn']:.1f} ms")
+                            st.write(f"• RMSSD: {day_metrics['rmssd']:.1f} ms")
+                            st.write(f"• Coerenza: {day_metrics['coherence']:.1f}%")
+                        
+                        with col2:
+                            st.write("**Analisi Spettrale:**")
+                            st.write(f"• Potenza Totale: {day_metrics['total_power']:.0f} ms²")
+                            st.write(f"• LF: {day_metrics['lf']:.0f} ms²")
+                            st.write(f"• HF: {day_metrics['hf']:.0f} ms²")
+                            st.write(f"• Rapporto LF/HF: {day_metrics['lf_hf_ratio']:.2f}")
+                        
+                        st.write("**Sonno:**")
+                        col_s1, col_s2, col_s3 = st.columns(3)
+                        with col_s1:
+                            st.write(f"• Durata: {day_metrics['sleep_duration']:.1f} h")
+                        with col_s2:
+                            st.write(f"• Efficienza: {day_metrics['sleep_efficiency']:.1f}%")
+                        with col_s3:
+                            st.write(f"• HR: {day_metrics['sleep_hr']:.1f} bpm")
+                        
+                        st.divider()
+            
+            # 5. SALVATAGGIO ANALISI
             if st.button("💾 Salva Analisi nel Database", type="primary"):
-                # Salva l'analisi nell'utente corrente
                 user_key = get_user_key(user_profile)
                 if user_key and user_key in st.session_state.user_database:
                     analysis_data = {
                         'timestamp': datetime.now().isoformat(),
+                        'recording_start': timeline['start_time'].isoformat(),
+                        'recording_end': timeline['end_time'].isoformat(),
+                        'recording_duration_hours': timeline['total_duration_hours'],
                         'rr_intervals_count': len(rr_intervals),
-                        'metrics': hrv_metrics
+                        'overall_metrics': avg_metrics,
+                        'daily_metrics': daily_metrics
                     }
                     st.session_state.user_database[user_key]['analyses'].append(analysis_data)
                     save_user_database()
                     st.success("✅ Analisi salvata nel database!")
                 else:
                     st.error("❌ Salva prima il profilo utente!")
-            # 🔼🔼🔼 FINE CODICE AGGIUNTO 🔼🔼🔼
+            # 🔼🔼🔼 FINE NUOVA ANALISI 🔼🔼🔼
             
         except Exception as e:
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
