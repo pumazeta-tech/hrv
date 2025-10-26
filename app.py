@@ -69,12 +69,41 @@ def setup_google_sheets():
 def setup_google_sheets():
     """Configura la connessione a Google Sheets"""
     try:
-        # [il tuo codice esistente...]
+        # Configurazione per Streamlit Cloud (no file credentials)
+        scope = ['https://www.googleapis.com/auth/spreadsheets']
+        
+        # Crea credentials direttamente da environment variables
+        credentials_dict = {
+            "type": "service_account",
+            "project_id": "hrv-analytics",
+            "private_key_id": st.secrets["GOOGLE_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GOOGLE_PRIVATE_KEY"].replace('\\n', '\n'),
+            "client_email": st.secrets["GOOGLE_CLIENT_EMAIL"],
+            "client_id": st.secrets["GOOGLE_CLIENT_ID"],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+        
+        creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        
+        # Apri il foglio (sostituisci con il tuo ID)
+        sheet_id = "1y60EPD453xYG8nqb8m4-Xyo6npHZh0ELSh_X4TGRVAw"  # SOSTITUISCI CON IL TUO!
+        spreadsheet = client.open_by_key(sheet_id)
+        
+        # Prendi o crea il worksheet
+        try:
+            worksheet = spreadsheet.worksheet("HRV_Data")
+        except:
+            worksheet = spreadsheet.add_worksheet(title="HRV_Data", rows=1000, cols=20)
+            # Intestazioni
+            worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
+        
+        return worksheet
     except Exception as e:
         st.error(f"Errore configurazione Google Sheets: {e}")
         return None
 
-# 🔽🔽🔽 AGGIUNGI QUI QUESTA NUOVA FUNZIONE 🔽🔽🔽
 def test_google_sheets():
     """Funzione di test per verificare la connessione a Google Sheets"""
     try:
@@ -90,10 +119,6 @@ def test_google_sheets():
     except Exception as e:
         st.error(f"❌ Errore connessione Google Sheets: {e}")
         return False
-# 🔼🔼🔼 FINE CODICE DA AGGIUNGERE 🔼🔼🔼
-
-def load_user_database():
-    """Carica il database da Google Sheets"""
 
 def load_user_database():
     """Carica il database da Google Sheets"""
