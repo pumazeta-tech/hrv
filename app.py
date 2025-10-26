@@ -2874,7 +2874,7 @@ def main():
 
                         # ⭐⭐⭐ QUESTE TRACCE DEVONO ESSERE FUORI DAL LOOP! ⭐⭐⭐
                         
-                        # Aggiungi HR istantaneo (SMOOTH)
+                        # Aggiungi HR istantaneo (SMOOTH) - SEMPRE
                         fig_main.add_trace(go.Scatter(
                             x=timestamps,
                             y=hr_instant_smooth,
@@ -2884,10 +2884,10 @@ def main():
                             opacity=0.9
                         ))
                 
-                        # Aggiungi SDNN mobile
-                        if sdnn_moving and sdnn_timestamps:
+                        # Aggiungi SDNN mobile - condizioni più lasche
+                        if sdnn_moving and len(sdnn_moving) > 0:
                             fig_main.add_trace(go.Scatter(
-                                x=sdnn_timestamps,
+                                x=sdnn_timestamps if sdnn_timestamps else timestamps[:len(sdnn_moving)],
                                 y=sdnn_moving,
                                 mode='lines',
                                 name='SDNN Mobile',
@@ -2895,10 +2895,10 @@ def main():
                                 yaxis='y2'
                             ))
 
-                        # Aggiungi RMSSD mobile
-                        if rmssd_moving and rmssd_timestamps:
+                        # Aggiungi RMSSD mobile - condizioni più lasche
+                        if rmssd_moving and len(rmssd_moving) > 0:
                             fig_main.add_trace(go.Scatter(
-                                x=rmssd_timestamps,
+                                x=rmssd_timestamps if rmssd_timestamps else timestamps[:len(rmssd_moving)],
                                 y=rmssd_moving,
                                 mode='lines',
                                 name='RMSSD Mobile',
@@ -2952,6 +2952,14 @@ def main():
                                 type="date"
                             )
                         )
+
+                        # DEBUG: Verifica cosa c'è nel grafico
+                        st.write("🔍 DEBUG GRAFICO:")
+                        st.write(f"- Timestamps HR: {len(timestamps)}")
+                        st.write(f"- HR smooth: {len(hr_instant_smooth)}")
+                        st.write(f"- SDNN moving: {len(sdnn_moving) if sdnn_moving else 0}")
+                        st.write(f"- RMSSD moving: {len(rmssd_moving) if rmssd_moving else 0}")
+                        st.write(f"- Numero tracce nel grafico: {len(fig_main.data)}")
                         
                         st.plotly_chart(fig_main, use_container_width=True)
                         
