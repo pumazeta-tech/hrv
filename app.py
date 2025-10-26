@@ -71,17 +71,6 @@ def setup_google_sheets():
     try:
         scope = ['https://www.googleapis.com/auth/spreadsheets']
         
-        st.write("🔧 **STEP 1:** Configurando Google Sheets...")
-        
-        # Verifica che i secrets esistano
-        required_secrets = ['GOOGLE_PRIVATE_KEY_ID', 'GOOGLE_PRIVATE_KEY', 'GOOGLE_CLIENT_EMAIL', 'GOOGLE_CLIENT_ID']
-        for secret in required_secrets:
-            if secret not in st.secrets:
-                st.error(f"❌ Secret mancante: {secret}")
-                return None
-        
-        st.write("✅ **STEP 2:** Tutti i secrets trovati")
-        
         credentials_dict = {
             "type": "service_account",
             "project_id": "hrv-analytics-476306",
@@ -93,30 +82,22 @@ def setup_google_sheets():
             "token_uri": "https://oauth2.googleapis.com/token",
         }
         
-        st.write("✅ **STEP 3:** Credenziali caricate")
-        st.write(f"📧 Client Email: {st.secrets['GOOGLE_CLIENT_EMAIL']}")
-        
         creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        st.write("✅ **STEP 4:** Client autorizzato")
-        
-        # Apri il foglio
         sheet_id = "1y60EPD453xYG8nqb8m4-Xyo6npHZh0ELSh_X4TGRVAw"
-        st.write(f"🔧 **STEP 5:** Tentativo di aprire Sheet ID: {sheet_id}")
+        spreadsheet = client.open_by_key(sheet_id)
         
         try:
-            spreadsheet = client.open_by_key(sheet_id)
-            st.write("✅ **STEP 6:** Foglio aperto con successo!")
-            st.write(f"📊 Titolo foglio: {spreadsheet.title}")
-        except Exception as e:
-            st.error(f"❌ **ERRORE STEP 6:** Impossibile aprire il foglio: {e}")
-            st.info("💡 **Soluzione:** Controlla che:")
-            st.info("1. Il Sheet ID sia corretto")
-            st.info("2. Il foglio sia condiviso con: hrv-analytics-bot@hrv-analytics-476306.iam.gserviceaccount.com")
-            st.info("3. I permessi siano 'Editor'")
-            return None
+            worksheet = spreadsheet.worksheet("HRV_Data")
+        except:
+            worksheet = spreadsheet.add_worksheet(title="HRV_Data", rows=1000, cols=20)
+            worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
         
+        return worksheet
+    except Exception as e:
+        st.error(f"Errore configurazione Google Sheets: {e}")
+        return None        
         # Prendi o crea il worksheet
         try:
             worksheet = spreadsheet.worksheet("HRV_Data")
