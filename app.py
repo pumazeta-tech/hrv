@@ -98,26 +98,6 @@ def setup_google_sheets():
     except Exception as e:
         st.error(f"Errore configurazione Google Sheets: {e}")
         return None        
-        # Prendi o crea il worksheet
-        try:
-            worksheet = spreadsheet.worksheet("HRV_Data")
-            st.write("✅ **STEP 7:** Worksheet HRV_Data trovato!")
-        except Exception as e:
-            st.write("⚠️ **STEP 7:** Worksheet HRV_Data non trovato, creazione...")
-            try:
-                worksheet = spreadsheet.add_worksheet(title="HRV_Data", rows=1000, cols=20)
-                worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
-                st.write("✅ **STEP 7:** Nuovo worksheet HRV_Data creato!")
-            except Exception as e2:
-                st.error(f"❌ **ERRORE STEP 7:** Impossibile creare worksheet: {e2}")
-                return None
-        
-        st.success("🎉 **CONNESSIONE A GOOGLE SHEETS COMPLETATA!**")
-        return worksheet
-        
-    except Exception as e:
-        st.error(f"❌ Errore configurazione Google Sheets: {e}")
-        return None
 
 def test_google_sheets():
     """Funzione di test per verificare la connessione a Google Sheets"""
@@ -915,6 +895,18 @@ def analyze_activities_impact(activities, daily_metrics, timeline):
         if activity['type'] == "Allenamento":
             analysis = analyze_training_impact(activity, daily_metrics, timeline)
             activity_analysis.append(analysis)
+        elif activity['type'] == "Alimentazione":
+            analysis = analyze_nutrition_impact(activity, daily_metrics)
+            activity_analysis.append(analysis)
+        elif activity['type'] == "Riposo":  # 🆕 AGGIUNGI QUESTO!
+            analysis = analyze_recovery_impact(activity, daily_metrics)
+            activity_analysis.append(analysis)
+        elif activity['type'] == "Stress":  # 🆕 E ANCHE QUESTO!
+            analysis = analyze_stress_impact(activity, daily_metrics)
+            activity_analysis.append(analysis)
+        elif activity['type'] == "Altro":  # 🆕 E ANCHE QUESTO!
+            analysis = analyze_other_impact(activity, daily_metrics)
+            activity_analysis.append(analysis)
     
     return activity_analysis
 
@@ -1048,6 +1040,28 @@ def display_activity_analysis(analysis):
     with col4:
         for rec in analysis['recommendations'][:1]:  # Prima raccomandazione
             st.write(f"💡 {rec}")
+
+def analyze_stress_impact(activity, daily_metrics):
+    """Analisi impatto attività stressanti"""
+    return {
+        'activity': activity,
+        'expected_impact': -2,
+        'observed_impact': -1,
+        'type': 'stress',
+        'recovery_status': 'poor',
+        'recommendations': ["🧘 Considera tecniche di respirazione per gestire lo stress"]
+    }
+
+def analyze_other_impact(activity, daily_metrics):
+    """Analisi impatto altre attività"""
+    return {
+        'activity': activity,
+        'expected_impact': 0,
+        'observed_impact': 0,
+        'type': 'other',
+        'recovery_status': 'unknown',
+        'recommendations': ["📝 Attività registrata"]
+    }
 
 # =============================================================================
 # DATABASE COMPLETO ATTIVITÀ FISICHE + IMPATTO HRV
@@ -2171,15 +2185,6 @@ def main():
                     'sleep_duration': 7.2, 'sleep_efficiency': 85.0, 'sleep_hr': 62.0,
                     'sleep_light': 3.6, 'sleep_deep': 1.4, 'sleep_rem': 1.4, 'sleep_awake': 0.8
                 }
-
-            for key in sorted(avg_metrics.keys()):
-                st.sidebar.write(f" - {key}: {avg_metrics[key]}")
-
-            if daily_metrics:
-                first_day = list(daily_metrics.values())[0]
-                st.sidebar.write("Chiavi primo giorno:")
-                for key in first_day.keys():
-                    st.sidebar.write(f" - {key}")
 
             st.subheader("📈 Medie Complessive")
             
