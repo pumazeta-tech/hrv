@@ -1360,195 +1360,181 @@ def main():
                             use_container_width=True
                         )
                     
-                    # Grafico interattivo con selettore temporale e attività
-                    st.subheader("📈 Andamento Temporale - HRV con Attività")
+                    # Grafico dettagliato con zoom interattivo e attività
+                    st.subheader("📈 Andamento Dettagliato HRV con Attività")
                     
-                    # Prepara i dati per il grafico temporale
-                    all_dates = []
-                    all_hr = []
-                    all_sdnn = []
-                    all_rmssd = []
-                    
-                    for day_date, day_metrics in daily_metrics.items():
-                        day_dt = datetime.fromisoformat(day_date)
-                        all_dates.append(day_dt)
-                        all_hr.append(day_metrics.get('hr_mean', 0))
-                        all_sdnn.append(day_metrics.get('sdnn', 0))
-                        all_rmssd.append(day_metrics.get('rmssd', 0))
-                    
-                    # Selettore range date
-                    if len(all_dates) > 1:
-                        min_date = min(all_dates)
-                        max_date = max(all_dates)
+                    # Crea timeline dettagliata dai dati RR
+                    if len(rr_intervals) > 0:
+                        # Calcola i timestamp per ogni battito
+                        timestamps = []
+                        current_time = start_time
                         
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            start_date = st.date_input(
-                                "Data Inizio",
-                                value=min_date,
-                                min_value=min_date,
-                                max_value=max_date
-                            )
-                        with col2:
-                            end_date = st.date_input(
-                                "Data Fine", 
-                                value=max_date,
-                                min_value=min_date,
-                                max_value=max_date
-                            )
+                        for rr in rr_intervals:
+                            timestamps.append(current_time)
+                            current_time += timedelta(milliseconds=rr)
                         
-                        # Filtra i dati in base al range selezionato
-                        filtered_dates = []
-                        filtered_hr = []
-                        filtered_sdnn = []
-                        filtered_rmssd = []
+                        # Calcola HRV in finestre mobili (per SDNN e RMSSD)
+                        window_size = min(300, len(rr_intervals) // 10)  # Finestra adattiva
+                        if window_size < 30:
+                            window_size = min(30, len(rr_intervals))
                         
-                        for i, date in enumerate(all_dates):
-                            if start_date <= date.date() <= end_date:
-                                filtered_dates.append(date)
-                                filtered_hr.append(all_hr[i])
-                                filtered_sdnn.append(all_sdnn[i])
-                                filtered_rmssd.append(all_rmssd[i])
-                    else:
-                        filtered_dates = all_dates
-                        filtered_hr = all_hr
-                        filtered_sdnn = all_sdnn
-                        filtered_rmssd = all_rmssd
-                    
-                    # Crea il grafico interattivo
-                    fig = go.Figure()
-                    
-                    # Aggiungi le tre metriche con scale diverse
-                    fig.add_trace(go.Scatter(
-                        x=filtered_dates, 
-                        y=filtered_hr,
-                        mode='lines+markers',
-                        name='Battito Medio (bpm)',
-                        line=dict(color='#e74c3c', width=3),
-                        marker=dict(size=6),
-                        yaxis='y1'
-                    ))
-                    
-                    fig.add_trace(go.Scatter(
-                        x=filtered_dates, 
-                        y=filtered_sdnn,
-                        mode='lines+markers',
-                        name='SDNN (ms)',
-                        line=dict(color='#3498db', width=3),
-                        marker=dict(size=6),
-                        yaxis='y2'
-                    ))
-                    
-                    fig.add_trace(go.Scatter(
-                        x=filtered_dates, 
-                        y=filtered_rmssd,
-                        mode='lines+markers',
-                        name='RMSSD (ms)',
-                        line=dict(color='#2ecc71', width=3),
-                        marker=dict(size=6),
-                        yaxis='y3'
-                    ))
-                    
-                    # Aggiungi le attività come linee verticali con etichette
-                    if st.session_state.activities:
-                        for activity in st.session_state.activities:
-                            activity_time = activity['start_time']
+                        hr_instant = [60000 / rr for rr in rr_intervals]
+                        sdnn_moving = []
+                        rmssd_moving = []
+                        moving_timestamps = []
+                        
+                        for i in range(len(rr_intervals) - window_size):
+                            window_rr = rr_intervals[i:i + window_size]
+                            window_hr = hr_instant[i:i + window_size]
                             
-                            # Controlla se l'attività è nel range selezionato
-                            if start_date <= activity_time.date() <= end_date:
+                            # Calcola SDNN e RMSSD per la finestra
+                            sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
+                            differences = np.diff(window_rr)
+                            rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
+                            
+                            sdnn_moving.append(sdnn)
+                            rmssd_moving.append(rmssd)
+                            moving_timestamps.append(timestamps[i + window_size // 2])
+                        
+                        # Crea il grafico principale con zoom interattivo
+                        fig_main = go.Figure()
+                        
+                        # Aggiungi le attività come rettangoli di sfondo PRIMA delle linee
+                        if st.session_state.activities:
+                            for activity in st.session_state.activities:
+                                activity_start = activity['start_time']
+                                activity_end = activity_start + timedelta(minutes=activity['duration'])
+                                
                                 # Colore in base al tipo di attività
                                 color = activity.get('color', '#95a5a6')
                                 
-                                # Aggiungi linea verticale
-                                fig.add_vline(
-                                    x=activity_time,
-                                    line=dict(color=color, width=2, dash="dash"),
-                                    opacity=0.7
+                                # Aggiungi rettangolo di sfondo per l'attività
+                                fig_main.add_vrect(
+                                    x0=activity_start,
+                                    x1=activity_end,
+                                    fillcolor=color,
+                                    opacity=0.2,
+                                    layer="below",
+                                    line_width=0,
                                 )
                                 
-                                # Aggiungi etichetta obliqua
-                                fig.add_annotation(
-                                    x=activity_time,
-                                    y=1.05,  # Posizione in alto nel grafico
+                                # Aggiungi etichetta obliqua al centro dell'attività
+                                activity_center = activity_start + (activity_end - activity_start) / 2
+                                fig_main.add_annotation(
+                                    x=activity_center,
+                                    y=1.02,  # Posizione in alto nel grafico
                                     yref="paper",
                                     text=activity['name'],
                                     showarrow=False,
                                     textangle=-45,
-                                    font=dict(size=10, color=color),
-                                    bgcolor="rgba(255,255,255,0.8)",
+                                    font=dict(size=9, color=color),
+                                    bgcolor="rgba(255,255,255,0.9)",
                                     bordercolor=color,
                                     borderwidth=1,
                                     borderpad=2
                                 )
-                    
-                    # Layout con tre assi Y - VERSIONE CORRETTA
-                    fig.update_layout(
-                        title='Andamento Metriche HRV nel Tempo con Attività',
-                        xaxis=dict(
-                            title='Data',
-                            tickformat='%d/%m/%Y',
-                            rangeslider=dict(visible=True)  # Aggiungi slider per zoom
-                        ),
-                        yaxis=dict(
-                            title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
-                            tickfont=dict(color='#e74c3c'),
-                            side='left'
-                        ),
-                        yaxis2=dict(
-                            title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
-                            tickfont=dict(color='#3498db'),
-                            overlaying='y',
-                            side='right',
-                            position=0.85
-                        ),
-                        yaxis3=dict(
-                            title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
-                            tickfont=dict(color='#2ecc71'),
-                            overlaying='y',
-                            side='right',
-                            position=0.15
-                        ),
-                        height=600,  # Grafico più alto
-                        showlegend=True,
-                        hovermode='x unified',
-                        plot_bgcolor='rgba(240,240,240,0.1)'
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Legenda attività
-                    if st.session_state.activities:
-                        st.subheader("🎯 Legenda Attività")
-                        activity_colors = {
-                            "Allenamento": "#e74c3c",
-                            "Alimentazione": "#f39c12", 
-                            "Stress": "#9b59b6",
-                            "Riposo": "#3498db",
-                            "Altro": "#95a5a6"
-                        }
                         
-                        cols = st.columns(5)
-                        for i, (activity_type, color) in enumerate(activity_colors.items()):
-                            with cols[i]:
-                                st.markdown(
-                                    f"<div style='background-color: {color}; padding: 5px; border-radius: 5px; text-align: center; color: white; font-size: 12px;'>{activity_type}</div>",
-                                    unsafe_allow_html=True
-                                )
-                    
-                    # Statistiche del periodo selezionato
-                    if filtered_hr:
-                        st.subheader("📊 Statistiche Periodo Selezionato")
+                        # Aggiungi HR istantaneo (smooth)
+                        fig_main.add_trace(go.Scatter(
+                            x=timestamps,
+                            y=hr_instant,
+                            mode='lines',
+                            name='Battito Istantaneo',
+                            line=dict(color='#e74c3c', width=1),
+                            opacity=0.8
+                        ))
                         
-                        col1, col2, col3, col4 = st.columns(4)
+                        # Aggiungi SDNN mobile
+                        if sdnn_moving:
+                            fig_main.add_trace(go.Scatter(
+                                x=moving_timestamps,
+                                y=sdnn_moving,
+                                mode='lines',
+                                name='SDNN Mobile',
+                                line=dict(color='#3498db', width=2),
+                                yaxis='y2'
+                            ))
                         
-                        with col1:
-                            st.metric("Battito Medio", f"{np.mean(filtered_hr):.1f} bpm")
-                        with col2:
-                            st.metric("SDNN Medio", f"{np.mean(filtered_sdnn):.1f} ms")
-                        with col3:
-                            st.metric("RMSSD Medio", f"{np.mean(filtered_rmssd):.1f} ms")
-                        with col4:
-                            st.metric("Giorni Analizzati", len(filtered_dates))
+                        # Aggiungi RMSSD mobile
+                        if rmssd_moving:
+                            fig_main.add_trace(go.Scatter(
+                                x=moving_timestamps,
+                                y=rmssd_moving,
+                                mode='lines',
+                                name='RMSSD Mobile',
+                                line=dict(color='#2ecc71', width=2),
+                                yaxis='y3'
+                            ))
+                        
+                        # Layout del grafico principale con zoom
+                        fig_main.update_layout(
+                            title='Andamento Dettagliato HRV - Zoomma con mouse/touch (Aree colorate = Attività)',
+                            xaxis=dict(
+                                title='Tempo',
+                                rangeslider=dict(visible=False)
+                            ),
+                            yaxis=dict(
+                                title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
+                                tickfont=dict(color='#e74c3c')
+                            ),
+                            yaxis2=dict(
+                                title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
+                                tickfont=dict(color='#3498db'),
+                                overlaying='y',
+                                side='right',
+                                position=0.85
+                            ),
+                            yaxis3=dict(
+                                title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
+                                tickfont=dict(color='#2ecc71'),
+                                overlaying='y',
+                                side='right',
+                                position=0.15
+                            ),
+                            height=600,  # Grafico più alto
+                            showlegend=True,
+                            hovermode='x unified',
+                            plot_bgcolor='rgba(240,240,240,0.1)'
+                        )
+                        
+                        # Aggiungi bottoni per lo zoom
+                        fig_main.update_layout(
+                            xaxis=dict(
+                                rangeselector=dict(
+                                    buttons=list([
+                                        dict(count=1, label="1h", step="hour", stepmode="backward"),
+                                        dict(count=6, label="6h", step="hour", stepmode="backward"),
+                                        dict(count=1, label="1gg", step="day", stepmode="backward"),
+                                        dict(step="all", label="Tutto")
+                                    ])
+                                ),
+                                rangeslider=dict(visible=False),
+                                type="date"
+                            )
+                        )
+                        
+                        st.plotly_chart(fig_main, use_container_width=True)
+                        
+                        # Istruzioni per l'uso
+                        st.caption("""
+                        **🔍 Come zoommare:**
+                        - **Mouse:** Trascina per selezionare un'area da zoommare
+                        - **Doppio click:** Reset dello zoom
+                        - **Pulsanti sopra:** Zoom predefiniti (1h, 6h, 1 giorno, Tutto)
+                        - **Aree colorate:** Periodi di attività (Allenamento=🔴, Alimentazione=🟠, Stress=🟣, Riposo=🔵)
+                        """)
+                        
+                        # Informazioni sui dati
+                        st.info(f"""
+                        **📊 Informazioni Dati:**
+                        - **Battiti totali:** {len(rr_intervals)}
+                        - **Durata registrazione:** {timeline['total_duration_hours']:.1f} ore
+                        - **Finestra mobile:** {window_size} battiti
+                        - **Battito medio:** {np.mean(hr_instant):.1f} bpm
+                        - **SDNN medio:** {np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms
+                        - **RMSSD medio:** {np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms
+                        - **Attività tracciate:** {len(st.session_state.activities)}
+                        """)
                     
                     else:
                         st.warning("Dati insufficienti per l'analisi dettagliata")
