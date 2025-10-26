@@ -1360,16 +1360,6 @@ def main():
                             use_container_width=True
                         )
                     
-                    # Download della tabella
-                    csv = df.to_csv(index=False, sep=';')
-                    st.download_button(
-                        label="📥 Scarica Tabella come CSV",
-                        data=csv,
-                        file_name=f"hrv_analisi_giornaliera_{datetime.now().strftime('%Y%m%d')}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                    
                     # Grafico dettagliato con zoom interattivo
                     st.subheader("📈 Andamento Dettagliato HRV")
                     
