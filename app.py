@@ -1471,20 +1471,19 @@ def main():
                     else:
                         st.warning("Dati insufficienti per l'analisi dettagliata")
                     
-                    # Statistiche del periodo selezionato
-                    if filtered_hr:
-                        st.subheader("📊 Statistiche Periodo Selezionato")
-                        
-                        col1, col2, col3, col4 = st.columns(4)
-                        
-                        with col1:
-                            st.metric("Battito Medio", f"{np.mean(filtered_hr):.1f} bpm")
-                        with col2:
-                            st.metric("SDNN Medio", f"{np.mean(filtered_sdnn):.1f} ms")
-                        with col3:
-                            st.metric("RMSSD Medio", f"{np.mean(filtered_rmssd):.1f} ms")
-                        with col4:
-                            st.metric("Giorni Analizzati", len(filtered_dates))
+                    # Statistiche generali (non più del periodo selezionato)
+                    st.subheader("📊 Statistiche Generali")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Battito Medio", f"{np.mean(hr_instant):.1f} bpm")
+                    with col2:
+                        st.metric("SDNN Medio", f"{np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms")
+                    with col3:
+                        st.metric("RMSSD Medio", f"{np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms")
+                    with col4:
+                        st.metric("Battiti Totali", len(rr_intervals))
             
             # 5. SALVATAGGIO ANALISI
             if st.button("💾 Salva Analisi nel Database", type="primary"):
