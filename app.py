@@ -2835,42 +2835,42 @@ def main():
                                     borderpad=2
                                 )
 
-                                # Aggiungi HR istantaneo (SMOOTH)
-                                fig_main.add_trace(go.Scatter(
-                                    x=timestamps,
-                                    y=hr_instant_smooth,
-                                    mode='lines',
-                                    name='Battito Istantaneo',
-                                    line=dict(color='#e74c3c', width=1.5),
-                                    opacity=0.9
-                                ))
-                        
-                                # Aggiungi SDNN mobile solo se ci sono dati
-                                if sdnn_moving and sdnn_timestamps and len(sdnn_moving) == len(sdnn_timestamps):
-                                fig_main.add_trace(go.Scatter(
-                                    x=sdnn_timestamps,
-                                    y=sdnn_moving,
-                                    mode='lines',
-                                    name='SDNN Mobile',
-                                    line=dict(color='#3498db', width=2),
-                                    yaxis='y2'
-                                ))
+                        # Aggiungi HR istantaneo (SMOOTH) - FUORI dal loop attività!
+                        fig_main.add_trace(go.Scatter(
+                            x=timestamps,
+                            y=hr_instant_smooth,
+                            mode='lines',
+                            name='Battito Istantaneo',
+                            line=dict(color='#e74c3c', width=1.5),
+                            opacity=0.9
+                        ))
+                
+                        # Aggiungi SDNN mobile solo se ci sono dati
+                        if sdnn_moving and sdnn_timestamps and len(sdnn_moving) == len(sdnn_timestamps):
+                            fig_main.add_trace(go.Scatter(
+                                x=sdnn_timestamps,
+                                y=sdnn_moving,
+                                mode='lines',
+                                name='SDNN Mobile',
+                                line=dict(color='#3498db', width=2),
+                                yaxis='y2'
+                            ))
                         else:
                             st.warning("❌ Dati SDNN insufficienti per il grafico")
 
-                                # Aggiungi RMSSD mobile solo se ci sono dati  
-                                if rmssd_moving and rmssd_timestamps and len(rmssd_moving) == len(rmssd_timestamps):
-                                fig_main.add_trace(go.Scatter(
-                                    x=rmssd_timestamps,
-                                    y=rmssd_moving,
-                                    mode='lines',
-                                    name='RMSSD Mobile',
-                                    line=dict(color='#2ecc71', width=2),
-                                    yaxis='y3'
-                                ))
+                        # Aggiungi RMSSD mobile solo se ci sono dati  
+                        if rmssd_moving and rmssd_timestamps and len(rmssd_moving) == len(rmssd_timestamps):
+                            fig_main.add_trace(go.Scatter(
+                                x=rmssd_timestamps,
+                                y=rmssd_moving,
+                                mode='lines',
+                                name='RMSSD Mobile',
+                                line=dict(color='#2ecc71', width=2),
+                                yaxis='y3'
+                            ))
                         else:
                             st.warning("❌ Dati RMSSD insufficienti per il grafico")
-                        
+                            
                         # Layout del grafico principale con zoom
                         fig_main.update_layout(
                             title='Andamento Dettagliato HRV - Zoomma con mouse/touch (Aree colorate = Attività)',
@@ -2918,12 +2918,14 @@ def main():
                             )
                         )
                         
+                        st.plotly_chart(fig_main, use_container_width=True)
+                        
                         # Informazioni sui dati
                         st.info(f"""
                         **📊 Informazioni Dati:**
                         - **Battiti totali:** {len(rr_intervals)}
                         - **Durata registrazione:** {timeline['total_duration_hours']:.1f} ore
-                        - **Finestra mobile:** {window_size} battiti
+                        - **Finestra mobile:** 300 battiti
                         - **Battito medio:** {np.mean(hr_instant):.1f} bpm
                         - **SDNN medio:** {np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms
                         - **RMSSD medio:** {np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms
