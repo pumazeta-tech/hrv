@@ -767,8 +767,9 @@ def main():
     # =============================================================================
     
     # Upload file
+        # Upload file
     st.header("📤 Carica File IBI")
-    uploaded_file = st.file_uploader("Carica il tuo file .txt o .csv con gli intervalli IBI", type=['txt', 'csv'], key="file_uploader")
+    uploaded_file = st.file_uploader("Carica il tuo file .txt, .csv o .sdf con gli intervalli IBI", type=['txt', 'csv', 'sdf'], key="file_uploader")
     
     if uploaded_file is not None:
         try:
@@ -789,6 +790,61 @@ def main():
             
             st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
             
+            # 🔽🔽🔽 CODICE DI ANALISI AGGIUNTO QUI 🔽🔽🔽
+            st.header("📊 Analisi HRV")
+            
+            # Calcola le metriche HRV
+            user_profile = st.session_state.user_profile
+            hrv_metrics = calculate_realistic_hrv_metrics(
+                rr_intervals, 
+                user_profile['age'], 
+                user_profile['gender']
+            )
+            
+            # Mostra le metriche principali
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("💓 Battito Medio", f"{hrv_metrics['hr_mean']:.1f} bpm")
+            with col2:
+                st.metric("📊 SDNN", f"{hrv_metrics['sdnn']:.1f} ms")
+            with col3:
+                st.metric("🔄 RMSSD", f"{hrv_metrics['rmssd']:.1f} ms")
+            with col4:
+                st.metric("🎯 Coerenza", f"{hrv_metrics['coherence']:.1f}%")
+            
+            # Metriche aggiuntive
+            with st.expander("📈 Metriche Dettagliate"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("**Analisi Spettrale:**")
+                    st.write(f"• Potenza Totale: {hrv_metrics['total_power']:.0f} ms²")
+                    st.write(f"• LF: {hrv_metrics['lf']:.0f} ms²")
+                    st.write(f"• HF: {hrv_metrics['hf']:.0f} ms²")
+                    st.write(f"• Rapporto LF/HF: {hrv_metrics['lf_hf_ratio']:.2f}")
+                
+                with col2:
+                    st.write("**Stima Sonno:**")
+                    st.write(f"• Durata: {hrv_metrics['sleep_duration']:.1f} h")
+                    st.write(f"• Efficienza: {hrv_metrics['sleep_efficiency']:.1f}%")
+                    st.write(f"• Battito a riposo: {hrv_metrics['sleep_hr']:.1f} bpm")
+            
+            # Pulsante per salvare l'analisi
+            if st.button("💾 Salva Analisi nel Database", type="primary"):
+                # Salva l'analisi nell'utente corrente
+                user_key = get_user_key(user_profile)
+                if user_key and user_key in st.session_state.user_database:
+                    analysis_data = {
+                        'timestamp': datetime.now().isoformat(),
+                        'rr_intervals_count': len(rr_intervals),
+                        'metrics': hrv_metrics
+                    }
+                    st.session_state.user_database[user_key]['analyses'].append(analysis_data)
+                    save_user_database()
+                    st.success("✅ Analisi salvata nel database!")
+                else:
+                    st.error("❌ Salva prima il profilo utente!")
+            # 🔼🔼🔼 FINE CODICE AGGIUNTO 🔼🔼🔼
+            
         except Exception as e:
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
     
@@ -797,7 +853,7 @@ def main():
         st.info("""
         ### 👆 Carica un file IBI per iniziare l'analisi
         
-        **Formati supportati:** .txt, .csv
+        **Formati supportati:** .txt, .csv, .sdf
         
         Il file deve contenere gli intervalli IBI (Inter-Beat Intervals) in millisecondi, uno per riga.
         
@@ -808,6 +864,8 @@ def main():
         - ✅ **Analisi alimentazione** con database nutrizionale ESPANSO
         - ✅ **Persistenza dati** - utenti salvati automaticamente
         """)
+        
+
 
 if __name__ == "__main__":
     main()
