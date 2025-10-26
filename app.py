@@ -1330,127 +1330,149 @@ def main():
                         use_container_width=True
                     )
                     
-                    # Grafico interattivo con selettore temporale
-                    st.subheader("📈 Andamento Temporale - HRV")
+                    # Grafico dettagliato con selettore banda
+                    st.subheader("📈 Andamento Dettagliato HRV")
                     
-                    # Prepara i dati per il grafico temporale
-                    all_dates = []
-                    all_hr = []
-                    all_sdnn = []
-                    all_rmssd = []
+                    # Crea timeline dettagliata dai dati RR
+                    if len(rr_intervals) > 0:
+                        # Calcola i timestamp per ogni battito
+                        timestamps = []
+                        current_time = start_time
+                        
+                        for rr in rr_intervals:
+                            timestamps.append(current_time)
+                            current_time += timedelta(milliseconds=rr)
+                        
+                        # Calcola HRV in finestre mobili (per SDNN e RMSSD)
+                        window_size = min(300, len(rr_intervals) // 10)  # Finestra adattiva
+                        if window_size < 30:
+                            window_size = min(30, len(rr_intervals))
+                        
+                        hr_instant = [60000 / rr for rr in rr_intervals]
+                        sdnn_moving = []
+                        rmssd_moving = []
+                        moving_timestamps = []
+                        
+                        for i in range(len(rr_intervals) - window_size):
+                            window_rr = rr_intervals[i:i + window_size]
+                            window_hr = hr_instant[i:i + window_size]
+                            
+                            # Calcola SDNN e RMSSD per la finestra
+                            sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
+                            differences = np.diff(window_rr)
+                            rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
+                            
+                            sdnn_moving.append(sdnn)
+                            rmssd_moving.append(rmssd)
+                            moving_timestamps.append(timestamps[i + window_size // 2])
+                        
+                        # Crea il grafico principale
+                        fig_main = go.Figure()
+                        
+                        # Aggiungi HR istantaneo (smooth)
+                        fig_main.add_trace(go.Scatter(
+                            x=timestamps,
+                            y=hr_instant,
+                            mode='lines',
+                            name='Battito Istantaneo',
+                            line=dict(color='#e74c3c', width=1),
+                            opacity=0.7
+                        ))
+                        
+                        # Aggiungi SDNN mobile
+                        if sdnn_moving:
+                            fig_main.add_trace(go.Scatter(
+                                x=moving_timestamps,
+                                y=sdnn_moving,
+                                mode='lines',
+                                name='SDNN Mobile',
+                                line=dict(color='#3498db', width=2),
+                                yaxis='y2'
+                            ))
+                        
+                        # Aggiungi RMSSD mobile
+                        if rmssd_moving:
+                            fig_main.add_trace(go.Scatter(
+                                x=moving_timestamps,
+                                y=rmssd_moving,
+                                mode='lines',
+                                name='RMSSD Mobile',
+                                line=dict(color='#2ecc71', width=2),
+                                yaxis='y3'
+                            ))
+                        
+                        # Layout del grafico principale
+                        fig_main.update_layout(
+                            title='Andamento Dettagliato HRV - Dati Raw',
+                            xaxis=dict(title='Tempo'),
+                            yaxis=dict(
+                                title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
+                                tickfont=dict(color='#e74c3c')
+                            ),
+                            yaxis2=dict(
+                                title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
+                                tickfont=dict(color='#3498db'),
+                                overlaying='y',
+                                side='right',
+                                position=0.85
+                            ),
+                            yaxis3=dict(
+                                title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
+                                tickfont=dict(color='#2ecc71'),
+                                overlaying='y',
+                                side='right',
+                                position=0.15
+                            ),
+                            height=400,
+                            showlegend=True,
+                            hovermode='x unified'
+                        )
+                        
+                        # GRAFICO DI SELEZIONE (banda)
+                        st.subheader("🎚️ Selettore Periodo")
+                        
+                        # Crea grafico di selezione
+                        fig_selector = go.Figure()
+                        
+                        # HR medio per il selettore (downsampled per performance)
+                        downsample_factor = max(1, len(hr_instant) // 1000)
+                        hr_downsampled = hr_instant[::downsample_factor]
+                        ts_downsampled = timestamps[::downsample_factor]
+                        
+                        fig_selector.add_trace(go.Scatter(
+                            x=ts_downsampled,
+                            y=hr_downsampled,
+                            mode='lines',
+                            name='Battito',
+                            line=dict(color='#e74c3c', width=1),
+                            fill='tozeroy',
+                            opacity=0.6
+                        ))
+                        
+                        fig_selector.update_layout(
+                            title='Seleziona il periodo da analizzare (trascina per zoommare)',
+                            xaxis=dict(title='Tempo', rangeslider=dict(visible=True)),
+                            yaxis=dict(title='Battito (bpm)'),
+                            height=200,
+                            showlegend=False
+                        )
+                        
+                        st.plotly_chart(fig_selector, use_container_width=True)
+                        st.plotly_chart(fig_main, use_container_width=True)
+                        
+                        # Informazioni sui dati
+                        st.info(f"""
+                        **📊 Informazioni Dati:**
+                        - **Battiti totali:** {len(rr_intervals)}
+                        - **Durata registrazione:** {timeline['total_duration_hours']:.1f} ore
+                        - **Finestra mobile:** {window_size} battiti
+                        - **Battito medio:** {np.mean(hr_instant):.1f} bpm
+                        - **SDNN medio:** {np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms
+                        - **RMSSD medio:** {np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms
+                        """)
                     
-                    for day_date, day_metrics in daily_metrics.items():
-                        day_dt = datetime.fromisoformat(day_date)
-                        all_dates.append(day_dt)
-                        all_hr.append(day_metrics.get('hr_mean', 0))
-                        all_sdnn.append(day_metrics.get('sdnn', 0))
-                        all_rmssd.append(day_metrics.get('rmssd', 0))
-                    
-                    # Selettore range date
-                    if len(all_dates) > 1:
-                        min_date = min(all_dates)
-                        max_date = max(all_dates)
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            start_date = st.date_input(
-                                "Data Inizio",
-                                value=min_date,
-                                min_value=min_date,
-                                max_value=max_date
-                            )
-                        with col2:
-                            end_date = st.date_input(
-                                "Data Fine", 
-                                value=max_date,
-                                min_value=min_date,
-                                max_value=max_date
-                            )
-                        
-                        # Filtra i dati in base al range selezionato
-                        filtered_dates = []
-                        filtered_hr = []
-                        filtered_sdnn = []
-                        filtered_rmssd = []
-                        
-                        for i, date in enumerate(all_dates):
-                            if start_date <= date.date() <= end_date:
-                                filtered_dates.append(date)
-                                filtered_hr.append(all_hr[i])
-                                filtered_sdnn.append(all_sdnn[i])
-                                filtered_rmssd.append(all_rmssd[i])
                     else:
-                        filtered_dates = all_dates
-                        filtered_hr = all_hr
-                        filtered_sdnn = all_sdnn
-                        filtered_rmssd = all_rmssd
-                    
-                    # Crea il grafico interattivo
-                    fig = go.Figure()
-                    
-                    # Aggiungi le tre metriche con scale diverse
-                    fig.add_trace(go.Scatter(
-                        x=filtered_dates, 
-                        y=filtered_hr,
-                        mode='lines+markers',
-                        name='Battito Medio (bpm)',
-                        line=dict(color='#e74c3c', width=3),
-                        marker=dict(size=8),
-                        yaxis='y1'
-                    ))
-                    
-                    fig.add_trace(go.Scatter(
-                        x=filtered_dates, 
-                        y=filtered_sdnn,
-                        mode='lines+markers',
-                        name='SDNN (ms)',
-                        line=dict(color='#3498db', width=3),
-                        marker=dict(size=8),
-                        yaxis='y2'
-                    ))
-                    
-                    fig.add_trace(go.Scatter(
-                        x=filtered_dates, 
-                        y=filtered_rmssd,
-                        mode='lines+markers',
-                        name='RMSSD (ms)',
-                        line=dict(color='#2ecc71', width=3),
-                        marker=dict(size=8),
-                        yaxis='y3'
-                    ))
-                    
-                    # Layout con tre assi Y - VERSIONE CORRETTA
-                    fig.update_layout(
-                        title='Andamento Metriche HRV nel Tempo',
-                        xaxis=dict(
-                            title='Data',
-                            tickformat='%d/%m/%Y'
-                        ),
-                        yaxis=dict(
-                            title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
-                            tickfont=dict(color='#e74c3c'),
-                            side='left'
-                        ),
-                        yaxis2=dict(
-                            title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
-                            tickfont=dict(color='#3498db'),
-                            overlaying='y',
-                            side='right',
-                            position=0.85
-                        ),
-                        yaxis3=dict(
-                            title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
-                            tickfont=dict(color='#2ecc71'),
-                            overlaying='y',
-                            side='right',
-                            position=0.15
-                        ),
-                        height=500,
-                        showlegend=True,
-                        hovermode='x unified'
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
+                        st.warning("Dati insufficienti per l'analisi dettagliata")
                     
                     # Statistiche del periodo selezionato
                     if filtered_hr:
