@@ -1330,7 +1330,7 @@ def main():
                         use_container_width=True
                     )
                     
-                    # Grafico dettagliato con selettore banda
+                    # Grafico dettagliato con zoom interattivo
                     st.subheader("📈 Andamento Dettagliato HRV")
                     
                     # Crea timeline dettagliata dai dati RR
@@ -1366,7 +1366,7 @@ def main():
                             rmssd_moving.append(rmssd)
                             moving_timestamps.append(timestamps[i + window_size // 2])
                         
-                        # Crea il grafico principale
+                        # Crea il grafico principale con zoom interattivo
                         fig_main = go.Figure()
                         
                         # Aggiungi HR istantaneo (smooth)
@@ -1401,10 +1401,13 @@ def main():
                                 yaxis='y3'
                             ))
                         
-                        # Layout del grafico principale
+                        # Layout del grafico principale con zoom
                         fig_main.update_layout(
-                            title='Andamento Dettagliato HRV - Dati Raw',
-                            xaxis=dict(title='Tempo'),
+                            title='Andamento Dettagliato HRV - Zoomma con mouse/touch',
+                            xaxis=dict(
+                                title='Tempo',
+                                rangeslider=dict(visible=False)  # Nascondi il rangeslider
+                            ),
                             yaxis=dict(
                                 title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
                                 tickfont=dict(color='#e74c3c')
@@ -1423,42 +1426,36 @@ def main():
                                 side='right',
                                 position=0.15
                             ),
-                            height=400,
+                            height=500,
                             showlegend=True,
                             hovermode='x unified'
                         )
                         
-                        # GRAFICO DI SELEZIONE (banda)
-                        st.subheader("🎚️ Selettore Periodo")
-                        
-                        # Crea grafico di selezione
-                        fig_selector = go.Figure()
-                        
-                        # HR medio per il selettore (downsampled per performance)
-                        downsample_factor = max(1, len(hr_instant) // 1000)
-                        hr_downsampled = hr_instant[::downsample_factor]
-                        ts_downsampled = timestamps[::downsample_factor]
-                        
-                        fig_selector.add_trace(go.Scatter(
-                            x=ts_downsampled,
-                            y=hr_downsampled,
-                            mode='lines',
-                            name='Battito',
-                            line=dict(color='#e74c3c', width=1),
-                            fill='tozeroy',
-                            opacity=0.6
-                        ))
-                        
-                        fig_selector.update_layout(
-                            title='Seleziona il periodo da analizzare (trascina per zoommare)',
-                            xaxis=dict(title='Tempo', rangeslider=dict(visible=True)),
-                            yaxis=dict(title='Battito (bpm)'),
-                            height=200,
-                            showlegend=False
+                        # Aggiungi bottoni per lo zoom
+                        fig_main.update_layout(
+                            xaxis=dict(
+                                rangeselector=dict(
+                                    buttons=list([
+                                        dict(count=1, label="1h", step="hour", stepmode="backward"),
+                                        dict(count=6, label="6h", step="hour", stepmode="backward"),
+                                        dict(count=1, label="1gg", step="day", stepmode="backward"),
+                                        dict(step="all", label="Tutto")
+                                    ])
+                                ),
+                                rangeslider=dict(visible=False),
+                                type="date"
+                            )
                         )
                         
-                        st.plotly_chart(fig_selector, use_container_width=True)
                         st.plotly_chart(fig_main, use_container_width=True)
+                        
+                        # Istruzioni per l'uso
+                        st.caption("""
+                        **🔍 Come zoommare:**
+                        - **Mouse:** Trascina per selezionare un'area da zoommare
+                        - **Doppio click:** Reset dello zoom
+                        - **Pulsanti sopra:** Zoom predefiniti (1h, 6h, 1 giorno, Tutto)
+                        """)
                         
                         # Informazioni sui dati
                         st.info(f"""
