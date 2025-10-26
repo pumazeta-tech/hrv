@@ -2786,10 +2786,14 @@ def main():
                         # Usa i timestamp corretti per ciascuna metrica
                         moving_timestamps = sdnn_timestamps  # Per compatibilità con codice esistente
 
+                        # DEBUG: Verifica che i dati siano calcolati correttamente
+                        st.write(f"📊 DEBUG - Dati calcolati:")
+                        st.write(f"HR instant: {len(hr_instant)} punti")
+                        st.write(f"SDNN moving: {len(sdnn_moving)} punti")
+                        st.write(f"RMSSD moving: {len(rmssd_moving)} punti")
+                        st.write(f"Timestamps SDNN: {len(sdnn_timestamps)} punti")
+                        st.write(f"Timestamps RMSSD: {len(rmssd_timestamps)} punti")
 
-                        # DEBUG: Elimina qualsiasi riferimento a window_size
-                        window_size = 300  # Valore fisso per compatibilità
-                        
                         # Crea il grafico principale con zoom interattivo
                         fig_main = go.Figure()
                         
@@ -2838,27 +2842,31 @@ def main():
                             opacity=0.9
                         ))
                         
-                        # Aggiungi SDNN mobile
-                        if sdnn_moving:
+                        # Aggiungi SDNN mobile solo se ci sono dati
+                        if sdnn_moving and sdnn_timestamps and len(sdnn_moving) == len(sdnn_timestamps):
                             fig_main.add_trace(go.Scatter(
-                                x=moving_timestamps,
+                                x=sdnn_timestamps,
                                 y=sdnn_moving,
                                 mode='lines',
                                 name='SDNN Mobile',
                                 line=dict(color='#3498db', width=2),
                                 yaxis='y2'
                             ))
-                        
-                        # Aggiungi RMSSD mobile
-                        if rmssd_moving:
+                        else:
+                            st.warning("❌ Dati SDNN insufficienti per il grafico")
+
+                        # Aggiungi RMSSD mobile solo se ci sono dati  
+                        if rmssd_moving and rmssd_timestamps and len(rmssd_moving) == len(rmssd_timestamps):
                             fig_main.add_trace(go.Scatter(
-                                x=moving_timestamps,
+                                x=rmssd_timestamps,
                                 y=rmssd_moving,
                                 mode='lines',
                                 name='RMSSD Mobile',
                                 line=dict(color='#2ecc71', width=2),
                                 yaxis='y3'
                             ))
+                        else:
+                            st.warning("❌ Dati RMSSD insufficienti per il grafico")
                         
                         # Layout del grafico principale con zoom
                         fig_main.update_layout(
