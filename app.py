@@ -501,20 +501,1047 @@ def get_default_metrics(age, gender):
 # SISTEMA ATTIVITÀ E ALIMENTAZIONE
 # =============================================================================
 
-# Database nutrizionale ESPANSO
+# =============================================================================
+# DATABASE NUTRIZIONALE SUPER DETTAGLIATO
+# =============================================================================
+
 NUTRITION_DB = {
-    "pasta": {"inflammatory_score": 2, "glycemic_index": "alto", "recovery_impact": -1, "category": "carboidrato"},
-    "riso": {"inflammatory_score": 1, "glycemic_index": "alto", "recovery_impact": -1, "category": "carboidrato"},
-    "patate": {"inflammatory_score": 2, "glycemic_index": "alto", "recovery_impact": -1, "category": "carboidrato"},
-    "pane": {"inflammatory_score": 2, "glycemic_index": "alto", "recovery_impact": -1, "category": "carboidrato"},
-    "pizza": {"inflammatory_score": 3, "glycemic_index": "alto", "recovery_impact": -2, "category": "carboidrato"},
-    "salmone": {"inflammatory_score": -3, "glycemic_index": "basso", "recovery_impact": 3, "category": "proteina"},
-    "pesce": {"inflammatory_score": -2, "glycemic_index": "basso", "recovery_impact": 2, "category": "proteina"},
-    "carne bianca": {"inflammatory_score": 0, "glycemic_index": "basso", "recovery_impact": 1, "category": "proteina"},
-    "verdura": {"inflammatory_score": -4, "glycemic_index": "basso", "recovery_impact": 4, "category": "vegetale"},
-    "insalata": {"inflammatory_score": -4, "glycemic_index": "basso", "recovery_impact": 4, "category": "vegetale"},
-    "frutta": {"inflammatory_score": -1, "glycemic_index": "medio", "recovery_impact": 1, "category": "frutta"},
+    # CARBOIDRATI COMPLESSI
+    "pasta integrale": {
+        "category": "carboidrato", "subcategory": "cereale integrale", "inflammatory_score": -1,
+        "glycemic_index": "medio-basso", "glycemic_load": "medio", "recovery_impact": 2,
+        "calories_per_100g": 350, "typical_portion": 80, "protein_g": 13, "carbs_g": 72, "fiber_g": 8, "fat_g": 2,
+        "micronutrients": ["Magnesio", "Selenio", "Vitamina B"], "allergens": ["glutine"],
+        "best_time": "pranzo", "sleep_impact": "neutro", "hrv_impact": "lieve positivo",
+        "tags": ["energia sostenuta", "fibra"]
+    },
+    
+    "riso integrale": {
+        "category": "carboidrato", "subcategory": "cereale integrale", "inflammatory_score": -2,
+        "glycemic_index": "medio-basso", "glycemic_load": "medio", "recovery_impact": 3,
+        "calories_per_100g": 111, "typical_portion": 150, "protein_g": 2.6, "carbs_g": 23, "fiber_g": 1.8, "fat_g": 0.9,
+        "micronutrients": ["Magnesio", "Fosforo", "Manganese"], "allergens": [],
+        "best_time": "pranzo", "sleep_impact": "positivo", "hrv_impact": "positivo",
+        "tags": ["digestivo", "minerali"]
+    },
+
+    "avena": {
+        "category": "carboidrato", "subcategory": "cereale integrale", "inflammatory_score": -3,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 4,
+        "calories_per_100g": 389, "typical_portion": 40, "protein_g": 16.9, "carbs_g": 66.3, "fiber_g": 10.6, "fat_g": 6.9,
+        "micronutrients": ["Beta-glucani", "Magnesio", "Zinco", "Vitamina B1"], "allergens": [],
+        "best_time": "colazione", "sleep_impact": "molto positivo", "hrv_impact": "molto positivo",
+        "tags": ["colazione", "energia lenta", "cuore"]
+    },
+
+    "pasta bianca": {
+        "category": "carboidrato", "subcategory": "cereale raffinato", "inflammatory_score": 2,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -2,
+        "calories_per_100g": 131, "typical_portion": 80, "protein_g": 5, "carbs_g": 25, "fiber_g": 1, "fat_g": 1,
+        "micronutrients": ["Ferro", "Vitamina B"], "allergens": ["glutine"],
+        "best_time": "pre-allenamento", "sleep_impact": "negativo se serale", "hrv_impact": "negativo",
+        "tags": ["energia rapida", "infiammatorio"]
+    },
+
+    "pane bianco": {
+        "category": "carboidrato", "subcategory": "cereale raffinato", "inflammatory_score": 3,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -3,
+        "calories_per_100g": 265, "typical_portion": 50, "protein_g": 9, "carbs_g": 49, "fiber_g": 2.7, "fat_g": 3.2,
+        "micronutrients": ["Calcio", "Ferro"], "allergens": ["glutine"],
+        "best_time": "colazione", "sleep_impact": "negativo", "hrv_impact": "negativo",
+        "tags": ["picco glicemico", "gonfiore"]
+    },
+
+    # PROTEINE ANIMALI
+    "salmone": {
+        "category": "proteina", "subcategory": "pesce grasso", "inflammatory_score": -4,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 5,
+        "calories_per_100g": 208, "typical_portion": 150, "protein_g": 20, "carbs_g": 0, "fiber_g": 0, "fat_g": 13,
+        "omega3_epa_dha": "2200mg", "micronutrients": ["Omega-3", "Vitamina D", "Selenio", "Vitamina B12"],
+        "allergens": ["pesce"], "best_time": "cena", "sleep_impact": "molto positivo", "hrv_impact": "molto positivo",
+        "tags": ["anti-infiammatorio", "cervello", "cuore"]
+    },
+
+    "tonno": {
+        "category": "proteina", "subcategory": "pesce magro", "inflammatory_score": -2,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
+        "calories_per_100g": 132, "typical_portion": 150, "protein_g": 28, "carbs_g": 0, "fiber_g": 0, "fat_g": 1,
+        "omega3_epa_dha": "300mg", "micronutrients": ["Selenio", "Vitamina B3", "Vitamina B12", "Fosforo"],
+        "allergens": ["pesce"], "best_time": "pranzo", "sleep_impact": "positivo", "hrv_impact": "positivo",
+        "tags": ["proteico", "metabolismo"]
+    },
+
+    "petto di pollo": {
+        "category": "proteina", "subcategory": "carne bianca", "inflammatory_score": 0,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 2,
+        "calories_per_100g": 165, "typical_portion": 150, "protein_g": 31, "carbs_g": 0, "fiber_g": 0, "fat_g": 3.6,
+        "micronutrients": ["Vitamina B6", "Niacina", "Selenio", "Fosforo"], "allergens": [],
+        "best_time": "pranzo/cena", "sleep_impact": "neutro", "hrv_impact": "lieve positivo",
+        "tags": ["magro", "muscoli"]
+    },
+
+    "uova": {
+        "category": "proteina", "subcategory": "uova", "inflammatory_score": -1,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
+        "calories_per_100g": 155, "typical_portion": 100, "protein_g": 13, "carbs_g": 1.1, "fiber_g": 0, "fat_g": 11,
+        "cholesterol_mg": 373, "micronutrients": ["Colina", "Vitamina D", "Selenio", "Luteina"],
+        "allergens": ["uova"], "best_time": "colazione", "sleep_impact": "positivo", "hrv_impact": "positivo",
+        "tags": ["colina", "occhi", "cervello"]
+    },
+
+    # VEGETALI
+    "spinaci": {
+        "category": "vegetale", "subcategory": "verdura a foglia verde", "inflammatory_score": -5,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 4,
+        "calories_per_100g": 23, "typical_portion": 200, "protein_g": 2.9, "carbs_g": 3.6, "fiber_g": 2.2, "fat_g": 0.4,
+        "micronutrients": ["Ferro", "Magnesio", "Vitamina K", "Folati", "Luteina"], "allergens": [],
+        "best_time": "pranzo/cena", "sleep_impact": "positivo", "hrv_impact": "molto positivo",
+        "tags": ["antiossidante", "sangue", "visione"]
+    },
+
+    "broccoli": {
+        "category": "vegetale", "subcategory": "crucifere", "inflammatory_score": -4,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 4,
+        "calories_per_100g": 34, "typical_portion": 200, "protein_g": 2.8, "carbs_g": 7, "fiber_g": 2.6, "fat_g": 0.4,
+        "micronutrients": ["Vitamina C", "Vitamina K", "Folati", "Potassio"], "allergens": [],
+        "best_time": "cena", "sleep_impact": "positivo", "hrv_impact": "molto positivo",
+        "tags": ["detox", "anti-cancro", "digestivo"]
+    },
+
+    "avocado": {
+        "category": "grasso", "subcategory": "frutta grassa", "inflammatory_score": -3,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
+        "calories_per_100g": 160, "typical_portion": 100, "protein_g": 2, "carbs_g": 9, "fiber_g": 7, "fat_g": 15,
+        "micronutrients": ["Potassio", "Vitamina E", "Vitamina K", "Folati"], "allergens": [],
+        "best_time": "colazione/pranzo", "sleep_impact": "positivo", "hrv_impact": "positivo",
+        "tags": ["grassi buoni", "sazietà", "pelle"]
+    },
+
+    # FRUTTA
+    "frutti di bosco": {
+        "category": "frutta", "subcategory": "bacche", "inflammatory_score": -4,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 4,
+        "calories_per_100g": 57, "typical_portion": 150, "protein_g": 0.7, "carbs_g": 14, "fiber_g": 2.4, "fat_g": 0.3,
+        "micronutrients": ["Antocianine", "Vitamina C", "Manganese", "Vitamina K"], "allergens": [],
+        "best_time": "colazione/spuntino", "sleep_impact": "molto positivo", "hrv_impact": "molto positivo",
+        "tags": ["antiossidante", "cervello", "anti-age"]
+    },
+
+    "banana": {
+        "category": "frutta", "subcategory": "frutta tropicale", "inflammatory_score": 0,
+        "glycemic_index": "medio", "glycemic_load": "medio", "recovery_impact": 2,
+        "calories_per_100g": 89, "typical_portion": 120, "protein_g": 1.1, "carbs_g": 23, "fiber_g": 2.6, "fat_g": 0.3,
+        "micronutrients": ["Potassio", "Vitamina B6", "Magnesio", "Vitamina C"], "allergens": [],
+        "best_time": "pre/post allenamento", "sleep_impact": "positivo", "hrv_impact": "positivo",
+        "tags": ["energia", "crampi", "recupero"]
+    },
+
+    # GRASSI
+    "olio d'oliva extravergine": {
+        "category": "grasso", "subcategory": "olio", "inflammatory_score": -3,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
+        "calories_per_100g": 884, "typical_portion": 10, "protein_g": 0, "carbs_g": 0, "fiber_g": 0, "fat_g": 100,
+        "micronutrients": ["Vitamina E", "Vitamina K", "Polifenoli", "Oleocantale"], "allergens": [],
+        "best_time": "a crudo tutti i pasti", "sleep_impact": "positivo", "hrv_impact": "positivo",
+        "tags": ["anti-infiammatorio", "cuore", "cervello"]
+    },
+
+    "frutta secca (noci/mandorle)": {
+        "category": "grasso", "subcategory": "semi oleosi", "inflammatory_score": -2,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
+        "calories_per_100g": 607, "typical_portion": 30, "protein_g": 20, "carbs_g": 21, "fiber_g": 7, "fat_g": 54,
+        "micronutrients": ["Magnesio", "Vitamina E", "Selenio", "Omega-3"], "allergens": ["frutta a guscio"],
+        "best_time": "spuntino", "sleep_impact": "positivo", "hrv_impact": "positivo",
+        "tags": ["snack sano", "cuore", "memoria"]
+    },
+
+    # DA LIMITARE
+    "zucchero bianco": {
+        "category": "zucchero", "subcategory": "zucchero raffinato", "inflammatory_score": 5,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -4,
+        "calories_per_100g": 387, "typical_portion": 5, "protein_g": 0, "carbs_g": 100, "fiber_g": 0, "fat_g": 0,
+        "micronutrients": [], "allergens": [], "best_time": "da evitare",
+        "sleep_impact": "molto negativo", "hrv_impact": "molto negativo",
+        "tags": ["infiammatorio", "picco glicemico", "dipendenza"]
+    },
+
+    "dolci industriali": {
+        "category": "zucchero", "subcategory": "ultra-processato", "inflammatory_score": 4,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -3,
+        "calories_per_100g": 450, "typical_portion": 100, "protein_g": 5, "carbs_g": 60, "fiber_g": 1, "fat_g": 22,
+        "micronutrients": [], "allergens": ["glutine", "latticini", "soia"], "best_time": "da evitare",
+        "sleep_impact": "negativo", "hrv_impact": "negativo",
+        "tags": ["grassi trans", "additivi", "gonfiore"]
+    },
+
+    "alcolici": {
+        "category": "alcol", "subcategory": "bevanda alcolica", "inflammatory_score": 4,
+        "glycemic_index": "variabile", "glycemic_load": "medio", "recovery_impact": -4,
+        "calories_per_100g": 200, "typical_portion": 150, "protein_g": 0, "carbs_g": 5, "fiber_g": 0, "fat_g": 0,
+        "micronutrients": [], "allergens": [], "best_time": "da limitare",
+        "sleep_impact": "molto negativo", "hrv_impact": "molto negativo",
+        "tags": ["disidrata", "fegato", "qualità sonno"]
+    }
 }
+
+# =============================================================================
+# DATABASE COMPLETO ATTIVITÀ FISICHE + IMPATTO HRV
+# =============================================================================
+
+ACTIVITY_IMPACT_DB = {
+    "corsa leggera": {
+        "category": "cardio", "intensity": "light", "duration_optimal": (30, 45),
+        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 2,
+        "metabolic_impact": 3, "stress_impact": -2, "sleep_impact": 1,
+        "best_time": "mattina", "frequency": "daily",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["cardiovascolare", "umore", "metabolismo"],
+        "risks": ["infortuni overuse"], "prerequisites": ["riscaldamento"]
+    },
+    
+    "corsa intensa": {
+        "category": "cardio", "intensity": "high", "duration_optimal": (20, 35),
+        "hrv_impact_immediate": -3, "hrv_impact_24h": 1, "recovery_impact": -1,
+        "metabolic_impact": 4, "stress_impact": 1, "sleep_impact": -1,
+        "best_time": "mattina", "frequency": "2-3x/settimana",
+        "hr_zones": ["Z4", "Z5"], "benefits": ["VO2max", "performance"],
+        "risks": ["overtraining", "cortisolo"], "prerequisites": ["base aerobica", "recupero"]
+    },
+    
+    "ciclismo": {
+        "category": "cardio", "intensity": "medium", "duration_optimal": (45, 120),
+        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 1,
+        "metabolic_impact": 3, "stress_impact": -2, "sleep_impact": 1,
+        "best_time": "mattina/pomeriggio", "frequency": "3-5x/settimana",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["resistenza", "articolazioni"],
+        "risks": ["postura"], "prerequisites": ["bike fit"]
+    },
+    
+    "nuoto": {
+        "category": "cardio", "intensity": "medium", "duration_optimal": (30, 60),
+        "hrv_impact_immediate": 0, "hrv_impact_24h": 3, "recovery_impact": 3,
+        "metabolic_impact": 2, "stress_impact": -3, "sleep_impact": 2,
+        "best_time": "qualsiasi", "frequency": "daily",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["full body", "low impact", "respirazione"],
+        "risks": ["minimi"], "prerequisites": ["tecnica"]
+    },
+
+    "sollevamento pesi": {
+        "category": "strength", "intensity": "high", "duration_optimal": (45, 90),
+        "hrv_impact_immediate": -2, "hrv_impact_24h": 1, "recovery_impact": -1,
+        "metabolic_impact": 4, "stress_impact": 1, "sleep_impact": 0,
+        "best_time": "pomeriggio", "frequency": "3-4x/settimana",
+        "hr_zones": ["Z3", "Z4"], "benefits": ["muscolo", "metabolismo", "ossa"],
+        "risks": ["infortuni", "cortisolo"], "prerequisites": ["tecnica", "recupero"]
+    },
+    
+    "bodyweight": {
+        "category": "strength", "intensity": "medium", "duration_optimal": (20, 40),
+        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 1,
+        "metabolic_impact": 2, "stress_impact": -1, "sleep_impact": 1,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["funzionale", "flessibilità"],
+        "risks": ["minimi"], "prerequisites": ["progressività"]
+    },
+
+    "yoga": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
+        "hrv_impact_immediate": 2, "hrv_impact_24h": 3, "recovery_impact": 4,
+        "metabolic_impact": 1, "stress_impact": -4, "sleep_impact": 3,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z1", "Z2"], "benefits": ["flessibilità", "respirazione", "parasimpatico"],
+        "risks": ["minimi"], "prerequisites": ["asana base"]
+    },
+    
+    "meditazione": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (10, 30),
+        "hrv_impact_immediate": 3, "hrv_impact_24h": 2, "recovery_impact": 3,
+        "metabolic_impact": 0, "stress_impact": -5, "sleep_impact": 2,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z1"], "benefits": ["coerenza cardiaca", "mindfulness", "stress"],
+        "risks": ["nessuno"], "prerequisites": ["costanza"]
+    },
+    
+    "respirazione consapevole": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (5, 15),
+        "hrv_impact_immediate": 4, "hrv_impact_24h": 1, "recovery_impact": 2,
+        "metabolic_impact": 0, "stress_impact": -3, "sleep_impact": 1,
+        "best_time": "qualsiasi", "frequency": "multipla giornaliera",
+        "hr_zones": ["Z1"], "benefits": ["coerenza immediata", "ansia", "focus"],
+        "risks": ["nessuno"], "prerequisites": ["tecnica base"]
+    },
+
+    "camminata": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
+        "hrv_impact_immediate": 1, "hrv_impact_24h": 2, "recovery_impact": 2,
+        "metabolic_impact": 1, "stress_impact": -2, "sleep_impact": 1,
+        "best_time": "qualsiasi", "frequency": "daily",
+        "hr_zones": ["Z1", "Z2"], "benefits": ["circolazione", "umore", "digestione"],
+        "risks": ["minimi"], "prerequisites": ["scarpe adatte"]
+    },
+    
+    "stretching": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (10, 20),
+        "hrv_impact_immediate": 1, "hrv_impact_24h": 1, "recovery_impact": 2,
+        "metabolic_impact": 0, "stress_impact": -1, "sleep_impact": 1,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z1"], "benefits": ["mobilità", "recupero muscolare"],
+        "risks": ["stiramenti"], "prerequisites": ["riscaldamento"]
+    }
+}
+
+# =============================================================================
+# DATABASE INTEGRAZIONI + IMPATTO HRV
+# =============================================================================
+
+SUPPLEMENTS_DB = {
+    "magnesio": {
+        "category": "minerale", "timing": "sera", "dosage_optimal": (200, 400),
+        "hrv_impact": 3, "recovery_impact": 3, "sleep_impact": 4, "stress_impact": -3,
+        "mechanism": "rilassamento muscolare, GABA", "best_for": ["sonno", "crampi", "stress"],
+        "synergies": ["vitamina B6", "taurina"], "contraindications": ["renali"],
+        "evidence": "alta", "onset_time": "1-2 ore", "duration": "8-12 ore"
+    },
+    
+    "omega-3": {
+        "category": "acidi grassi", "timing": "pasto", "dosage_optimal": (1000, 2000),
+        "hrv_impact": 2, "recovery_impact": 2, "sleep_impact": 1, "stress_impact": -2,
+        "mechanism": "anti-infiammatorio, fluidità membranale", "best_for": ["infiammazione", "umore", "cuore"],
+        "synergies": ["vitamina E"], "contraindications": ["anticoagulanti"],
+        "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
+    },
+    
+    "vitamina D": {
+        "category": "vitamina", "timing": "mattina", "dosage_optimal": (1000, 4000),
+        "hrv_impact": 2, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
+        "mechanism": "modulazione immunitaria, umore", "best_for": ["immunità", "umore", "ossa"],
+        "synergies": ["K2", "magnesio"], "contraindications": ["ipercalcemia"],
+        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
+    },
+    
+    "ashwagandha": {
+        "category": "adattogeno", "timing": "sera", "dosage_optimal": (300, 600),
+        "hrv_impact": 3, "recovery_impact": 2, "sleep_impact": 2, "stress_impact": -4,
+        "mechanism": "cortisolo, GABA", "best_for": ["stress", "ansia", "recupero"],
+        "synergies": ["magnesio", "L-teanina"], "contraindications": ["tiroide", "gravidanza"],
+        "evidence": "media", "onset_time": "2-4 settimane", "duration": "cronico"
+    },
+    
+    "L-teanina": {
+        "category": "aminoacido", "timing": "qualsiasi", "dosage_optimal": (100, 200),
+        "hrv_impact": 3, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -3,
+        "mechanism": "onde alfa cerebrali, GABA", "best_for": ["ansia", "focus", "rilassamento"],
+        "synergies": ["caffeina", "ashwagandha"], "contraindications": ["minime"],
+        "evidence": "alta", "onset_time": "30-60 min", "duration": "4-6 ore"
+    },
+    
+    "probiotici": {
+        "category": "digestivo", "timing": "mattina", "dosage_optimal": (1, 10), # miliardi
+        "hrv_impact": 1, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
+        "mechanism": "asse intestino-cervello", "best_for": ["digestione", "umore", "immunità"],
+        "synergies": ["prebiotici"], "contraindications": ["immunodepressione"],
+        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
+    },
+    
+    "melatonina": {
+        "category": "ormone", "timing": "pre-sonno", "dosage_optimal": (0.5, 3),
+        "hrv_impact": 2, "recovery_impact": 2, "sleep_impact": 4, "stress_impact": -2,
+        "mechanism": "ritmo circadiano", "best_for": ["sonno", "jet lag"],
+        "synergies": ["magnesio"], "contraindications": ["autoimmuni"],
+        "evidence": "alta", "onset_time": "30 min", "duration": "6-8 ore"
+    },
+    
+    "creatina": {
+        "category": "performance", "timing": "pre/post workout", "dosage_optimal": (3000, 5000),
+        "hrv_impact": 0, "recovery_impact": 2, "sleep_impact": 0, "stress_impact": 0,
+        "mechanism": "sistema fosfageno", "best_for": ["forza", "potenza"],
+        "synergies": ["carboidrati"], "contraindications": ["renali"],
+        "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
+    }
+}
+
+# =============================================================================
+# SISTEMA AVANZATO DI ANALISI IMPATTO
+# =============================================================================
+
+def calculate_comprehensive_impact(activities, daily_metrics, timeline, user_profile):
+    """Analisi completa dell'impatto di tutte le attività sull'HRV"""
+    
+    impact_report = {
+        'daily_summary': calculate_daily_impact_summary(activities, daily_metrics),
+        'activity_analysis': analyze_activities_impact(activities, daily_metrics, timeline),
+        'nutrition_analysis': analyze_nutritional_impact(activities),
+        'supplement_analysis': analyze_supplements_impact(activities),
+        'recovery_analysis': analyze_recovery_status(activities, daily_metrics, user_profile),
+        'personalized_recommendations': generate_comprehensive_recommendations(activities, daily_metrics, user_profile),
+        'risk_factors': identify_risk_factors(activities, daily_metrics),
+        'optimization_opportunities': find_optimization_opportunities(activities, daily_metrics, user_profile)
+    }
+    
+    return impact_report
+
+def calculate_daily_impact_summary(activities, daily_metrics):
+    """Calcola il sommario giornaliero dell'impatto"""
+    return {
+        'net_impact': calculate_net_impact(activities, daily_metrics),
+        'recovery_score': calculate_recovery_score(activities, daily_metrics),
+        'activity_count': len([a for a in activities if a['type'] == 'Allenamento']),
+        'nutrition_score': calculate_nutrition_score(activities)
+    }
+
+def calculate_net_impact(activities, daily_metrics):
+    """Calcola l'impatto netto complessivo"""
+    net_impact = 0
+    for activity in activities:
+        if activity['type'] == 'Allenamento':
+            net_impact += 1  # Placeholder - da implementare
+        elif activity['type'] == 'Alimentazione':
+            net_impact -= 0.5  # Placeholder
+    return net_impact
+
+def calculate_recovery_score(activities, daily_metrics):
+    """Calcola lo score di recupero"""
+    return 7  # Placeholder
+
+def calculate_nutrition_score(activities):
+    """Calcola lo score nutrizionale"""
+    return 8  # Placeholder
+
+def analyze_activities_impact(activities, daily_metrics, timeline):
+    """Analisi dettagliata impatto attività fisiche"""
+    
+    activity_analysis = []
+    
+    for activity in activities:
+        if activity['type'] == "Allenamento":
+            analysis = analyze_training_impact(activity, daily_metrics, timeline)
+            activity_analysis.append(analysis)
+    
+    return activity_analysis
+
+def analyze_training_impact(activity, daily_metrics, timeline):
+    """Analisi specifica per allenamenti"""
+    
+    activity_name = activity['name'].lower()
+    impact_data = ACTIVITY_IMPACT_DB.get(activity_name, {})
+    
+    # Trova il giorno dell'attività
+    activity_day = activity['start_time'].date().isoformat()
+    day_metrics = daily_metrics.get(activity_day, {})
+    
+    # Calcola impatto osservato vs atteso
+    expected_impact = impact_data.get('hrv_impact_24h', 0)
+    observed_impact = calculate_observed_hrv_impact(activity, day_metrics, timeline)
+    
+    analysis = {
+        'activity': activity,
+        'expected_impact': expected_impact,
+        'observed_impact': observed_impact,
+        'impact_difference': observed_impact - expected_impact,
+        'recovery_status': assess_recovery_status(activity, day_metrics),
+        'recommendations': generate_training_recommendations(activity, observed_impact, expected_impact)
+    }
+    
+    return analysis
+
+def calculate_observed_hrv_impact(activity, day_metrics, timeline):
+    """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
+    return 0  # Placeholder - da implementare con analisi temporale
+
+def assess_recovery_status(activity, day_metrics):
+    """Valuta lo stato di recupero"""
+    return "good"  # Placeholder
+
+def generate_training_recommendations(activity, observed_impact, expected_impact):
+    """Genera raccomandazioni per l'allenamento"""
+    return ["Mantieni questo tipo di allenamento"]  # Placeholder
+
+def analyze_nutritional_impact(activities):
+    """Analisi impatto nutrizionale"""
+    return {
+        'inflammatory_score': 0,
+        'recovery_score': 0,
+        'sleep_impact': 0,
+        'total_calories': 0
+    }  # Placeholder
+
+def analyze_supplements_impact(activities):
+    """Analisi impatto integratori"""
+    return {
+        'total_hrv_impact': 0,
+        'sleep_impact': 0,
+        'stress_impact': 0
+    }  # Placeholder
+
+def analyze_recovery_status(activities, daily_metrics, user_profile):
+    """Analisi stato di recupero"""
+    return {"status": "good"}  # Placeholder
+
+def generate_comprehensive_recommendations(activities, daily_metrics, user_profile):
+    """Genera raccomandazioni complete"""
+    return [
+        "Continua con l'allenamento moderato",
+        "Migliora l'idratazione durante il giorno",
+        "Considera integratori di magnesio per il sonno"
+    ]  # Placeholder
+
+def identify_risk_factors(activities, daily_metrics):
+    """Identifica fattori di rischio"""
+    return []  # Placeholder
+
+def find_optimization_opportunities(activities, daily_metrics, user_profile):
+    """Trova opportunità di ottimizzazione"""
+    return []  # Placeholder
+
+def display_impact_analysis(impact_report):
+    """Visualizza i risultati dell'analisi di impatto"""
+    
+    # 1. SOMMARIO GIORNALIERO
+    st.subheader("📊 Sommario Giornaliero")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Impatto Attività Netto", 
+                 f"{impact_report['daily_summary'].get('net_impact', 0):+.1f}")
+    
+    with col2:
+        st.metric("Score Recupero", 
+                 f"{impact_report['daily_summary'].get('recovery_score', 0)}/10")
+    
+    with col3:
+        st.metric("Bilancio Nutrizionale", 
+                 f"{impact_report['nutrition_analysis'].get('inflammatory_score', 0):+.1f}")
+    
+    with col4:
+        st.metric("Impatto Integratori", 
+                 f"{impact_report['supplement_analysis'].get('total_hrv_impact', 0):+.1f}")
+    
+    # 2. ANALISI DETTAGLIATA PER CATEGORIA
+    with st.expander("🧘 Analisi Dettagliata Attività", expanded=True):
+        for activity_analysis in impact_report['activity_analysis']:
+            display_activity_analysis(activity_analysis)
+    
+    # 3. RACCOMANDAZIONI PERSONALIZZATE
+    with st.expander("💡 Raccomandazioni Personalizzate", expanded=True):
+        for recommendation in impact_report['personalized_recommendations']:
+            st.write(f"• {recommendation}")
+
+def display_activity_analysis(analysis):
+    """Visualizza l'analisi di una singola attività"""
+    
+    activity = analysis['activity']
+    
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
+    
+    with col1:
+        st.write(f"**{activity['name']}**")
+        st.write(f"{activity['start_time'].strftime('%H:%M')} - {activity['duration']}min")
+    
+    with col2:
+        impact_diff = analysis['impact_difference']
+        color = "green" if impact_diff >= 0 else "red"
+        st.write(f"Impatto: :{color}[{impact_diff:+.1f}]")
+    
+    with col3:
+        st.write(f"Recupero: {analysis['recovery_status']}")
+    
+    with col4:
+        for rec in analysis['recommendations'][:1]:  # Prima raccomandazione
+            st.write(f"💡 {rec}")
+
+# =============================================================================
+# DATABASE COMPLETO ATTIVITÀ FISICHE + IMPATTO HRV
+# =============================================================================
+
+ACTIVITY_IMPACT_DB = {
+    # ALLENAMENTI CARDIO
+    "corsa leggera": {
+        "category": "cardio", "intensity": "light", "duration_optimal": (30, 45),
+        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 2,
+        "metabolic_impact": 3, "stress_impact": -2, "sleep_impact": 1,
+        "best_time": "mattina", "frequency": "daily",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["cardiovascolare", "umore", "metabolismo"],
+        "risks": ["infortuni overuse"], "prerequisites": ["riscaldamento"]
+    },
+    
+    "corsa intensa": {
+        "category": "cardio", "intensity": "high", "duration_optimal": (20, 35),
+        "hrv_impact_immediate": -3, "hrv_impact_24h": 1, "recovery_impact": -1,
+        "metabolic_impact": 4, "stress_impact": 1, "sleep_impact": -1,
+        "best_time": "mattina", "frequency": "2-3x/settimana",
+        "hr_zones": ["Z4", "Z5"], "benefits": ["VO2max", "performance"],
+        "risks": ["overtraining", "cortisolo"], "prerequisites": ["base aerobica", "recupero"]
+    },
+    
+    "ciclismo": {
+        "category": "cardio", "intensity": "medium", "duration_optimal": (45, 120),
+        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 1,
+        "metabolic_impact": 3, "stress_impact": -2, "sleep_impact": 1,
+        "best_time": "mattina/pomeriggio", "frequency": "3-5x/settimana",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["resistenza", "articolazioni"],
+        "risks": ["postura"], "prerequisites": ["bike fit"]
+    },
+    
+    "nuoto": {
+        "category": "cardio", "intensity": "medium", "duration_optimal": (30, 60),
+        "hrv_impact_immediate": 0, "hrv_impact_24h": 3, "recovery_impact": 3,
+        "metabolic_impact": 2, "stress_impact": -3, "sleep_impact": 2,
+        "best_time": "qualsiasi", "frequency": "daily",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["full body", "low impact", "respirazione"],
+        "risks": ["minimi"], "prerequisites": ["tecnica"]
+    },
+
+    # ALLENAMENTI FORZA
+    "sollevamento pesi": {
+        "category": "strength", "intensity": "high", "duration_optimal": (45, 90),
+        "hrv_impact_immediate": -2, "hrv_impact_24h": 1, "recovery_impact": -1,
+        "metabolic_impact": 4, "stress_impact": 1, "sleep_impact": 0,
+        "best_time": "pomeriggio", "frequency": "3-4x/settimana",
+        "hr_zones": ["Z3", "Z4"], "benefits": ["muscolo", "metabolismo", "ossa"],
+        "risks": ["infortuni", "cortisolo"], "prerequisites": ["tecnica", "recupero"]
+    },
+    
+    "bodyweight": {
+        "category": "strength", "intensity": "medium", "duration_optimal": (20, 40),
+        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 1,
+        "metabolic_impact": 2, "stress_impact": -1, "sleep_impact": 1,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z2", "Z3"], "benefits": ["funzionale", "flessibilità"],
+        "risks": ["minimi"], "prerequisites": ["progressività"]
+    },
+
+    # ATTIVITÀ RIGENERATIVE
+    "yoga": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
+        "hrv_impact_immediate": 2, "hrv_impact_24h": 3, "recovery_impact": 4,
+        "metabolic_impact": 1, "stress_impact": -4, "sleep_impact": 3,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z1", "Z2"], "benefits": ["flessibilità", "respirazione", "parasimpatico"],
+        "risks": ["minimi"], "prerequisites": ["asana base"]
+    },
+    
+    "meditazione": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (10, 30),
+        "hrv_impact_immediate": 3, "hrv_impact_24h": 2, "recovery_impact": 3,
+        "metabolic_impact": 0, "stress_impact": -5, "sleep_impact": 2,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z1"], "benefits": ["coerenza cardiaca", "mindfulness", "stress"],
+        "risks": ["nessuno"], "prerequisites": ["costanza"]
+    },
+    
+    "respirazione consapevole": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (5, 15),
+        "hrv_impact_immediate": 4, "hrv_impact_24h": 1, "recovery_impact": 2,
+        "metabolic_impact": 0, "stress_impact": -3, "sleep_impact": 1,
+        "best_time": "qualsiasi", "frequency": "multipla giornaliera",
+        "hr_zones": ["Z1"], "benefits": ["coerenza immediata", "ansia", "focus"],
+        "risks": ["nessuno"], "prerequisites": ["tecnica base"]
+    },
+
+    # ATTIVITÀ RICREATIVE
+    "camminata": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
+        "hrv_impact_immediate": 1, "hrv_impact_24h": 2, "recovery_impact": 2,
+        "metabolic_impact": 1, "stress_impact": -2, "sleep_impact": 1,
+        "best_time": "qualsiasi", "frequency": "daily",
+        "hr_zones": ["Z1", "Z2"], "benefits": ["circolazione", "umore", "digestione"],
+        "risks": ["minimi"], "prerequisites": ["scarpe adatte"]
+    },
+    
+    "stretching": {
+        "category": "recovery", "intensity": "light", "duration_optimal": (10, 20),
+        "hrv_impact_immediate": 1, "hrv_impact_24h": 1, "recovery_impact": 2,
+        "metabolic_impact": 0, "stress_impact": -1, "sleep_impact": 1,
+        "best_time": "mattina/sera", "frequency": "daily",
+        "hr_zones": ["Z1"], "benefits": ["mobilità", "recupero muscolare"],
+        "risks": ["stiramenti"], "prerequisites": ["riscaldamento"]
+    }
+}
+
+# =============================================================================
+# DATABASE INTEGRAZIONI + IMPATTO HRV
+# =============================================================================
+
+SUPPLEMENTS_DB = {
+    "magnesio": {
+        "category": "minerale", "timing": "sera", "dosage_optimal": (200, 400),
+        "hrv_impact": 3, "recovery_impact": 3, "sleep_impact": 4, "stress_impact": -3,
+        "mechanism": "rilassamento muscolare, GABA", "best_for": ["sonno", "crampi", "stress"],
+        "synergies": ["vitamina B6", "taurina"], "contraindications": ["renali"],
+        "evidence": "alta", "onset_time": "1-2 ore", "duration": "8-12 ore"
+    },
+    
+    "omega-3": {
+        "category": "acidi grassi", "timing": "pasto", "dosage_optimal": (1000, 2000),
+        "hrv_impact": 2, "recovery_impact": 2, "sleep_impact": 1, "stress_impact": -2,
+        "mechanism": "anti-infiammatorio, fluidità membranale", "best_for": ["infiammazione", "umore", "cuore"],
+        "synergies": ["vitamina E"], "contraindications": ["anticoagulanti"],
+        "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
+    },
+    
+    "vitamina D": {
+        "category": "vitamina", "timing": "mattina", "dosage_optimal": (1000, 4000),
+        "hrv_impact": 2, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
+        "mechanism": "modulazione immunitaria, umore", "best_for": ["immunità", "umore", "ossa"],
+        "synergies": ["K2", "magnesio"], "contraindications": ["ipercalcemia"],
+        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
+    },
+    
+    "ashwagandha": {
+        "category": "adattogeno", "timing": "sera", "dosage_optimal": (300, 600),
+        "hrv_impact": 3, "recovery_impact": 2, "sleep_impact": 2, "stress_impact": -4,
+        "mechanism": "cortisolo, GABA", "best_for": ["stress", "ansia", "recupero"],
+        "synergies": ["magnesio", "L-teanina"], "contraindications": ["tiroide", "gravidanza"],
+        "evidence": "media", "onset_time": "2-4 settimane", "duration": "cronico"
+    },
+    
+    "L-teanina": {
+        "category": "aminoacido", "timing": "qualsiasi", "dosage_optimal": (100, 200),
+        "hrv_impact": 3, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -3,
+        "mechanism": "onde alfa cerebrali, GABA", "best_for": ["ansia", "focus", "rilassamento"],
+        "synergies": ["caffeina", "ashwagandha"], "contraindications": ["minime"],
+        "evidence": "alta", "onset_time": "30-60 min", "duration": "4-6 ore"
+    },
+    
+    "probiotici": {
+        "category": "digestivo", "timing": "mattina", "dosage_optimal": (1, 10), # miliardi
+        "hrv_impact": 1, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
+        "mechanism": "asse intestino-cervello", "best_for": ["digestione", "umore", "immunità"],
+        "synergies": ["prebiotici"], "contraindications": ["immunodepressione"],
+        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
+    },
+    
+    "melatonina": {
+        "category": "ormone", "timing": "pre-sonno", "dosage_optimal": (0.5, 3),
+        "hrv_impact": 2, "recovery_impact": 2, "sleep_impact": 4, "stress_impact": -2,
+        "mechanism": "ritmo circadiano", "best_for": ["sonno", "jet lag"],
+        "synergies": ["magnesio"], "contraindications": ["autoimmuni"],
+        "evidence": "alta", "onset_time": "30 min", "duration": "6-8 ore"
+    },
+    
+    "creatina": {
+        "category": "performance", "timing": "pre/post workout", "dosage_optimal": (3000, 5000),
+        "hrv_impact": 0, "recovery_impact": 2, "sleep_impact": 0, "stress_impact": 0,
+        "mechanism": "sistema fosfageno", "best_for": ["forza", "potenza"],
+        "synergies": ["carboidrati"], "contraindications": ["renali"],
+        "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
+    }
+}
+
+# =============================================================================
+# SISTEMA AVANZATO DI ANALISI IMPATTO
+# =============================================================================
+
+def calculate_comprehensive_impact(activities, daily_metrics, timeline, user_profile):
+    """Analisi completa dell'impatto di tutte le attività sull'HRV"""
+    
+    impact_report = {
+        'daily_summary': calculate_daily_impact_summary(activities, daily_metrics),
+        'activity_analysis': analyze_activities_impact(activities, daily_metrics, timeline),
+        'nutrition_analysis': analyze_nutritional_impact(activities),
+        'supplement_analysis': analyze_supplements_impact(activities),
+        'recovery_analysis': analyze_recovery_status(activities, daily_metrics, user_profile),
+        'personalized_recommendations': generate_comprehensive_recommendations(activities, daily_metrics, user_profile),
+        'risk_factors': identify_risk_factors(activities, daily_metrics),
+        'optimization_opportunities': find_optimization_opportunities(activities, daily_metrics, user_profile)
+    }
+    
+    return impact_report
+
+def analyze_activities_impact(activities, daily_metrics, timeline):
+    """Analisi dettagliata impatto attività fisiche"""
+    
+    activity_analysis = []
+    
+    for activity in activities:
+        if activity['type'] == "Allenamento":
+            analysis = analyze_training_impact(activity, daily_metrics, timeline)
+            activity_analysis.append(analysis)
+    
+    return activity_analysis
+
+def analyze_training_impact(activity, daily_metrics, timeline):
+    """Analisi specifica per allenamenti"""
+    
+    activity_name = activity['name'].lower()
+    impact_data = ACTIVITY_IMPACT_DB.get(activity_name, {})
+    
+    # Trova il giorno dell'attività
+    activity_day = activity['start_time'].date().isoformat()
+    day_metrics = daily_metrics.get(activity_day, {})
+    
+    # Calcola impatto osservato vs atteso
+    expected_impact = impact_data.get('hrv_impact_24h', 0)
+    observed_impact = calculate_observed_hrv_impact(activity, day_metrics, timeline)
+    
+    analysis = {
+        'activity': activity,
+        'expected_impact': expected_impact,
+        'observed_impact': observed_impact,
+        'impact_difference': observed_impact - expected_impact,
+        'recovery_status': assess_recovery_status(activity, day_metrics),
+        'recommendations': generate_training_recommendations(activity, observed_impact, expected_impact)
+    }
+    
+    return analysis
+
+def analyze_nutritional_impact(activities):
+    """Analisi impatto nutrizionale"""
+    
+    nutritional_impact = {
+        'inflammatory_score': 0,
+        'recovery_score': 0,
+        'sleep_impact': 0,
+        'total_calories': 0,
+        'macronutrient_balance': {'protein': 0, 'carbs': 0, 'fat': 0},
+        'micronutrient_score': 0,
+        'meal_timing_analysis': {}
+    }
+    
+    for activity in activities:
+        if activity['type'] == "Alimentazione" and activity.get('food_items'):
+            food_impact = analyze_meal_impact(activity)
+            nutritional_impact['inflammatory_score'] += food_impact['inflammatory_score']
+            nutritional_impact['recovery_score'] += food_impact['recovery_score']
+            nutritional_impact['sleep_impact'] += food_impact['sleep_impact']
+            nutritional_impact['total_calories'] += food_impact['calories']
+            
+            # Analisi timing pasti
+            meal_time = activity['start_time']
+            nutritional_impact['meal_timing_analysis'][meal_time.strftime('%H:%M')] = food_impact
+    
+    return nutritional_impact
+
+def analyze_supplements_impact(activities):
+    """Analisi impatto integratori"""
+    
+    supplements_taken = []
+    supplement_impact = {
+        'total_hrv_impact': 0,
+        'sleep_impact': 0,
+        'stress_impact': 0,
+        'recovery_impact': 0,
+        'interactions': [],
+        'timing_analysis': {}
+    }
+    
+    for activity in activities:
+        if activity['type'] == "Integrazione" and activity.get('food_items'):
+            supplements = [s.strip().lower() for s in activity['food_items'].split(',')]
+            
+            for supplement in supplements:
+                supp_data = SUPPLEMENTS_DB.get(supplement)
+                if supp_data:
+                    supplement_impact['total_hrv_impact'] += supp_data['hrv_impact']
+                    supplement_impact['sleep_impact'] += supp_data['sleep_impact']
+                    supplement_impact['stress_impact'] += supp_data['stress_impact']
+                    supplement_impact['recovery_impact'] += supp_data['recovery_impact']
+                    
+                    supplements_taken.append({
+                        'name': supplement,
+                        'data': supp_data,
+                        'timing': activity['start_time']
+                    })
+    
+    supplement_impact['supplements_taken'] = supplements_taken
+    return supplement_impact
+
+def calculate_observed_hrv_impact(activity, day_metrics, timeline):
+    """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
+    
+    if not day_metrics:
+        return 0
+    
+    # Confronta con baseline o giorno precedente
+    activity_time = activity['start_time']
+    
+    # Cerca periodo pre-attività (4 ore prima)
+    pre_activity_metrics = find_pre_activity_metrics(activity_time, timeline, 4)  # 4 ore prima
+    
+    # Cerca periodo post-attività (24 ore dopo)
+    post_activity_metrics = find_post_activity_metrics(activity_time, timeline, 24)  # 24 ore dopo
+    
+    if pre_activity_metrics and post_activity_metrics:
+        # Calcola differenza RMSSD (indicatore recupero)
+        rmssd_change = post_activity_metrics.get('rmssd', 0) - pre_activity_metrics.get('rmssd', 0)
+        return normalize_impact_score(rmssd_change)
+    
+    return 0
+
+def generate_comprehensive_recommendations(activities, daily_metrics, user_profile):
+    """Genera raccomandazioni complete basate su tutti i dati"""
+    
+    recommendations = []
+    
+    # 1. Raccomandazioni attività fisica
+    training_recs = generate_training_recommendations_batch(activities, daily_metrics)
+    recommendations.extend(training_recs)
+    
+    # 2. Raccomandazioni nutrizionali
+    nutrition_recs = generate_nutrition_recommendations(activities, daily_metrics)
+    recommendations.extend(nutrition_recs)
+    
+    # 3. Raccomandazioni integratori
+    supplement_recs = generate_supplement_recommendations(activities, daily_metrics, user_profile)
+    recommendations.extend(supplement_recs)
+    
+    # 4. Raccomandazioni recupero
+    recovery_recs = generate_recovery_recommendations(activities, daily_metrics)
+    recommendations.extend(recovery_recs)
+    
+    # 5. Raccomandazioni sonno
+    sleep_recs = generate_sleep_recommendations(daily_metrics)
+    recommendations.extend(sleep_recs)
+    
+    return recommendations
+
+# =============================================================================
+# FUNZIONI DI SUPPORTO PER L'ANALISI
+# =============================================================================
+
+def find_pre_activity_metrics(activity_time, timeline, hours_before=4):
+    """Trova le metriche HRV nel periodo prima dell'attività"""
+    start_search = activity_time - timedelta(hours=hours_before)
+    
+    # Cerca nel giorno corrispondente o giorno precedente
+    for day_date, day_rr in timeline['days_data'].items():
+        day_dt = datetime.fromisoformat(day_date).date()
+        if day_dt == start_search.date():
+            return calculate_realistic_hrv_metrics(day_rr, 35, 'Uomo')  # Valori placeholder
+    
+    return None
+
+def find_post_activity_metrics(activity_time, timeline, hours_after=24):
+    """Trova le metriche HRV nel periodo dopo l'attività"""
+    end_search = activity_time + timedelta(hours=hours_after)
+    
+    for day_date, day_rr in timeline['days_data'].items():
+        day_dt = datetime.fromisoformat(day_date).date()
+        if day_dt == end_search.date():
+            return calculate_realistic_hrv_metrics(day_rr, 35, 'Uomo')  # Valori placeholder
+    
+    return None
+
+def normalize_impact_score(raw_change, max_change=20):
+    """Normalizza il punteggio di impatto tra -5 e +5"""
+    normalized = (raw_change / max_change) * 5
+    return max(-5, min(5, normalized))
+
+def assess_recovery_status(activity, day_metrics):
+    """Valuta lo stato di recupero basato sull'attività e metriche HRV"""
+    
+    if not day_metrics:
+        return "unknown"
+    
+    rmssd = day_metrics.get('rmssd', 0)
+    sdnn = day_metrics.get('sdnn', 0)
+    
+    # Soglie basate su letteratura
+    if rmssd > 50 and sdnn > 40:
+        return "optimal"
+    elif rmssd > 30 and sdnn > 30:
+        return "good" 
+    elif rmssd > 20 and sdnn > 20:
+        return "moderate"
+    else:
+        return "poor"
+
+# =============================================================================
+# INTEGRAZIONE NEL MAIN
+# =============================================================================
+
+def add_impact_analysis_to_main():
+    """Aggiungi l'analisi di impatto all'interfaccia principale"""
+    
+    # Dopo il calcolo delle metriche giornaliere, aggiungi:
+    if uploaded_file is not None and len(rr_intervals) > 0:
+        
+        # ... [codice esistente] ...
+        
+        # NUOVA SEZIONE: ANALISI IMPATTO ATTIVITÀ
+        st.header("🎯 Analisi Impatto Attività sull'HRV")
+        
+        if st.session_state.activities:
+            impact_report = calculate_comprehensive_impact(
+                st.session_state.activities, 
+                daily_metrics, 
+                timeline,
+                st.session_state.user_profile
+            )
+            
+            # Visualizza risultati
+            display_impact_analysis(impact_report)
+            
+        else:
+            st.info("Aggiungi attività nel pannello laterale per vedere l'analisi dell'impatto sull'HRV")
+
+def display_impact_analysis(impact_report):
+    """Visualizza i risultati dell'analisi di impatto"""
+    
+    # 1. SOMMARIO GIORNALIERO
+    st.subheader("📊 Sommario Giornaliero")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Impatto Attività Netto", 
+                 f"{impact_report['daily_summary'].get('net_impact', 0):+.1f}")
+    
+    with col2:
+        st.metric("Score Recupero", 
+                 f"{impact_report['daily_summary'].get('recovery_score', 0)}/10")
+    
+    with col3:
+        st.metric("Bilancio Nutrizionale", 
+                 f"{impact_report['nutrition_analysis'].get('inflammatory_score', 0):+.1f}")
+    
+    with col4:
+        st.metric("Impatto Integratori", 
+                 f"{impact_report['supplement_analysis'].get('total_hrv_impact', 0):+.1f}")
+    
+    # 2. ANALISI DETTAGLIATA PER CATEGORIA
+    with st.expander("🧘 Analisi Dettagliata Attività", expanded=True):
+        for activity_analysis in impact_report['activity_analysis']:
+            display_activity_analysis(activity_analysis)
+    
+    # 3. RACCOMANDAZIONI PERSONALIZZATE
+    with st.expander("💡 Raccomandazioni Personalizzate", expanded=True):
+        for recommendation in impact_report['personalized_recommendations']:
+            st.write(f"• {recommendation}")
+    
+    # 4. ANALISI NUTRIZIONALE
+    with st.expander("🍎 Analisi Nutrizionale", expanded=False):
+        display_nutrition_analysis(impact_report['nutrition_analysis'])
+    
+    # 5. ANALISI INTEGRATORI
+    with st.expander("💊 Analisi Integratori", expanded=False):
+        display_supplement_analysis(impact_report['supplement_analysis'])
+
+def display_activity_analysis(analysis):
+    """Visualizza l'analisi di una singola attività"""
+    
+    activity = analysis['activity']
+    
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
+    
+    with col1:
+        st.write(f"**{activity['name']}**")
+        st.write(f"{activity['start_time'].strftime('%H:%M')} - {activity['duration']}min")
+    
+    with col2:
+        impact_diff = analysis['impact_difference']
+        color = "green" if impact_diff >= 0 else "red"
+        st.write(f"Impatto: :{color}[{impact_diff:+.1f}]")
+    
+    with col3:
+        st.write(f"Recupero: {analysis['recovery_status']}")
+    
+    with col4:
+        for rec in analysis['recommendations'][:1]:  # Prima raccomandazione
+            st.write(f"💡 {rec}")
+
+# Aggiungi questa chiamata nella funzione main() dopo l'analisi HRV
+# add_impact_analysis_to_main()
 
 # Colori per i tipi di attività
 ACTIVITY_COLORS = {
@@ -1571,7 +2598,22 @@ def main():
                     st.success("✅ Analisi salvata nel database!")
                 else:
                     st.error("❌ Salva prima il profilo utente!")
-            # 🔼🔼🔼 FINE NUOVA ANALISI 🔼🔼🔼
+
+            # 🆕 NUOVA SEZIONE: ANALISI IMPATTO ATTIVITÀ
+            st.header("🎯 Analisi Impatto Attività sull'HRV")
+            
+            if st.session_state.activities:
+                impact_report = calculate_comprehensive_impact(
+                    st.session_state.activities, 
+                    daily_metrics, 
+                    timeline,
+                    st.session_state.user_profile
+                )
+                
+                display_impact_analysis(impact_report)
+                
+            else:
+                st.info("Aggiungi attività nel pannello laterale per vedere l'analisi dell'impatto sull'HRV")
             
         except Exception as e:
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
