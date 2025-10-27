@@ -2768,44 +2768,35 @@ def main():
                 else:
                     st.error("❌ Utente non trovato nel database di sessione")
 
-            # 6. REPORT BELLO PDF COLORATO
-            st.header("🎨 Report Super Colorato")
-            
-            if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
-                with st.spinner("🎨 Sto creando il report colorato..."):
-                    try:
-                        # 🆕 CREA I GRAFICI GIORNALIERI
-                        daily_plots = create_daily_plots(daily_metrics, timeline, st.session_state.activities)
-                        
-                        # 🆕 CREA IL PDF BELLO
-            if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
-                with st.spinner("🎨 Sto creando il report colorato..."):
-                    try:
-                        # 🆕 CREA I GRAFICI GIORNALIERI
-                        daily_plots = create_daily_plots(daily_metrics, timeline, st.session_state.activities)
-                        
-                        pdf_buffer = generate_beautiful_pdf_report(
-                            st.session_state.user_profile,
-                            timeline, 
-                            daily_metrics,
-                            avg_metrics,
-                            st.session_state.activities,
-                            rr_intervals
-                        )
-                        
-                        if pdf_buffer:
-                            filename = f"report_bello_{st.session_state.user_profile['name']}.pdf"
-                            display_pdf_download_button(pdf_buffer, filename)
-                            st.success("✅ Report bellissimo pronto! 🎉")
-                            st.balloons()  # 🎈 PALLONCINI! 🎈
-                        else:
-                            st.error("❌ Errore nella generazione del PDF")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Errore durante la creazione del report: {e}")
+# 6. REPORT BELLO PDF COLORATO
+st.header("🎨 Report Super Colorato")
 
-    except Exception as e:
-        st.error(f"❌ Errore nel processare il file: {e}")
+if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
+    with st.spinner("🎨 Sto creando il report colorato..."):
+        try:
+            # 🆕 CREA I GRAFICI GIORNALIERI
+            daily_plots = create_daily_plots(daily_metrics, timeline, st.session_state.activities)
+            
+            # 🆕 CREA IL PDF BELLO
+            pdf_buffer = generate_beautiful_pdf_report(
+                st.session_state.user_profile,
+                timeline, 
+                daily_metrics,
+                avg_metrics,
+                st.session_state.activities,
+                rr_intervals
+            )
+            
+            if pdf_buffer:
+                filename = f"report_bello_{st.session_state.user_profile['name']}.pdf"
+                display_pdf_download_button(pdf_buffer, filename)
+                st.success("✅ Report bellissimo pronto! 🎉")
+                st.balloons()  # 🎈 PALLONCINI! 🎈
+            else:
+                st.error("❌ Errore nella generazione del PDF")
+                
+        except Exception as e:
+            st.error(f"❌ Errore durante la creazione del report: {e}")
     
     else:
         # Schermata iniziale
