@@ -398,6 +398,25 @@ def get_user_key(user_profile):
             # Se è un oggetto date, formatta come DDMMYYYY
             birth_str = birth_date.strftime('%d%m%Y')
         else:
+            # Se è una stringa, prova a parsarladef get_user_key(user_profile):
+    """Crea una chiave univoca per l'utente - VERSIONE ROBUSTA"""
+    try:
+        name = user_profile.get('name', '').strip().lower()
+        surname = user_profile.get('surname', '').strip().lower()
+        birth_date = user_profile.get('birth_date')
+        
+        # Debug
+        print(f"DEBUG get_user_key - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
+        
+        if not name or not surname or not birth_date:
+            st.error("❌ Nome, cognome e data di nascita sono obbligatori")
+            return None
+        
+        # 🆕 FORMATTA DATA IN MODO CONSISTENTE
+        if hasattr(birth_date, 'strftime'):
+            # Se è un oggetto date, formatta come DDMMYYYY
+            birth_str = birth_date.strftime('%d%m%Y')
+        else:
             # Se è una stringa, prova a parsarla
             try:
                 # Prova formato italiano DD/MM/YYYY
@@ -412,16 +431,18 @@ def get_user_key(user_profile):
                     # Usa la stringa originale pulita
                     birth_str = str(birth_date).replace('-', '').replace('/', '').replace(' ', '')
         
-        # Pulisci i caratteri speciali
+        # 🆕 PULIZIA CONSISTENTE
         name_clean = re.sub(r'[^a-zA-Z0-9]', '', name)
         surname_clean = re.sub(r'[^a-zA-Z0-9]', '', surname)
         birth_clean = re.sub(r'[^0-9]', '', birth_str)
         
         user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
         
+        print(f"DEBUG - User Key generata: {user_key}")
         return user_key.lower()
         
     except Exception as e:
+        print(f"DEBUG - Errore in get_user_key: {e}")
         st.error(f"❌ Errore nella generazione della chiave utente: {e}")
         return None
         
@@ -1386,20 +1407,26 @@ def load_user_into_session(user_data):
     user_key_selected = list(user_data.keys())[0]  # Prende la chiave originale
     user_data_selected = user_data[user_key_selected]
     
-    # CARICA I DATI NEL PROFILO
-    st.session_state.user_profile = copy.deepcopy(user_data_selected['profile'])
+    # 🆕 AGGIORNA TUTTI I CAMPI DEL PROFILO
+    profile = user_data_selected['profile']
     
-    # CALCOLA ETÀ
-    if st.session_state.user_profile['birth_date']:
-        age = datetime.now().year - st.session_state.user_profile['birth_date'].year
-        if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
-            age -= 1
-        st.session_state.user_profile['age'] = age
+    # Aggiorna i campi del profilo nella sessione
+    st.session_state.user_profile = {
+        'name': profile.get('name', ''),
+        'surname': profile.get('surname', ''),
+        'birth_date': profile.get('birth_date'),
+        'gender': profile.get('gender', 'Uomo'),
+        'age': profile.get('age', 0)
+    }
     
-    # 🆕 USA LA CHIAVE ORIGINALE DEL DATABASE
-    st.session_state.user_database[user_key_selected] = copy.deepcopy(user_data_selected)
+    # 🆕 FORZA L'AGGIORNAMENTO DEI WIDGET STREAMLIT
+    # Usiamo session state per forzare l'aggiornamento
+    st.session_state.name_input = profile.get('name', '')
+    st.session_state.surname_input = profile.get('surname', '')
+    st.session_state.birth_date_input = profile.get('birth_date')
+    st.session_state.gender_select = profile.get('gender', 'Uomo')
     
-    st.success(f"✅ {st.session_state.user_profile['name']} {st.session_state.user_profile['surname']} caricato!")
+    st.success(f"✅ {profile.get('name', '')} {profile.get('surname', '')} caricato!")
     st.rerun()
 
 def delete_user_from_database(user_key):
@@ -2076,12 +2103,20 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            st.session_state.user_profile['name'] = st.text_input("Nome", value=st.session_state.user_profile['name'], key="name_input")
+            st.session_state.user_profile['name'] = st.text_input(
+                "Nome", 
+                value=st.session_state.user_profile.get('name', ''), 
+                key="name_input"
+            )
         with col2:
-            st.session_state.user_profile['surname'] = st.text_input("Cognome", value=st.session_state.user_profile['surname'], key="surname_input")
+            st.session_state.user_profile['surname'] = st.text_input(
+                "Cognome", 
+                value=st.session_state.user_profile.get('surname', ''), 
+                key="surname_input"
+            )
         
-        # Data di nascita - 🆕 CORREGGI IL BINDING
-        current_birth_date = st.session_state.user_profile['birth_date']
+        # Data di nascita - CORREGGI IL BINDING
+        current_birth_date = st.session_state.user_profile.get('birth_date')
         if current_birth_date is None:
             current_birth_date = datetime(1980, 1, 1).date()
 
@@ -2097,13 +2132,17 @@ def main():
         if st.session_state.user_profile['birth_date']:
             st.write(f"Data selezionata: {st.session_state.user_profile['birth_date'].strftime('%d/%m/%Y')}")
         
-        # 🆕 CORREGGI ANCHE IL GENDER
-        gender = st.selectbox("Sesso", ["Uomo", "Donna"], 
-                            index=0 if st.session_state.user_profile.get('gender', 'Uomo') == 'Uomo' else 1,
-                            key="gender_select")
+        # CORREGGI ANCHE IL GENDER
+        current_gender = st.session_state.user_profile.get('gender', 'Uomo')
+        gender = st.selectbox(
+            "Sesso", 
+            ["Uomo", "Donna"], 
+            index=0 if current_gender == 'Uomo' else 1,
+            key="gender_select"
+        )
         st.session_state.user_profile['gender'] = gender
         
-        # 🆕 CALCOLA ETA' SEMPRE
+        # CALCOLA ETA' SEMPRE
         if st.session_state.user_profile['birth_date']:
             age = datetime.now().year - st.session_state.user_profile['birth_date'].year
             if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
