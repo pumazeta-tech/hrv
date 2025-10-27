@@ -2781,48 +2781,48 @@ def main():
                     with col4:
                         st.metric("Battiti Totali", len(rr_intervals))
             
-# 5. SALVATAGGIO ANALISI - VERSIONE MIGLIORATA
-if st.button("💾 Salva Analisi nel Database", type="primary"):
-    # PRIMA SALVA L'UTENTE SE NON ESISTE
-    user_key = get_user_key(st.session_state.user_profile)
-    
-    st.write(f"🔍 User Key: {user_key}")
-    st.write(f"🔍 Utenti nel database: {list(st.session_state.user_database.keys())}")
-    
-    # Se l'utente non esiste nel database, salvalo prima
-    if user_key and user_key not in st.session_state.user_database:
-        st.info("🔄 Utente non trovato, salvo prima il profilo...")
-        if save_current_user():
-            st.success("✅ Profilo utente salvato!")
-        else:
-            st.error("❌ Errore nel salvare il profilo utente")
-            return
-    
-    if user_key and user_key in st.session_state.user_database:
-        analysis_data = {
-            'timestamp': datetime.now().isoformat(),
-            'recording_start': timeline['start_time'].isoformat(),
-            'recording_end': timeline['end_time'].isoformat(),
-            'recording_duration_hours': timeline['total_duration_hours'],
-            'rr_intervals_count': len(rr_intervals),
-            'overall_metrics': avg_metrics,
-            'daily_metrics': daily_metrics
-        }
-        
-        # Inizializza la lista analyses se non esiste
-        if 'analyses' not in st.session_state.user_database[user_key]:
-            st.session_state.user_database[user_key]['analyses'] = []
-        
-        st.session_state.user_database[user_key]['analyses'].append(analysis_data)
-        
-        if save_user_database():
-            st.success("✅ Analisi salvata nel database!")
-            st.rerun()
-        else:
-            st.error("❌ Errore nel salvare il database")
-    else:
-        st.error("❌ Utente non trovato nel database di sessione")
-        st.info("💡 Prima salva il profilo utente con il pulsante 'Salva/Modifica Utente'")
+            # 5. SALVATAGGIO ANALISI - VERSIONE MIGLIORATA
+            if st.button("💾 Salva Analisi nel Database", type="primary"):
+                # PRIMA SALVA L'UTENTE SE NON ESISTE
+                user_key = get_user_key(st.session_state.user_profile)
+                
+                st.write(f"🔍 User Key: {user_key}")
+                st.write(f"🔍 Utenti nel database: {list(st.session_state.user_database.keys())}")
+                
+                # Se l'utente non esiste nel database, salvalo prima
+                if user_key and user_key not in st.session_state.user_database:
+                    st.info("🔄 Utente non trovato, salvo prima il profilo...")
+                    if save_current_user():
+                        st.success("✅ Profilo utente salvato!")
+                    else:
+                        st.error("❌ Errore nel salvare il profilo utente")
+                        return
+                
+                if user_key and user_key in st.session_state.user_database:
+                    analysis_data = {
+                        'timestamp': datetime.now().isoformat(),
+                        'recording_start': timeline['start_time'].isoformat(),
+                        'recording_end': timeline['end_time'].isoformat(),
+                        'recording_duration_hours': timeline['total_duration_hours'],
+                        'rr_intervals_count': len(rr_intervals),
+                        'overall_metrics': avg_metrics,
+                        'daily_metrics': daily_metrics
+                    }
+                    
+                    # Inizializza la lista analyses se non esiste
+                    if 'analyses' not in st.session_state.user_database[user_key]:
+                        st.session_state.user_database[user_key]['analyses'] = []
+                    
+                    st.session_state.user_database[user_key]['analyses'].append(analysis_data)
+                    
+                    if save_user_database():
+                        st.success("✅ Analisi salvata nel database!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Errore nel salvare il database")
+                else:
+                    st.error("❌ Utente non trovato nel database di sessione")
+                    st.info("💡 Prima salva il profilo utente con il pulsante 'Salva/Modifica Utente'")
 
             # 6. REPORT BELLO PDF COLORATO
             st.header("🎨 Report Super Colorato")
