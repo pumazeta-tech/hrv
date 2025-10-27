@@ -1657,6 +1657,69 @@ def display_pdf_download_button(pdf_buffer, filename):
     </div>
     ''', unsafe_allow_html=True)
 
+def display_complete_analysis_history(user_key):
+    """Mostra la storia completa di tutte le analisi dell'utente"""
+    if user_key not in st.session_state.user_database:
+        return
+    
+    user_analyses = st.session_state.user_database[user_key].get('analyses', [])
+    
+    if len(user_analyses) <= 1:  # Solo analisi corrente o nessuna
+        st.info("📝 Solo una analisi presente - Registra più dati per vedere l'evoluzione!")
+        return
+    
+    st.subheader("📈 Evoluzione Metriche HRV nel Tempo")
+    
+    # Prepara dati per il grafico temporale
+    dates = []
+    sdnn_values = []
+    rmssd_values = []
+    hr_values = []
+    coherence_values = []
+    
+    for analysis in sorted(user_analyses, key=lambda x: x['recording_start']):
+        start_date = datetime.fromisoformat(analysis['recording_start']).strftime('%d/%m/%Y')
+        dates.append(start_date)
+        metrics = analysis.get('overall_metrics', {})
+        sdnn_values.append(metrics.get('sdnn', 0))
+        rmssd_values.append(metrics.get('rmssd', 0))
+        hr_values.append(metrics.get('hr_mean', 0))
+        coherence_values.append(metrics.get('coherence', 0))
+    
+    # Grafico evoluzione SDNN/RMSSD/HR
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=dates, y=sdnn_values, name='SDNN', line=dict(color='#3498db', width=4), marker=dict(size=8)))
+    fig.add_trace(go.Scatter(x=dates, y=rmssd_values, name='RMSSD', line=dict(color='#2ecc71', width=4), marker=dict(size=8)))
+    fig.add_trace(go.Scatter(x=dates, y=hr_values, name='Battito', line=dict(color='#e74c3c', width=4), marker=dict(size=8), yaxis='y2'))
+    
+    fig.update_layout(
+        title='📊 Andamento Metriche Principali',
+        xaxis=dict(title='Data Registrazione', tickangle=45),
+        yaxis=dict(title='SDNN/RMSSD (ms)', color='#3498db', gridcolor='#f0f0f0'),
+        yaxis2=dict(title='Battito (bpm)', color='#e74c3c', overlaying='y', side='right', gridcolor='#f0f0f0'),
+        height=400,
+        showlegend=True,
+        plot_bgcolor='rgba(240,240,240,0.1)'
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Grafico Coerenza
+    fig_coherence = go.Figure()
+    fig_coherence.add_trace(go.Scatter(x=dates, y=coherence_values, name='Coerenza Cardiaca', 
+                                     line=dict(color='#9b59b6', width=4), marker=dict(size=8)))
+    
+    fig_coherence.update_layout(
+        title='🎯 Andamento Coerenza Cardiaca',
+        xaxis=dict(title='Data Registrazione', tickangle=45),
+        yaxis=dict(title='Coerenza (%)', color='#9b59b6', gridcolor='#f0f0f0'),
+        height=300,
+        showlegend=True,
+        plot_bgcolor='rgba(240,240,240,0.1)'
+    )
+    
+    st.plotly_chart(fig_coherence, use_container_width=True)
+
 # =============================================================================
 # FUNZIONE PRINCIPALE - VERSIONE CORRETTA
 # =============================================================================
@@ -2038,13 +2101,74 @@ def main():
             else:
                 st.info("🌞 Registrazione diurna - Dati sul sonno non disponibili")
             
-            # 4. METRICHE DETTAGLIATE PER GIORNO - TABELLE SEPARATE
-            with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
+            # 4. METRICHE DETTAGLIATE PER GIORNO - CON STORICO COMPLETO
+            with st.expander("📅 Metriche Dettagliate per Giorno + Storico Completo", expanded=True):
+                
+                # 🆕 SEZIONE STORICO ANALISI PRECEDENTI
+                user_key = get_user_key(st.session_state.user_profile)
+                if user_key and user_key in st.session_state.user_database:
+                    user_analyses = st.session_state.user_database[user_key].get('analyses', [])
+                    
+                    if len(user_analyses) > 0:
+                        st.subheader("📊 Storico Analisi Complete")
+                        
+                        # Tabella riassuntiva di TUTTE le analisi
+                        storico_data = []
+                        for i, analysis in enumerate(sorted(user_analyses, key=lambda x: x['recording_start'], reverse=True)):
+                            start_date = datetime.fromisoformat(analysis['recording_start']).strftime('%d/%m/%Y %H:%M')
+                            end_date = datetime.fromisoformat(analysis['recording_end']).strftime('%d/%m/%Y %H:%M')
+                            metrics = analysis.get('overall_metrics', {})
+                            
+                            # Evidenzia l'analisi corrente
+                            is_current = (analysis.get('recording_start') == timeline['start_time'].isoformat())
+                            prefix = "📍 " if is_current else "📅 "
+                            
+                            storico_data.append({
+                                'Analisi': f"{prefix}Registrazione {i+1}",
+                                'Periodo': f"{start_date} → {end_date}",
+                                'Durata (h)': f"{analysis.get('recording_duration_hours', 0):.1f}",
+                                'Battiti Totali': f"{analysis.get('rr_intervals_count', 0):,}".replace(',', '.'),
+                                'SDNN Medio': f"{metrics.get('sdnn', 0):.1f} ms",
+                                'RMSSD Medio': f"{metrics.get('rmssd', 0):.1f} ms", 
+                                'Battito Medio': f"{metrics.get('hr_mean', 0):.1f} bpm",
+                                'Coerenza': f"{metrics.get('coherence', 0):.1f}%"
+                            })
+                        
+                        if storico_data:
+                            storico_df = pd.DataFrame(storico_data)
+                            st.dataframe(
+                                storico_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                height=min(400, 50 + len(storico_df) * 35)
+                            )
+                            
+                            # 🆕 GRAFICO EVOLUZIONE NEL TEMPO
+                            display_complete_analysis_history(user_key)
+                            
+                            # 🆕 DOWNLOAD STORICO COMPLETO
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                storico_csv = storico_df.to_csv(index=False, sep=';')
+                                st.download_button(
+                                    label="📥 Scarica Storico Completo",
+                                    data=storico_csv,
+                                    file_name=f"storico_completo_{st.session_state.user_profile['name']}.csv",
+                                    mime="text/csv",
+                                    use_container_width=True
+                                )
+                            with col2:
+                                st.info(f"📈 **{len(user_analyses)} analisi** trovate per {st.session_state.user_profile['name']}")
+                
+                # SEZIONE ANALISI CORRENTE (giorno per giorno)
+                st.markdown("---")
+                st.subheader("🧮 Analisi Corrente - Dettaglio Giornaliero")
+                
                 if not daily_metrics:
                     st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
                 else:
                     # TABELLA 1: METRICHE HRV E SPETTRALI
-                    st.subheader("🧮 Metriche HRV e Analisi Spettrale")
+                    st.subheader("📊 Metriche HRV e Analisi Spettrale")
                     
                     hrv_table_data = []
                     
@@ -2137,13 +2261,12 @@ def main():
                         else:
                             st.download_button(
                                 label="📥 Scarica Metriche Sonno",
-                                data="",  # Dati vuoti
+                                data="",
                                 file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
                                 mime="text/csv",
                                 use_container_width=True,
-                                disabled=True  # Disabilita il pulsante
-                            )
-                    
+                                disabled=True
+                            )                    
                     # Grafico dettagliato con zoom interattivo e attività
                     st.subheader("📈 Andamento Dettagliato HRV con Attività")
                     
