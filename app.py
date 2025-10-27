@@ -1658,19 +1658,19 @@ def display_pdf_download_button(pdf_buffer, filename):
     ''', unsafe_allow_html=True)
 
 def display_complete_analysis_history(user_key):
-    """Mostra la storia completa di tutte le analisi dell'utente"""
+    """Mostra la storia completa di tutte le analisi dell'utente con dettaglio giornaliero"""
     if user_key not in st.session_state.user_database:
         return
     
     user_analyses = st.session_state.user_database[user_key].get('analyses', [])
     
-    if len(user_analyses) <= 1:  # Solo analisi corrente o nessuna
+    if len(user_analyses) <= 1:
         st.info("📝 Solo una analisi presente - Registra più dati per vedere l'evoluzione!")
         return
     
     st.subheader("📈 Evoluzione Metriche HRV nel Tempo")
     
-    # Prepara dati per il grafico temporale
+    # Prepara dati per il grafico temporale (media per analisi)
     dates = []
     sdnn_values = []
     rmssd_values = []
@@ -2104,43 +2104,72 @@ def main():
             # 4. METRICHE DETTAGLIATE PER GIORNO - CON STORICO COMPLETO
             with st.expander("📅 Metriche Dettagliate per Giorno + Storico Completo", expanded=True):
                 
-                # 🆕 SEZIONE STORICO ANALISI PRECEDENTI
+                # 🆕 SEZIONE STORICO ANALISI PRECEDENTI CON DETTAGLIO GIORNALIERO
                 user_key = get_user_key(st.session_state.user_profile)
                 if user_key and user_key in st.session_state.user_database:
                     user_analyses = st.session_state.user_database[user_key].get('analyses', [])
                     
                     if len(user_analyses) > 0:
-                        st.subheader("📊 Storico Analisi Complete")
+                        st.subheader("📊 Storico Analisi Complete - Dettaglio Giornaliero")
                         
-                        # Tabella riassuntiva di TUTTE le analisi
-                        storico_data = []
+                        # 🆕 TABELLA DETTAGLIATA GIORNO PER GIORNO
+                        storico_giornaliero_data = []
+                        
                         for i, analysis in enumerate(sorted(user_analyses, key=lambda x: x['recording_start'], reverse=True)):
-                            start_date = datetime.fromisoformat(analysis['recording_start']).strftime('%d/%m/%Y %H:%M')
-                            end_date = datetime.fromisoformat(analysis['recording_end']).strftime('%d/%m/%Y %H:%M')
+                            start_date = datetime.fromisoformat(analysis['recording_start']).strftime('%d/%m/%Y')
+                            end_date = datetime.fromisoformat(analysis['recording_end']).strftime('%d/%m/%Y')
                             metrics = analysis.get('overall_metrics', {})
+                            daily_metrics = analysis.get('daily_metrics', {})
                             
                             # Evidenzia l'analisi corrente
                             is_current = (analysis.get('recording_start') == timeline['start_time'].isoformat())
                             prefix = "📍 " if is_current else "📅 "
                             
-                            storico_data.append({
-                                'Analisi': f"{prefix}Registrazione {i+1}",
-                                'Periodo': f"{start_date} → {end_date}",
-                                'Durata (h)': f"{analysis.get('recording_duration_hours', 0):.1f}",
-                                'Battiti Totali': f"{analysis.get('rr_intervals_count', 0):,}".replace(',', '.'),
-                                'SDNN Medio': f"{metrics.get('sdnn', 0):.1f} ms",
-                                'RMSSD Medio': f"{metrics.get('rmssd', 0):.1f} ms", 
-                                'Battito Medio': f"{metrics.get('hr_mean', 0):.1f} bpm",
-                                'Coerenza': f"{metrics.get('coherence', 0):.1f}%"
+                            # 🆕 AGGIUNGI RIGA PER L'ANALISI COMPLESSIVA
+                            storico_giornaliero_data.append({
+                                'Giorno': f"{prefix}MEDIA {start_date}→{end_date}",
+                                'Tipo': '📊 Media Registrazione',
+                                'SDNN (ms)': f"{metrics.get('sdnn', 0):.1f}",
+                                'RMSSD (ms)': f"{metrics.get('rmssd', 0):.1f}",
+                                'Battito (bpm)': f"{metrics.get('hr_mean', 0):.1f}",
+                                'Coerenza (%)': f"{metrics.get('coherence', 0):.1f}",
+                                'Sonno (h)': f"{metrics.get('sleep_duration', 0):.1f}" if metrics.get('sleep_duration') else "N/D",
+                                'Efficienza Sonno (%)': f"{metrics.get('sleep_efficiency', 0):.1f}" if metrics.get('sleep_efficiency') else "N/D"
                             })
+                            
+                            # 🆕 AGGIUNGI RIGHE PER OGNI GIORNO DELL'ANALISI
+                            for day_date, day_metrics in daily_metrics.items():
+                                day_dt = datetime.fromisoformat(day_date)
+                                day_str = day_dt.strftime('%d/%m/%Y')
+                                
+                                storico_giornaliero_data.append({
+                                    'Giorno': f"   📅 {day_str}",
+                                    'Tipo': '📈 Dettaglio Giornaliero',
+                                    'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
+                                    'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
+                                    'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
+                                    'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
+                                    'Sonno (h)': f"{day_metrics.get('sleep_duration', 0):.1f}" if day_metrics.get('sleep_duration') else "N/D",
+                                    'Efficienza Sonno (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}" if day_metrics.get('sleep_efficiency') else "N/D"
+                                })
                         
-                        if storico_data:
-                            storico_df = pd.DataFrame(storico_data)
+                        if storico_giornaliero_data:
+                            storico_df = pd.DataFrame(storico_giornaliero_data)
+                            
+                            # 🆕 APPLICA STILE PER MIGLIORE LEGGIBILITÀ
+                            def style_storico_row(row):
+                                if 'MEDIA' in row['Giorno']:
+                                    return ['background-color: #e8f4fd; font-weight: bold'] * len(row)
+                                elif 'Dettaglio Giornaliero' in row['Tipo']:
+                                    return ['background-color: #f9f9f9'] * len(row)
+                                else:
+                                    return [''] * len(row)
+                            
                             st.dataframe(
-                                storico_df,
+                                storico_df.style.apply(style_storico_row, axis=1),
                                 use_container_width=True,
                                 hide_index=True,
-                                height=min(400, 50 + len(storico_df) * 35)
+                                height=min(500, 100 + len(storico_df) * 25)
                             )
                             
                             # 🆕 GRAFICO EVOLUZIONE NEL TEMPO
@@ -2153,12 +2182,13 @@ def main():
                                 st.download_button(
                                     label="📥 Scarica Storico Completo",
                                     data=storico_csv,
-                                    file_name=f"storico_completo_{st.session_state.user_profile['name']}.csv",
+                                    file_name=f"storico_giornaliero_{st.session_state.user_profile['name']}.csv",
                                     mime="text/csv",
                                     use_container_width=True
                                 )
                             with col2:
-                                st.info(f"📈 **{len(user_analyses)} analisi** trovate per {st.session_state.user_profile['name']}")
+                                total_giorni = len([x for x in storico_giornaliero_data if 'Dettaglio' in x['Tipo']])
+                                st.info(f"📈 **{len(user_analyses)} analisi** - **{total_giorni} giorni** di dati per {st.session_state.user_profile['name']}")
                 
                 # SEZIONE ANALISI CORRENTE (giorno per giorno)
                 st.markdown("---")
