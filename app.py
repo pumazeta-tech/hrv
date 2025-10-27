@@ -16,6 +16,8 @@ import re
 import tempfile
 import os
 from scipy import stats
+from fpdf import FPDF
+from io import BytesIO
 
 # =============================================================================
 # SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
@@ -3140,14 +3142,6 @@ def main():
                         # Usa i timestamp corretti per ciascuna metrica
                         moving_timestamps = sdnn_timestamps  # Per compatibilità con codice esistente
 
-                        # DEBUG: Verifica che i dati siano calcolati correttamente
-                        st.write(f"📊 DEBUG - Dati calcolati:")
-                        st.write(f"HR instant: {len(hr_instant)} punti")
-                        st.write(f"SDNN moving: {len(sdnn_moving)} punti")
-                        st.write(f"RMSSD moving: {len(rmssd_moving)} punti")
-                        st.write(f"Timestamps SDNN: {len(sdnn_timestamps)} punti")
-                        st.write(f"Timestamps RMSSD: {len(rmssd_timestamps)} punti")
-
                         # Definisci window_size per le statistiche
                         window_size = 300  # Finestra fissa di 5 minuti
 
@@ -3269,14 +3263,6 @@ def main():
                                 type="date"
                             )
                         )
-
-                        # DEBUG: Verifica cosa c'è nel grafico
-                        st.write("🔍 DEBUG GRAFICO:")
-                        st.write(f"- Timestamps HR: {len(timestamps)}")
-                        st.write(f"- HR smooth: {len(hr_instant_smooth)}")
-                        st.write(f"- SDNN moving: {len(sdnn_moving) if sdnn_moving else 0}")
-                        st.write(f"- RMSSD moving: {len(rmssd_moving) if rmssd_moving else 0}")
-                        st.write(f"- Numero tracce nel grafico: {len(fig_main.data)}")
                         
                         st.plotly_chart(fig_main, use_container_width=True)
                         
@@ -3328,12 +3314,12 @@ def main():
                 else:
                     st.error("❌ Salva prima il profilo utente!")
 
-            # 6. ESPORTAZIONE REPORT PDF
-            st.header("📄 Report Completo")
+            # 6. REPORT BELLO PDF
+            st.header("📄 Report Bello PDF")
             
-            if st.button("📊 Genera Report Completo", type="primary"):
-                with st.spinner("Generando report..."):
-                    report = generate_hrv_report(
+            if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
+                with st.spinner("🎨 Sto creando il report colorato..."):
+                    pdf_buffer = generate_beautiful_pdf_report(
                         st.session_state.user_profile,
                         timeline, 
                         daily_metrics,
@@ -3342,18 +3328,9 @@ def main():
                         rr_intervals
                     )
                     
-                    # Mostra anteprima report
-                    with st.expander("📋 Anteprima Report", expanded=True):
-                        display_report_preview(report)
-                    
-                    # Pulsante esportazione
-                    st.download_button(
-                        label="📥 Scarica Report (TXT)",
-                        data=generate_text_report(report),
-                        file_name=f"report_hrv_{st.session_state.user_profile['name']}_{datetime.now().strftime('%Y%m%d')}.txt",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
+                    filename = f"report_bello_{st.session_state.user_profile['name']}.pdf"
+                    display_pdf_download_button(pdf_buffer, filename)
+                    st.success("✅ Report colorato pronto!")
 
 
 
@@ -3477,6 +3454,83 @@ def add_logout_button():
             st.session_state.authenticated = False
             st.session_state.current_user = None
             st.rerun()
+
+# =============================================================================
+# 🎨 CODICE PER I REPORT BELLI - INCOLLA QUI!
+# =============================================================================
+
+class HRVReportPDF(FPDF):
+    def __init__(self):
+        super().__init__()
+        self.set_auto_page_break(auto=True, margin=15)
+        self.add_page()
+        
+    def header(self):
+        # Logo e intestazione
+        self.set_fill_color(57, 107, 177)
+        self.rect(0, 0, 210, 40, 'F')
+        
+        self.set_font('Arial', 'B', 24)
+        self.set_text_color(255, 255, 255)
+        self.cell(0, 15, "❤️ REPORT HRV ANALYTICS", 0, 1, 'C')
+        
+        self.set_font('Arial', 'I', 12)
+        self.cell(0, 8, "Analisi Variabilità Cardiaca - Report Professionale", 0, 1, 'C')
+        self.ln(5)
+
+def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_metrics, activities, rr_intervals):
+    pdf = HRVReportPDF()
+    
+    # Copertina colorata
+    pdf.set_fill_color(57, 107, 177)
+    pdf.rect(0, 0, 210, 297, 'F')
+    
+    pdf.set_y(80)
+    pdf.set_font('Arial', 'B', 28)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 15, "REPORT HRV ANALYTICS", 0, 1, 'C')
+    pdf.cell(0, 10, f"Paziente: {user_profile['name']} {user_profile['surname']}", 0, 1, 'C')
+    
+    pdf.add_page()
+    
+    # Scrivere le informazioni
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, "📊 Le tue metriche HRV:", 0, 1)
+    
+    if avg_metrics:
+        pdf.cell(0, 10, f"💓 Battito Medio: {avg_metrics.get('hr_mean', 0):.1f} bpm", 0, 1)
+        pdf.cell(0, 10, f"📊 SDNN: {avg_metrics.get('sdnn', 0):.1f} ms", 0, 1)
+        pdf.cell(0, 10, f"🔄 RMSSD: {avg_metrics.get('rmssd', 0):.1f} ms", 0, 1)
+    
+    # Salva il PDF
+    pdf_output = BytesIO()
+    pdf_output.write(pdf.output(dest='S').encode('latin1'))
+    pdf_output.seek(0)
+    return pdf_output
+
+def display_pdf_download_button(pdf_buffer, filename):
+    pdf_b64 = base64.b64encode(pdf_buffer.getvalue()).decode()
+    
+    st.markdown(f'''
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                padding: 20px; 
+                border-radius: 15px; 
+                text-align: center;
+                margin: 20px 0;">
+        <h3 style="color: white; margin: 0;">📄 Report PDF Pronto!</h3>
+        <a href="data:application/pdf;base64,{pdf_b64}" download="{filename}" 
+           style="background: white; 
+                  color: #667eea; 
+                  padding: 12px 30px; 
+                  border-radius: 25px; 
+                  text-decoration: none;
+                  font-weight: bold;
+                  display: inline-block;
+                  margin: 10px 0;">
+           📥 Scarica Report PDF
+        </a>
+    </div>
+    ''', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main_with_auth()
