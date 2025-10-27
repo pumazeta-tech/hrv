@@ -389,8 +389,11 @@ def get_user_key(user_profile):
     """Crea una chiave univoca per l'utente - VERSIONE SEMPLICE E SICURA"""
     try:
         name = user_profile.get('name', '').strip()
-        surname = user_profile.get('surname', '').strip()
+        surname = user_profile.get('surname', '').strip() 
         birth_date = user_profile.get('birth_date')
+        
+        # Debug
+        print(f"DEBUG - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
         
         if not name or not surname or not birth_date:
             return None
@@ -405,7 +408,8 @@ def get_user_key(user_profile):
         user_key = f"{name.lower()}_{surname.lower()}_{birth_str}"
         return user_key
         
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG - Errore in get_user_key: {e}")
         return None
 
 def init_session_state():
@@ -1335,15 +1339,10 @@ def create_user_selector():
     return selected_user_display
 
 def load_user_into_session(user_data):
-    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE CORRETTA"""
-    # 🆕 CARICA TUTTI I DATI NEL PROFILO
-    st.session_state.user_profile = {
-        'name': user_data['profile']['name'],
-        'surname': user_data['profile']['surname'], 
-        'birth_date': user_data['profile']['birth_date'],
-        'gender': user_data['profile']['gender'],
-        'age': user_data['profile']['age']
-    }
+    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE DEFINITIVA"""
+    # 🆕 USA UNA COPIA PROFONDA PER EVITARE PROBLEMI DI RIFERIMENTO
+    import copy
+    st.session_state.user_profile = copy.deepcopy(user_data['profile'])
     
     # 🆕 FORZA IL RICALCOLO DELL'ETÀ
     if st.session_state.user_profile['birth_date']:
@@ -1352,7 +1351,7 @@ def load_user_into_session(user_data):
             age -= 1
         st.session_state.user_profile['age'] = age
     
-    # 🆕 FORZA IL REFRESH DEI COMPONENTI STREAMLIT
+    # 🆕 FORZA IL REFRESH IMMEDIATO
     st.rerun()
     
     st.success(f"✅ Utente {user_data['profile']['name']} {user_data['profile']['surname']} caricato!")
@@ -1513,12 +1512,19 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            # 🆕 USA VARIABILE TEMPORANEA E POI ASSEGNA
-            name = st.text_input("Nome", value=st.session_state.user_profile['name'], key="name_input")
-            st.session_state.user_profile['name'] = name
+            # 🆕 USA KEY UNICA PER FORZARE AGGIORNAMENTO
+            name = st.text_input("Nome", 
+                               value=st.session_state.user_profile['name'] or "",
+                               key=f"name_input_{datetime.now().timestamp()}")
+            if name != st.session_state.user_profile['name']:
+                st.session_state.user_profile['name'] = name
+                
         with col2:
-            surname = st.text_input("Cognome", value=st.session_state.user_profile['surname'], key="surname_input")
-            st.session_state.user_profile['surname'] = surname
+            surname = st.text_input("Cognome", 
+                                  value=st.session_state.user_profile['surname'] or "", 
+                                  key=f"surname_input_{datetime.now().timestamp()}")
+            if surname != st.session_state.user_profile['surname']:
+                st.session_state.user_profile['surname'] = surname
         
         # Data di nascita - 🆕 CORREGGI IL BINDING
         current_birth_date = st.session_state.user_profile['birth_date']
@@ -1583,7 +1589,20 @@ def main():
                 st.write(f"**Cognome:** {st.session_state.user_profile['surname']}")
                 st.write(f"**Data di nascita:** {st.session_state.user_profile['birth_date']}")
                 st.write(f"**Numero utenti nel DB:** {len(st.session_state.user_database)}")
-       
+ 
+        # 🆕 DEBUG AVANZATO - AGGIUNGI QUESTA SEZIONE QUI
+        with st.sidebar.expander("🐛 Debug Avanzato", expanded=True):
+            st.write("**Dettagli Profilo:**")
+            st.write(f"Nome: '{st.session_state.user_profile['name']}'")
+            st.write(f"Cognome: '{st.session_state.user_profile['surname']}'")
+            st.write(f"Data: {st.session_state.user_profile['birth_date']}")
+            
+            user_key = get_user_key(st.session_state.user_profile)
+            st.write(f"**User Key generata:** {user_key}")
+            
+            if st.button("🔄 Forza Ricarica Pagina"):
+                st.rerun()
+      
         # Solo le attività
         create_activity_tracker()
     
@@ -2139,20 +2158,21 @@ def main():
             
             # 5. SALVATAGGIO ANALISI - VERSIONE ULTRA-SICURA
             if st.button("💾 Salva Analisi nel Database", type="primary"):
-                user_key = get_user_key(user_profile)
+                # 🆕 DEBUG VISIVO
+                st.write("🔍 Debug pre-salvataggio:")
+                st.write(f"Nome: '{st.session_state.user_profile['name']}'")
+                st.write(f"Cognome: '{st.session_state.user_profile['surname']}'") 
+                st.write(f"Data: {st.session_state.user_profile['birth_date']}")
+                
+                user_key = get_user_key(st.session_state.user_profile)
                 
                 if not user_key:
-                    st.error("❌ Profilo utente incompleto. Verifica nome, cognome e data di nascita.")
+                    st.error("❌ Profilo utente incompleto. Verifica che:")
+                    st.error("- Nome sia compilato")
+                    st.error("- Cognome sia compilato") 
+                    st.error("- Data di nascita sia selezionata")
                 elif user_key not in st.session_state.user_database:
                     st.error("❌ Utente non trovato nel database. Clicca '🔄 Aggiorna Utente' nella sidebar!")
-                    
-                    # 🆕 GUIDA VISIVA
-                    st.info("""
-                    **Per risolvere:**
-                    1. Verifica che nome, cognome e data di nascita siano corretti
-                    2. Clicca '🔄 Aggiorna Utente' nella sidebar
-                    3. Riprova a salvare l'analisi
-                    """)
                 else:
                     analysis_data = {
                         'timestamp': datetime.now().isoformat(),
