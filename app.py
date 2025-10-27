@@ -358,9 +358,11 @@ def save_user_database():
         return False
 
 def save_current_user():
-    """Salva l'utente corrente nel database"""
+    """Salva l'utente corrente nel database - VERSIONE SEMPLIFICATA"""
     user_profile = st.session_state.user_profile
-    if not user_profile['name'] or not user_profile['surname'] or not user_profile['birth_date']:
+    
+    # Validazione base
+    if not user_profile.get('name') or not user_profile.get('surname') or not user_profile.get('birth_date'):
         st.error("❌ Inserisci nome, cognome e data di nascita")
         return False
     
@@ -368,58 +370,44 @@ def save_current_user():
     if not user_key:
         st.error("❌ Errore nella creazione della chiave utente")
         return False
-
-    # 🆕 DEBUG: Mostra informazioni utili
-    st.info(f"🔍 Debug - User Key: {user_key}")
-    st.info(f"🔍 Debug - Utente nel database: {user_key in st.session_state.user_database}")
     
+    # Salva/aggiorna nel database
     if user_key not in st.session_state.user_database:
         st.session_state.user_database[user_key] = {
             'profile': user_profile.copy(),
             'analyses': []
         }
-        st.info("🆕 Nuovo utente creato nel database di sessione")
     else:
-        st.info("🔄 Utente esistente aggiornato nel database di sessione")
-        # Aggiorna il profilo mantenendo le analisi esistenti
         st.session_state.user_database[user_key]['profile'] = user_profile.copy()
     
     success = save_user_database()
     if success:
-        st.success("✅ Utente salvato nel database Google Sheets!")
-    else:
-        st.error("❌ Errore nel salvataggio su Google Sheets")
+        st.success("✅ Utente salvato nel database!")
     return success
 
 def get_user_key(user_profile):
-    """Crea una chiave univoca per l'utente con formato data italiano - VERSIONE ROBUSTA"""
-    if not user_profile['name'] or not user_profile['surname'] or not user_profile['birth_date']:
-        st.error("❌ Profilo utente incompleto per generare chiave")
-        return None
-    
+    """Crea una chiave univoca per l'utente - VERSIONE SEMPLICE E SICURA"""
     try:
-        # Converti la data in formato stringa italiano dd/mm/yyyy
-        if hasattr(user_profile['birth_date'], 'strftime'):
-            birth_date_str = user_profile['birth_date'].strftime('%d/%m/%Y')
+        name = user_profile.get('name', '').strip()
+        surname = user_profile.get('surname', '').strip()
+        birth_date = user_profile.get('birth_date')
+        
+        if not name or not surname or not birth_date:
+            return None
+        
+        # Formatta la data
+        if hasattr(birth_date, 'strftime'):
+            birth_str = birth_date.strftime('%d%m%Y')
         else:
-            # Se già è una stringa, assumiamo sia già nel formato italiano
-            birth_date_str = str(user_profile['birth_date'])
+            birth_str = str(birth_date).replace('-', '').replace('/', '')
         
-        # Pulizia dei caratteri speciali
-        name_clean = re.sub(r'[^a-zA-Z0-9]', '', user_profile['name'].lower())
-        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', user_profile['surname'].lower())
-        birth_clean = re.sub(r'[^0-9]', '', birth_date_str)
-        
-        user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
-        
-        # �DEBUG
-        st.info(f"🔑 Chiave generata: {user_key}")
-        
+        # Crea chiave semplice
+        user_key = f"{name.lower()}_{surname.lower()}_{birth_str}"
         return user_key
         
-    except Exception as e:
-        st.error(f"❌ Errore nella generazione della chiave utente: {e}")
+    except Exception:
         return None
+
 def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
     # Carica il database all'inizio
@@ -1347,9 +1335,26 @@ def create_user_selector():
     return selected_user_display
 
 def load_user_into_session(user_data):
-    """Carica i dati dell'utente selezionato nella sessione corrente"""
-    st.session_state.user_profile = user_data['profile'].copy()
-    user_key = get_user_key(st.session_state.user_profile)
+    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE CORRETTA"""
+    # 🆕 CARICA TUTTI I DATI NEL PROFILO
+    st.session_state.user_profile = {
+        'name': user_data['profile']['name'],
+        'surname': user_data['profile']['surname'], 
+        'birth_date': user_data['profile']['birth_date'],
+        'gender': user_data['profile']['gender'],
+        'age': user_data['profile']['age']
+    }
+    
+    # 🆕 FORZA IL RICALCOLO DELL'ETÀ
+    if st.session_state.user_profile['birth_date']:
+        age = datetime.now().year - st.session_state.user_profile['birth_date'].year
+        if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
+            age -= 1
+        st.session_state.user_profile['age'] = age
+    
+    # 🆕 FORZA IL REFRESH DEI COMPONENTI STREAMLIT
+    st.rerun()
+    
     st.success(f"✅ Utente {user_data['profile']['name']} {user_data['profile']['surname']} caricato!")
 
 def delete_user_from_database(user_key):
@@ -1508,30 +1513,37 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            st.session_state.user_profile['name'] = st.text_input("Nome", value=st.session_state.user_profile['name'], key="name_input")
+            # 🆕 USA VARIABILE TEMPORANEA E POI ASSEGNA
+            name = st.text_input("Nome", value=st.session_state.user_profile['name'], key="name_input")
+            st.session_state.user_profile['name'] = name
         with col2:
-            st.session_state.user_profile['surname'] = st.text_input("Cognome", value=st.session_state.user_profile['surname'], key="surname_input")
+            surname = st.text_input("Cognome", value=st.session_state.user_profile['surname'], key="surname_input")
+            st.session_state.user_profile['surname'] = surname
         
-        # Data di nascita
-        birth_date = st.session_state.user_profile['birth_date']
-        if birth_date is None:
-            birth_date = datetime(1980, 1, 1).date()
+        # Data di nascita - 🆕 CORREGGI IL BINDING
+        current_birth_date = st.session_state.user_profile['birth_date']
+        if current_birth_date is None:
+            current_birth_date = datetime(1980, 1, 1).date()
 
-        st.session_state.user_profile['birth_date'] = st.date_input(
+        birth_date = st.date_input(
             "Data di nascita", 
-            value=birth_date,
+            value=current_birth_date,
             min_value=datetime(1900, 1, 1).date(),
             max_value=datetime.now().date(),
             key="birth_date_input"
         )
+        st.session_state.user_profile['birth_date'] = birth_date
 
         if st.session_state.user_profile['birth_date']:
             st.write(f"Data selezionata: {st.session_state.user_profile['birth_date'].strftime('%d/%m/%Y')}")
         
-        st.session_state.user_profile['gender'] = st.selectbox("Sesso", ["Uomo", "Donna"], 
-                                                             index=0 if st.session_state.user_profile['gender'] == 'Uomo' else 1,
-                                                             key="gender_select")
+        # 🆕 CORREGGI ANCHE IL GENDER
+        gender = st.selectbox("Sesso", ["Uomo", "Donna"], 
+                            index=0 if st.session_state.user_profile.get('gender', 'Uomo') == 'Uomo' else 1,
+                            key="gender_select")
+        st.session_state.user_profile['gender'] = gender
         
+        # 🆕 CALCOLA ETA' SEMPRE
         if st.session_state.user_profile['birth_date']:
             age = datetime.now().year - st.session_state.user_profile['birth_date'].year
             if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
@@ -1570,7 +1582,7 @@ def main():
                 st.write(f"**Nome:** {st.session_state.user_profile['name']}")
                 st.write(f"**Cognome:** {st.session_state.user_profile['surname']}")
                 st.write(f"**Data di nascita:** {st.session_state.user_profile['birth_date']}")
-                st.write(f"**Numero utenti nel DB:** {len(st.session_state.user_database)}") 
+                st.write(f"**Numero utenti nel DB:** {len(st.session_state.user_database)}")
        
         # Solo le attività
         create_activity_tracker()
@@ -2125,10 +2137,23 @@ def main():
                     with col4:
                         st.metric("Battiti Totali", len(rr_intervals))
             
-            # 5. SALVATAGGIO ANALISI
+            # 5. SALVATAGGIO ANALISI - VERSIONE ULTRA-SICURA
             if st.button("💾 Salva Analisi nel Database", type="primary"):
                 user_key = get_user_key(user_profile)
-                if user_key and user_key in st.session_state.user_database:
+                
+                if not user_key:
+                    st.error("❌ Profilo utente incompleto. Verifica nome, cognome e data di nascita.")
+                elif user_key not in st.session_state.user_database:
+                    st.error("❌ Utente non trovato nel database. Clicca '🔄 Aggiorna Utente' nella sidebar!")
+                    
+                    # 🆕 GUIDA VISIVA
+                    st.info("""
+                    **Per risolvere:**
+                    1. Verifica che nome, cognome e data di nascita siano corretti
+                    2. Clicca '🔄 Aggiorna Utente' nella sidebar
+                    3. Riprova a salvare l'analisi
+                    """)
+                else:
                     analysis_data = {
                         'timestamp': datetime.now().isoformat(),
                         'recording_start': timeline['start_time'].isoformat(),
@@ -2141,11 +2166,9 @@ def main():
                     st.session_state.user_database[user_key]['analyses'].append(analysis_data)
                     save_user_database()
                     st.success("✅ Analisi salvata nel database!")
-                else:
-                    st.error("❌ Salva prima il profilo utente!")
 
             # 6. REPORT BELLO PDF (VERSIONE CORRETTA)
-            st.header("📄 Report Bello PDF")
+            st.header("📄 Report in PDF")
             
             if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
                 with st.spinner("🎨 Sto creando il report colorato..."):
