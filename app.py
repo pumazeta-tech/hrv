@@ -1303,7 +1303,7 @@ def delete_activity(index):
 # =============================================================================
 
 def create_user_selector():
-    """Crea un selettore per gli utenti già registrati"""
+    """Crea un selettore per gli utenti già registrati - VERSIONE CORRETTA"""
     if not st.session_state.user_database:
         st.sidebar.info("📝 Nessun utente registrato nel database")
         return None
@@ -1312,7 +1312,7 @@ def create_user_selector():
     
     # Crea lista di utenti per il dropdown
     user_list = ["-- Seleziona un utente --"]
-    user_keys = []
+    user_data_list = []
     
     for user_key, user_data in st.session_state.user_database.items():
         profile = user_data['profile']
@@ -1325,7 +1325,7 @@ def create_user_selector():
         
         display_name = f"{profile['name']} {profile['surname']} - {birth_date_display} - {profile['age']} anni"
         user_list.append(display_name)
-        user_keys.append(user_key)
+        user_data_list.append({user_key: user_data})  # 🆕 SALVA LA CHIAVE ORIGINALE
     
     # Dropdown per selezione utente
     selected_user_display = st.sidebar.selectbox(
@@ -1336,33 +1336,28 @@ def create_user_selector():
     
     if selected_user_display != "-- Seleziona un utente --":
         selected_index = user_list.index(selected_user_display) - 1
-        selected_user_key = user_keys[selected_index]
-        selected_user_data = st.session_state.user_database[selected_user_key]
+        selected_user_data = user_data_list[selected_index]
         
         # Mostra info utente selezionato
         st.sidebar.success(f"✅ {selected_user_display}")
         
         # Pulsante per caricare questo utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
-            load_user_into_session(selected_user_data)
-            st.rerun()
-        
-        # Pulsante per eliminare utente
-        if st.sidebar.button("🗑️ Elimina questo utente", use_container_width=True):
-            delete_user_from_database(selected_user_key)
+            load_user_into_session(selected_user_data)  # 🆕 PASSA I DATI CORRETTI
             st.rerun()
     
     return selected_user_display
 
 def load_user_into_session(user_data):
-    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE ULTRA-SICURA"""
+    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE CORRETTA"""
     import copy
     
-    # 🆕 DEBUG VISIBILE
-    st.info(f"Caricamento utente: {user_data['profile']['name']} {user_data['profile']['surname']}")
+    # 🆕 CARICA ESATTAMENTE I DATI DELL'UTENTE SELEZIONATO
+    user_key_selected = list(user_data.keys())[0]  # Prende la chiave originale
+    user_data_selected = user_data[user_key_selected]
     
     # CARICA I DATI NEL PROFILO
-    st.session_state.user_profile = copy.deepcopy(user_data['profile'])
+    st.session_state.user_profile = copy.deepcopy(user_data_selected['profile'])
     
     # CALCOLA ETÀ
     if st.session_state.user_profile['birth_date']:
@@ -1371,16 +1366,10 @@ def load_user_into_session(user_data):
             age -= 1
         st.session_state.user_profile['age'] = age
     
-    # 🆕 SALVA DIRETTAMENTE NEL DATABASE DI SESSIONE
-    user_key = get_user_key(st.session_state.user_profile)
+    # 🆕 USA LA CHIAVE ORIGINALE DEL DATABASE
+    st.session_state.user_database[user_key_selected] = copy.deepcopy(user_data_selected)
     
-    if user_key:
-        # 🆕 SOSTITUISCE SEMPRE l'utente nel database di sessione
-        st.session_state.user_database[user_key] = copy.deepcopy(user_data)
-        st.success(f"✅ {st.session_state.user_profile['name']} {st.session_state.user_profile['surname']} caricato e pronto per le analisi!")
-    else:
-        st.error("❌ Errore nel caricamento dell'utente")
-    
+    st.success(f"✅ {st.session_state.user_profile['name']} {st.session_state.user_profile['surname']} caricato!")
     st.rerun()
 
 def delete_user_from_database(user_key):
