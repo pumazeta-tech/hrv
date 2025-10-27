@@ -1355,30 +1355,32 @@ def create_user_selector():
     return selected_user_display
 
 def load_user_into_session(user_data):
-    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE AUTOMATICA"""
+    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE ULTRA-SICURA"""
     import copy
     
-    # Carica i dati nel profilo
+    # 🆕 DEBUG VISIBILE
+    st.info(f"Caricamento utente: {user_data['profile']['name']} {user_data['profile']['surname']}")
+    
+    # CARICA I DATI NEL PROFILO
     st.session_state.user_profile = copy.deepcopy(user_data['profile'])
     
-    # Calcola età
+    # CALCOLA ETÀ
     if st.session_state.user_profile['birth_date']:
         age = datetime.now().year - st.session_state.user_profile['birth_date'].year
         if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
             age -= 1
         st.session_state.user_profile['age'] = age
     
-    # Salva automaticamente nel database
+    # 🆕 SALVA DIRETTAMENTE NEL DATABASE DI SESSIONE
     user_key = get_user_key(st.session_state.user_profile)
     
-    if user_key and user_key not in st.session_state.user_database:
-        st.session_state.user_database[user_key] = {
-            'profile': copy.deepcopy(st.session_state.user_profile),
-            'analyses': user_data.get('analyses', [])  # 🆕 Mantiene le analisi esistenti!
-        }
-        save_user_database()  # Salva su Google Sheets
+    if user_key:
+        # 🆕 SOSTITUISCE SEMPRE l'utente nel database di sessione
+        st.session_state.user_database[user_key] = copy.deepcopy(user_data)
+        st.success(f"✅ {st.session_state.user_profile['name']} {st.session_state.user_profile['surname']} caricato e pronto per le analisi!")
+    else:
+        st.error("❌ Errore nel caricamento dell'utente")
     
-    st.success(f"✅ {st.session_state.user_profile['name']} {st.session_state.user_profile['surname']} caricato!")
     st.rerun()
 
 def delete_user_from_database(user_key):
@@ -2151,9 +2153,13 @@ def main():
                     with col4:
                         st.metric("Battiti Totali", len(rr_intervals))
             
-            # 5. SALVATAGGIO ANALISI - VERSIONE PULITA
+            # 5. SALVATAGGIO ANALISI - VERSIONE CON DEBUG TEMPORANEO
             if st.button("💾 Salva Analisi nel Database", type="primary"):
-                user_key = get_user_key(user_profile)
+                user_key = get_user_key(st.session_state.user_profile)
+                
+                # 🆕 DEBUG TEMPORANEO
+                st.write(f"🔍 User Key: {user_key}")
+                st.write(f"🔍 Utenti nel database: {list(st.session_state.user_database.keys())}")
                 
                 if user_key and user_key in st.session_state.user_database:
                     analysis_data = {
@@ -2169,7 +2175,7 @@ def main():
                     save_user_database()
                     st.success("✅ Analisi salvata nel database!")
                 else:
-                    st.error("❌ Utente non trovato. Seleziona un utente dalla lista.")
+                    st.error("❌ Utente non trovato nel database di sessione")
 
             # 6. REPORT BELLO PDF (VERSIONE CORRETTA)
             st.header("📄 Report in PDF")
