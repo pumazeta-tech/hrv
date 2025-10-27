@@ -1523,8 +1523,10 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
             pdf.set_xy(10 + i*47, 155)
             pdf.cell(45, 8, value, 0, 1, 'C')
         
-        # Terza riga - METRICHE SONNO
-        if avg_metrics.get('sleep_duration', 0) > 0:
+        # Terza riga - METRICHE SONNO (SOLO SE C'È SONNO)
+        has_sleep_data = avg_metrics.get('sleep_duration', 0) > 0 and has_night_data(timeline, rr_intervals)
+        
+        if has_sleep_data:
             metrics_row3 = [
                 ("Sonno Totale", f"{avg_metrics.get('sleep_duration', 0):.1f}h", (63, 81, 181)),
                 ("Efficienza", f"{avg_metrics.get('sleep_efficiency', 0):.0f}%", (136, 14, 79)),
@@ -1542,8 +1544,10 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
                 pdf.set_font('Arial', 'B', 10)
                 pdf.set_xy(10 + i*47, 180)
                 pdf.cell(45, 8, value, 0, 1, 'C')
-        
-        pdf.ln(25)
+            
+            pdf.ln(25)
+        else:
+            pdf.ln(10)
         
         # =============================================================================
         # ANALISI GIORNALIERA DETTAGLIATA CON TUTTI I DATI
@@ -1611,9 +1615,11 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
                     ("LF/HF Ratio", f"{day_metrics.get('lf_hf_ratio', 0):.2f}")
                 ]
                 
-                # Dati metriche - SECONDA COLONNA (SONNO E ALTRI)
+                # Dati metriche - SECONDA COLONNA (SONNO SOLO SE DISPONIBILE)
+                has_day_sleep = day_metrics.get('sleep_duration', 0) > 0
                 metrics_right = []
-                if day_metrics.get('sleep_duration', 0) > 0:
+                
+                if has_day_sleep:
                     metrics_right.extend([
                         ("Sonno Totale", f"{day_metrics.get('sleep_duration', 0):.1f} h"),
                         ("Efficienza Sonno", f"{day_metrics.get('sleep_efficiency', 0):.0f}%"),
@@ -1625,8 +1631,8 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
                     ])
                 else:
                     metrics_right.extend([
-                        ("Sonno", "Dati non disp."),
-                        ("", ""),
+                        ("VLF Power", f"{day_metrics.get('vlf', 0):.0f}"),
+                        ("Recording Hours", f"{day_metrics.get('recording_hours', 0):.1f} h"),
                         ("", ""),
                         ("", ""),
                         ("", ""),
@@ -1638,7 +1644,6 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
                 max_rows = max(len(metrics_left), len(metrics_right))
                 
                 for i in range(max_rows):
-                    # Colore riga alternato
                     if i % 2 == 0:
                         pdf.set_fill_color(245, 245, 245)
                     else:
@@ -1669,7 +1674,7 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
                 
                 pdf.ln(8)
                 
-                # 🆕 SEZIONE GRAFICO (placeholder - nella realtà salveresti l'immagine)
+                # 🆕 SEZIONE GRAFICO
                 pdf.set_font('Arial', 'I', 9)
                 pdf.set_text_color(128, 128, 128)
                 pdf.cell(0, 8, "GRAFICO: Andamento HRV giornaliero con attivita registrate", 0, 1, 'L')
@@ -1678,6 +1683,109 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
                 # Linea separatrice tra giorni
                 pdf.set_draw_color(200, 200, 200)
                 pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+                pdf.ln(8)
+        
+        # =============================================================================
+        # STORICO ANALISI PRECEDENTI
+        # =============================================================================
+        user_key = get_user_key(user_profile)
+        if user_key and user_key in st.session_state.user_database:
+            user_analyses = st.session_state.user_database[user_key].get('analyses', [])
+            
+            if len(user_analyses) > 1:
+                pdf.add_page()
+                
+                pdf.set_font('Arial', 'B', 16)
+                pdf.set_text_color(57, 107, 177)
+                pdf.cell(0, 10, "STORICO ANALISI PRECEDENTI", 0, 1, 'L')
+                pdf.ln(5)
+                
+                pdf.set_font('Arial', 'I', 10)
+                pdf.set_text_color(128, 128, 128)
+                pdf.cell(0, 8, f"Panoramica di tutte le registrazioni di {user_profile['name']}", 0, 1, 'L')
+                pdf.ln(8)
+                
+                # Tabella riassuntiva storico
+                storico_data = []
+                for i, analysis in enumerate(sorted(user_analyses, key=lambda x: x['recording_start'], reverse=True)):
+                    start_date = datetime.fromisoformat(analysis['recording_start']).strftime('%d/%m/%Y')
+                    end_date = datetime.fromisoformat(analysis['recording_end']).strftime('%d/%m/%Y')
+                    metrics = analysis.get('overall_metrics', {})
+                    
+                    is_current = (analysis.get('recording_start') == timeline['start_time'].isoformat())
+                    
+                    storico_data.append({
+                        'Periodo': f"{start_date} a {end_date}",
+                        'Durata': f"{analysis.get('recording_duration_hours', 0):.1f} h",
+                        'Battiti': f"{analysis.get('rr_intervals_count', 0):,}",
+                        'SDNN': f"{metrics.get('sdnn', 0):.1f}",
+                        'RMSSD': f"{metrics.get('rmssd', 0):.1f}",
+                        'Battito': f"{metrics.get('hr_mean', 0):.1f}",
+                        'Corrente': "SI" if is_current else "NO"
+                    })
+                
+                # Intestazione tabella storico
+                pdf.set_fill_color(57, 107, 177)
+                pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+                pdf.set_font('Arial', 'B', 8)
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_xy(10, pdf.get_y())
+                pdf.cell(40, 8, "PERIODO", 0, 0, 'C')
+                pdf.cell(20, 8, "DURATA", 0, 0, 'C')
+                pdf.cell(30, 8, "BATTITI", 0, 0, 'C')
+                pdf.cell(20, 8, "SDNN", 0, 0, 'C')
+                pdf.cell(20, 8, "RMSSD", 0, 0, 'C')
+                pdf.cell(20, 8, "BATTITO", 0, 0, 'C')
+                pdf.cell(20, 8, "CORRENTE", 0, 1, 'C')
+                
+                # Dati storico
+                for i, row in enumerate(storico_data):
+                    if i % 2 == 0:
+                        pdf.set_fill_color(245, 245, 245)
+                    else:
+                        pdf.set_fill_color(255, 255, 255)
+                    
+                    pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+                    pdf.set_font('Arial', '', 8)
+                    pdf.set_text_color(0, 0, 0)
+                    
+                    pdf.set_xy(10, pdf.get_y())
+                    pdf.cell(40, 8, row['Periodo'], 0, 0, 'C')
+                    pdf.cell(20, 8, row['Durata'], 0, 0, 'C')
+                    pdf.cell(30, 8, row['Battiti'], 0, 0, 'C')
+                    pdf.cell(20, 8, row['SDNN'], 0, 0, 'C')
+                    pdf.cell(20, 8, row['RMSSD'], 0, 0, 'C')
+                    pdf.cell(20, 8, row['Battito'], 0, 0, 'C')
+                    
+                    if row['Corrente'] == "SI":
+                        pdf.set_text_color(233, 30, 99)
+                        pdf.set_font('Arial', 'B', 8)
+                    
+                    pdf.cell(20, 8, row['Corrente'], 0, 1, 'C')
+                    pdf.set_text_color(0, 0, 0)
+                    pdf.set_font('Arial', '', 8)
+                
+                pdf.ln(10)
+                
+                # Statistiche riassuntive
+                pdf.set_font('Arial', 'B', 10)
+                pdf.set_text_color(57, 107, 177)
+                pdf.cell(0, 8, f"RIEPILOGO STORICO: {len(user_analyses)} analisi registrate", 0, 1, 'L')
+                
+                if len(user_analyses) > 1:
+                    oldest_sdnn = user_analyses[-1].get('overall_metrics', {}).get('sdnn', 0)
+                    newest_sdnn = user_analyses[0].get('overall_metrics', {}).get('sdnn', 0)
+                    improvement = ((newest_sdnn - oldest_sdnn) / oldest_sdnn * 100) if oldest_sdnn > 0 else 0
+                    
+                    pdf.set_font('Arial', 'I', 9)
+                    pdf.set_text_color(0, 0, 0)
+                    if improvement > 5:
+                        pdf.cell(0, 8, f"TREND: Miglioramento SDNN del {improvement:+.1f}% dall'inizio del monitoraggio", 0, 1, 'L')
+                    elif improvement < -5:
+                        pdf.cell(0, 8, f"ATTENZIONE: Calo SDNN del {improvement:+.1f}% - valuta recupero", 0, 1, 'L')
+                    else:
+                        pdf.cell(0, 8, f"TREND: Stabilità SDNN ({improvement:+.1f}%) - mantenere buone abitudini", 0, 1, 'L')
+                
                 pdf.ln(8)
         
         # =============================================================================
@@ -1749,6 +1857,7 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
     except Exception as e:
         st.error(f"Errore nella generazione del PDF: {e}")
         return None
+
 def display_pdf_download_button(pdf_buffer, filename):
     pdf_b64 = base64.b64encode(pdf_buffer.getvalue()).decode()
     
@@ -1819,6 +1928,22 @@ def display_complete_analysis_history(user_key):
     )
     
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Grafico Coerenza
+    fig_coherence = go.Figure()
+    fig_coherence.add_trace(go.Scatter(x=dates, y=coherence_values, name='Coerenza Cardiaca', 
+                                     line=dict(color='#9b59b6', width=4), marker=dict(size=8)))
+    
+    fig_coherence.update_layout(
+        title='🎯 Andamento Coerenza Cardiaca',
+        xaxis=dict(title='Data Registrazione', tickangle=45),
+        yaxis=dict(title='Coerenza (%)', color='#9b59b6', gridcolor='#f0f0f0'),
+        height=300,
+        showlegend=True,
+        plot_bgcolor='rgba(240,240,240,0.1)'
+    )
+    
+    st.plotly_chart(fig_coherence, use_container_width=True)
     
     # Grafico Coerenza
     fig_coherence = go.Figure()
@@ -2635,6 +2760,12 @@ def main():
                         daily_plots = create_daily_plots(daily_metrics, timeline, st.session_state.activities)
                         
                         # 🆕 CREA IL PDF BELLO
+            if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
+                with st.spinner("🎨 Sto creando il report colorato..."):
+                    try:
+                        # 🆕 CREA I GRAFICI GIORNALIERI
+                        daily_plots = create_daily_plots(daily_metrics, timeline, st.session_state.activities)
+                        
                         pdf_buffer = generate_beautiful_pdf_report(
                             st.session_state.user_profile,
                             timeline, 
@@ -2648,15 +2779,12 @@ def main():
                             filename = f"report_bello_{st.session_state.user_profile['name']}.pdf"
                             display_pdf_download_button(pdf_buffer, filename)
                             st.success("✅ Report bellissimo pronto! 🎉")
-                            st.balloons()
+                            st.balloons()  # 🎈 PALLONCINI! 🎈
                         else:
                             st.error("❌ Errore nella generazione del PDF")
                             
                     except Exception as e:
                         st.error(f"❌ Errore durante la creazione del report: {e}")
-        
-        except Exception as e:
-            st.error(f"❌ Errore nel processare il file: {e}")
     
     else:
         # Schermata iniziale
