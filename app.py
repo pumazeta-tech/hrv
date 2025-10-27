@@ -1339,23 +1339,29 @@ def create_user_selector():
     return selected_user_display
 
 def load_user_into_session(user_data):
-    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE DEFINITIVA"""
-    # 🆕 USA UNA COPIA PROFONDA PER EVITARE PROBLEMI DI RIFERIMENTO
+    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE AUTOMATICA"""
     import copy
     st.session_state.user_profile = copy.deepcopy(user_data['profile'])
     
-    # 🆕 FORZA IL RICALCOLO DELL'ETÀ
+    # 🆕 CALCOLA ETÀ
     if st.session_state.user_profile['birth_date']:
         age = datetime.now().year - st.session_state.user_profile['birth_date'].year
         if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
             age -= 1
         st.session_state.user_profile['age'] = age
     
-    # 🆕 FORZA IL REFRESH IMMEDIATO
-    st.rerun()
+    # 🆕 AGGIUNGI AUTOMATICAMENTE AL DATABASE DI SESSIONE
+    user_key = get_user_key(st.session_state.user_profile)
+    if user_key and user_key not in st.session_state.user_database:
+        st.session_state.user_database[user_key] = {
+            'profile': copy.deepcopy(st.session_state.user_profile),
+            'analyses': []
+        }
+        st.success("✅ Utente caricato e aggiunto al database automaticamente!")
+    else:
+        st.success("✅ Utente caricato!")
     
-    st.success(f"✅ Utente {user_data['profile']['name']} {user_data['profile']['surname']} caricato!")
-
+    st.rerun()
 def delete_user_from_database(user_key):
     """Elimina un utente dal database"""
     if user_key in st.session_state.user_database:
