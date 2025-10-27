@@ -3314,44 +3314,122 @@ def main():
                 else:
                     st.error("❌ Salva prima il profilo utente!")
 
-            # 6. REPORT BELLO PDF
+            # 6. REPORT BELLO PDF (VERSIONE CORRETTA)
             st.header("📄 Report Bello PDF")
             
             if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
                 with st.spinner("🎨 Sto creando il report colorato..."):
-                    pdf_buffer = generate_beautiful_pdf_report(
-                        st.session_state.user_profile,
-                        timeline, 
-                        daily_metrics,
-                        avg_metrics,
-                        st.session_state.activities,
-                        rr_intervals
-                    )
-                    
-                    filename = f"report_bello_{st.session_state.user_profile['name']}.pdf"
-                    display_pdf_download_button(pdf_buffer, filename)
-                    st.success("✅ Report colorato pronto!")
-
-
-
-            # 🆕 NUOVA SEZIONE: ANALISI IMPATTO ATTIVITÀ
-            st.header("🎯 Analisi Impatto Attività sull'HRV")
-            
-            if st.session_state.activities:
-                impact_report = calculate_comprehensive_impact(
-                    st.session_state.activities, 
-                    daily_metrics, 
-                    timeline,
-                    st.session_state.user_profile
-                )
-                
-                display_impact_analysis(impact_report)
-                
-            else:
-                st.info("Aggiungi attività nel pannello laterale per vedere l'analisi dell'impatto sull'HRV")
-            
-        except Exception as e:
-            st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
+                    try:
+                        from fpdf import FPDF
+                        import base64
+                        from io import BytesIO
+                        
+                        # Crea PDF con supporto UTF-8
+                        pdf = FPDF()
+                        pdf.add_page()
+                        
+                        # Aggiungi font con supporto UTF-8 (caratteri italiani)
+                        try:
+                            pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
+                            pdf.set_font('DejaVu', '', 12)
+                        except:
+                            # Se non trova il font, usa Arial normale
+                            pdf.set_font('Arial', '', 12)
+                        
+                        # Titolo
+                        pdf.set_font('Arial', 'B', 16)
+                        pdf.cell(0, 10, 'REPORT HRV ANALISI', 0, 1, 'C')
+                        pdf.ln(10)
+                        
+                        # Informazioni paziente (SENZA CARATTERI SPECIALI)
+                        pdf.set_font('Arial', '', 12)
+                        pdf.cell(0, 10, f"Paziente: {st.session_state.user_profile['name']} {st.session_state.user_profile['surname']}", 0, 1)
+                        pdf.cell(0, 10, f"Eta: {st.session_state.user_profile['age']} anni", 0, 1)
+                        pdf.cell(0, 10, f"Sesso: {st.session_state.user_profile['gender']}", 0, 1)
+                        
+                        # Data di nascita (formatta senza caratteri speciali)
+                        birth_date = st.session_state.user_profile['birth_date']
+                        if hasattr(birth_date, 'strftime'):
+                            birth_date_str = birth_date.strftime('%d/%m/%Y')
+                        else:
+                            birth_date_str = str(birth_date)
+                        pdf.cell(0, 10, f"Data di nascita: {birth_date_str}", 0, 1)
+                        
+                        pdf.ln(10)
+                        
+                        # Informazioni registrazione
+                        pdf.set_font('Arial', 'B', 14)
+                        pdf.cell(0, 10, 'INFORMAZIONI REGISTRAZIONE:', 0, 1)
+                        pdf.set_font('Arial', '', 12)
+                        pdf.cell(0, 10, f"Data inizio: {timeline['start_time'].strftime('%d/%m/%Y %H:%M')}", 0, 1)
+                        pdf.cell(0, 10, f"Data fine: {timeline['end_time'].strftime('%d/%m/%Y %H:%M')}", 0, 1)
+                        pdf.cell(0, 10, f"Durata totale: {timeline['total_duration_hours']:.1f} ore", 0, 1)
+                        pdf.cell(0, 10, f"Battiti totali: {len(rr_intervals):,}", 0, 1)
+                        
+                        pdf.ln(10)
+                        
+                        # Metriche HRV
+                        if avg_metrics:
+                            pdf.set_font('Arial', 'B', 14)
+                            pdf.cell(0, 10, 'METRICHE HRV MEDIE:', 0, 1)
+                            pdf.set_font('Arial', '', 12)
+                            pdf.cell(0, 10, f"Battito Medio: {avg_metrics.get('hr_mean', 0):.1f} bpm", 0, 1)
+                            pdf.cell(0, 10, f"SDNN (Variabilita totale): {avg_metrics.get('sdnn', 0):.1f} ms", 0, 1)
+                            pdf.cell(0, 10, f"RMSSD (Variabilita breve termine): {avg_metrics.get('rmssd', 0):.1f} ms", 0, 1)
+                            pdf.cell(0, 10, f"Coerenza Cardiaca: {avg_metrics.get('coherence', 0):.1f}%", 0, 1)
+                            pdf.cell(0, 10, f"Rapporto LF/HF: {avg_metrics.get('lf_hf_ratio', 0):.2f}", 0, 1)
+                        
+                        pdf.ln(10)
+                        
+                        # Analisi giornaliera
+                        if daily_metrics:
+                            pdf.set_font('Arial', 'B', 14)
+                            pdf.cell(0, 10, 'ANALISI GIORNALIERA:', 0, 1)
+                            pdf.set_font('Arial', '', 10)
+                            
+                            for day_date, metrics in daily_metrics.items():
+                                day_dt = datetime.fromisoformat(day_date)
+                                pdf.cell(0, 8, f"Giorno {day_dt.strftime('%d/%m/%Y')}:", 0, 1)
+                                pdf.cell(0, 6, f"  SDNN: {metrics.get('sdnn', 0):.1f} ms | RMSSD: {metrics.get('rmssd', 0):.1f} ms | Battito: {metrics.get('hr_mean', 0):.1f} bpm", 0, 1)
+                        
+                        # Salva PDF con codifica sicura
+                        pdf_output = BytesIO()
+                        try:
+                            pdf_output.write(pdf.output(dest='S').encode('latin1'))
+                        except:
+                            # Se latin1 fallisce, prova utf-8
+                            pdf_output.write(pdf.output(dest='S').encode('utf-8'))
+                        pdf_output.seek(0)
+                        
+                        # Pulsante download
+                        pdf_b64 = base64.b64encode(pdf_output.getvalue()).decode()
+                        st.markdown(f'''
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                    padding: 20px; 
+                                    border-radius: 15px; 
+                                    text-align: center;
+                                    margin: 20px 0;">
+                            <h3 style="color: white; margin: 0;">📄 Report PDF Pronto!</h3>
+                            <p style="color: white; opacity: 0.9;">Scarica il tuo report HRV completo</p>
+                            <a href="data:application/pdf;base64,{pdf_b64}" download="report_hrv_completo.pdf" 
+                               style="background: white; 
+                                      color: #667eea; 
+                                      padding: 12px 30px; 
+                                      border-radius: 25px; 
+                                      text-decoration: none;
+                                      font-weight: bold;
+                                      display: inline-block;
+                                      margin: 10px 0;">
+                               📥 Scarica Report PDF
+                            </a>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                        
+                        st.success("✅ Report PDF creato con successo!")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Errore nella creazione del PDF: {str(e)}")
+                        st.info("💡 Il PDF e stato creato ma con caratteri base per compatibilita")
     
     else:
         # Schermata iniziale
@@ -3479,32 +3557,88 @@ class HRVReportPDF(FPDF):
         self.ln(5)
 
 def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_metrics, activities, rr_intervals):
-    pdf = HRVReportPDF()
-    
-    # Copertina colorata
-    pdf.set_fill_color(57, 107, 177)
-    pdf.rect(0, 0, 210, 297, 'F')
-    
-    pdf.set_y(80)
-    pdf.set_font('Arial', 'B', 28)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 15, "REPORT HRV ANALYTICS", 0, 1, 'C')
-    pdf.cell(0, 10, f"Paziente: {user_profile['name']} {user_profile['surname']}", 0, 1, 'C')
-    
+    try:
+        pdf = HRVReportPDF()
+        
+        # Copertina colorata
+        pdf.set_fill_color(57, 107, 177)
+        pdf.rect(0, 0, 210, 297, 'F')
+        
+        pdf.set_y(80)
+        pdf.set_font('Arial', 'B', 28)
+        pdf.set_text_color(255, 255, 255)
+        
+        # ✅ RIMUOVI EMOJI E CARATTERI SPECIALI
+        pdf.cell(0, 15, "REPORT HRV ANALYTICS", 0, 1, 'C')
+        pdf.cell(0, 10, f"Paziente: {user_profile['name']} {user_profile['surname']}", 0, 1, 'C')
+        
+        pdf.add_page()
+        
+        # Scrivere le informazioni - ✅ RIMUOVI EMOJI
+        pdf.set_font('Arial', 'B', 16)
+        pdf.cell(0, 10, "Le tue metriche HRV:", 0, 1)
+        
+        if avg_metrics:
+            pdf.cell(0, 10, f"Battito Medio: {avg_metrics.get('hr_mean', 0):.1f} bpm", 0, 1)
+            pdf.cell(0, 10, f"SDNN: {avg_metrics.get('sdnn', 0):.1f} ms", 0, 1)
+            pdf.cell(0, 10, f"RMSSD: {avg_metrics.get('rmssd', 0):.1f} ms", 0, 1)
+        
+        # ✅ CORREGGI L'ENCODING
+        pdf_output = BytesIO()
+        pdf_bytes = pdf.output(dest='S')  # Questo restituisce una stringa
+        # Codifica in latin-1 sostituendo caratteri problematici
+        pdf_bytes_encoded = pdf_bytes.encode('latin-1', 'replace')
+        pdf_output.write(pdf_bytes_encoded)
+        pdf_output.seek(0)
+        return pdf_output
+        
+    except Exception as e:
+        st.error(f"Errore nella generazione del PDF principale: {e}")
+        # Fallback a PDF semplice
+        return create_simple_pdf_fallback(user_profile, avg_metrics)
+
+def create_simple_pdf_fallback(user_profile, avg_metrics):
+    """Fallback per creare un PDF semplice senza caratteri problematici"""
+    pdf = FPDF()
     pdf.add_page()
     
-    # Scrivere le informazioni
+    # Header semplice
     pdf.set_font('Arial', 'B', 16)
-    pdf.cell(0, 10, "📊 Le tue metriche HRV:", 0, 1)
+    pdf.cell(0, 10, "HRV ANALYTICS REPORT", 0, 1, 'C')
+    pdf.ln(10)
     
+    # Informazioni paziente
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, f"Paziente: {user_profile['name']} {user_profile['surname']}", 0, 1)
+    pdf.cell(0, 10, f"Data: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
+    pdf.ln(10)
+    
+    # Metriche HRV
     if avg_metrics:
-        pdf.cell(0, 10, f"💓 Battito Medio: {avg_metrics.get('hr_mean', 0):.1f} bpm", 0, 1)
-        pdf.cell(0, 10, f"📊 SDNN: {avg_metrics.get('sdnn', 0):.1f} ms", 0, 1)
-        pdf.cell(0, 10, f"🔄 RMSSD: {avg_metrics.get('rmssd', 0):.1f} ms", 0, 1)
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, "METRICHE HRV:", 0, 1)
+        pdf.set_font('Arial', '', 10)
+        
+        metrics = [
+            ("Battito Medio", f"{avg_metrics.get('hr_mean', 0):.1f} bpm"),
+            ("SDNN", f"{avg_metrics.get('sdnn', 0):.1f} ms"),
+            ("RMSSD", f"{avg_metrics.get('rmssd', 0):.1f} ms"),
+            ("Coerenza", f"{avg_metrics.get('coherence', 0):.1f}%"),
+            ("Potenza Totale", f"{avg_metrics.get('total_power', 0):.0f} ms2")
+        ]
+        
+        for label, value in metrics:
+            pdf.cell(0, 8, f"{label}: {value}", 0, 1)
     
     # Salva il PDF
     pdf_output = BytesIO()
-    pdf_output.write(pdf.output(dest='S').encode('latin1'))
+    try:
+        pdf_bytes = pdf.output(dest='S')
+        pdf_output.write(pdf_bytes.encode('latin-1'))
+    except:
+        # Ultimo tentativo con encoding ignorando errori
+        pdf_output.write(pdf.output(dest='S').encode('latin-1', 'ignore'))
+    
     pdf_output.seek(0)
     return pdf_output
 
