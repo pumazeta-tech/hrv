@@ -1933,7 +1933,7 @@ def display_complete_analysis_history(user_key):
         plot_bgcolor='rgba(240,240,240,0.1)'
     )
     
-    st.plotly_chart(fig, use_container_width=True, key="evolution_chart")
+    st.plotly_chart(fig, use_container_width=True, key=f"evolution_chart_{user_key}_{len(user_analyses)}")
     
     # Grafico Coerenza
     fig_coherence = go.Figure()
@@ -1949,39 +1949,7 @@ def display_complete_analysis_history(user_key):
         plot_bgcolor='rgba(240,240,240,0.1)'
     )
     
-    st.plotly_chart(fig_coherence, use_container_width=True, key="coherence_chart")
-    
-    # Grafico Coerenza
-    fig_coherence = go.Figure()
-    fig_coherence.add_trace(go.Scatter(x=dates, y=coherence_values, name='Coerenza Cardiaca', 
-                                     line=dict(color='#9b59b6', width=4), marker=dict(size=8)))
-    
-    fig_coherence.update_layout(
-        title='🎯 Andamento Coerenza Cardiaca',
-        xaxis=dict(title='Data Registrazione', tickangle=45),
-        yaxis=dict(title='Coerenza (%)', color='#9b59b6', gridcolor='#f0f0f0'),
-        height=300,
-        showlegend=True,
-        plot_bgcolor='rgba(240,240,240,0.1)'
-    )
-    
-    st.plotly_chart(fig_coherence, use_container_width=True, key="coherence_chart")
-    
-    # Grafico Coerenza
-    fig_coherence = go.Figure()
-    fig_coherence.add_trace(go.Scatter(x=dates, y=coherence_values, name='Coerenza Cardiaca', 
-                                     line=dict(color='#9b59b6', width=4), marker=dict(size=8)))
-    
-    fig_coherence.update_layout(
-        title='🎯 Andamento Coerenza Cardiaca',
-        xaxis=dict(title='Data Registrazione', tickangle=45),
-        yaxis=dict(title='Coerenza (%)', color='#9b59b6', gridcolor='#f0f0f0'),
-        height=300,
-        showlegend=True,
-        plot_bgcolor='rgba(240,240,240,0.1)'
-    )
-    
-    st.plotly_chart(fig_coherence, use_container_width=True, key="unique_chart_1")
+    st.plotly_chart(fig_coherence, use_container_width=True, key=f"coherence_chart_{user_key}_{len(user_analyses)}")
 
 # =============================================================================
 # 🐛 FUNZIONI DI DEBUG
@@ -2754,7 +2722,7 @@ def main():
                             )
                         )
                         
-                        st.plotly_chart(fig_main, use_container_width=True, key="main_hrv_chart")
+                        st.plotly_chart(fig_main, use_container_width=True, key=f"main_hrv_chart_{datetime.now().timestamp()}")
                         
                         # Informazioni sui dati
                         st.info(f"""
