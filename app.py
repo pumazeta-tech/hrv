@@ -1419,15 +1419,15 @@ def create_daily_plots(daily_metrics, timeline, activities):
     return plots
 
 def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_metrics, activities, rr_intervals):
-    """Genera un report HRV bellissimo e colorato con grafici giornalieri"""
+    """Genera un report HRV bellissimo e colorato con TUTTI i dati e grafici"""
     try:
         pdf = FPDF()
         pdf.add_page()
         
         # =============================================================================
-        # HEADER COLORATO - SENZA EMOJI
+        # HEADER COLORATO
         # =============================================================================
-        pdf.set_fill_color(57, 107, 177)  # Blu elegante
+        pdf.set_fill_color(57, 107, 177)
         pdf.rect(0, 0, 210, 30, 'F')
         
         pdf.set_font('Arial', 'B', 24)
@@ -1439,7 +1439,7 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
         pdf.ln(10)
         
         # =============================================================================
-        # INFORMAZIONI PAZIENTE - CARD STYLE
+        # INFORMAZIONI PAZIENTE
         # =============================================================================
         pdf.set_fill_color(240, 248, 255)
         pdf.rect(10, 45, 190, 30, 'F')
@@ -1457,6 +1457,27 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
         pdf.ln(15)
         
         # =============================================================================
+        # INFORMAZIONI REGISTRAZIONE
+        # =============================================================================
+        pdf.set_font('Arial', 'B', 16)
+        pdf.set_text_color(57, 107, 177)
+        pdf.cell(0, 10, "INFORMAZIONI REGISTRAZIONE", 0, 1, 'L')
+        
+        pdf.set_fill_color(245, 245, 245)
+        pdf.rect(10, pdf.get_y(), 190, 25, 'F')
+        
+        pdf.set_font('Arial', '', 10)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(95, 8, f"Inizio: {timeline['start_time'].strftime('%d/%m/%Y %H:%M')}", 0, 0)
+        pdf.cell(95, 8, f"Fine: {timeline['end_time'].strftime('%d/%m/%Y %H:%M')}", 0, 1)
+        pdf.cell(95, 8, f"Durata: {timeline['total_duration_hours']:.1f} ore", 0, 0)
+        pdf.cell(95, 8, f"Battiti totali: {len(rr_intervals)}", 0, 1)
+        pdf.cell(95, 8, f"Giorni registrati: {len(daily_metrics)}", 0, 0)
+        pdf.cell(95, 8, f"Attivita tracciate: {len(activities)}", 0, 1)
+        
+        pdf.ln(10)
+        
+        # =============================================================================
         # METRICHE PRINCIPALI - CARDS COLORATE
         # =============================================================================
         pdf.set_font('Arial', 'B', 16)
@@ -1468,42 +1489,64 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
         metrics_row1 = [
             ("Battito Medio", f"{avg_metrics.get('hr_mean', 0):.1f} bpm", (76, 175, 80)),
             ("SDNN", f"{avg_metrics.get('sdnn', 0):.1f} ms", (33, 150, 243)),
-            ("RMSSD", f"{avg_metrics.get('rmssd', 0):.1f} ms", (156, 39, 176))
+            ("RMSSD", f"{avg_metrics.get('rmssd', 0):.1f} ms", (156, 39, 176)),
+            ("Coerenza", f"{avg_metrics.get('coherence', 0):.1f}%", (255, 152, 0))
         ]
         
         for i, (label, value, color) in enumerate(metrics_row1):
             pdf.set_fill_color(*color)
-            pdf.rect(10 + i*65, 85, 60, 25, 'F')
-            pdf.set_font('Arial', 'B', 10)
+            pdf.rect(10 + i*47, 120, 45, 20, 'F')
+            pdf.set_font('Arial', 'B', 8)
             pdf.set_text_color(255, 255, 255)
-            pdf.set_xy(10 + i*65, 87)
-            pdf.cell(60, 8, label, 0, 1, 'C')
-            pdf.set_font('Arial', 'B', 14)
-            pdf.set_xy(10 + i*65, 97)
-            pdf.cell(60, 8, value, 0, 1, 'C')
+            pdf.set_xy(10 + i*47, 122)
+            pdf.cell(45, 8, label, 0, 1, 'C')
+            pdf.set_font('Arial', 'B', 10)
+            pdf.set_xy(10 + i*47, 130)
+            pdf.cell(45, 8, value, 0, 1, 'C')
         
         # Seconda riga di metriche
         metrics_row2 = [
-            ("Coerenza", f"{avg_metrics.get('coherence', 0):.1f}%", (255, 152, 0)),
-            ("Potenza Totale", f"{avg_metrics.get('total_power', 0):.0f} ms2", (233, 30, 99)),
-            ("LF/HF", f"{avg_metrics.get('lf_hf_ratio', 0):.2f}", (0, 150, 136))
+            ("Potenza Totale", f"{avg_metrics.get('total_power', 0):.0f}", (233, 30, 99)),
+            ("LF/HF", f"{avg_metrics.get('lf_hf_ratio', 0):.2f}", (0, 150, 136)),
+            ("LF Power", f"{avg_metrics.get('lf', 0):.0f}", (121, 85, 72)),
+            ("HF Power", f"{avg_metrics.get('hf', 0):.0f}", (104, 159, 56))
         ]
         
         for i, (label, value, color) in enumerate(metrics_row2):
             pdf.set_fill_color(*color)
-            pdf.rect(10 + i*65, 115, 60, 25, 'F')
-            pdf.set_font('Arial', 'B', 10)
+            pdf.rect(10 + i*47, 145, 45, 20, 'F')
+            pdf.set_font('Arial', 'B', 8)
             pdf.set_text_color(255, 255, 255)
-            pdf.set_xy(10 + i*65, 117)
-            pdf.cell(60, 8, label, 0, 1, 'C')
-            pdf.set_font('Arial', 'B', 14)
-            pdf.set_xy(10 + i*65, 127)
-            pdf.cell(60, 8, value, 0, 1, 'C')
+            pdf.set_xy(10 + i*47, 147)
+            pdf.cell(45, 8, label, 0, 1, 'C')
+            pdf.set_font('Arial', 'B', 10)
+            pdf.set_xy(10 + i*47, 155)
+            pdf.cell(45, 8, value, 0, 1, 'C')
         
-        pdf.ln(35)
+        # Terza riga - METRICHE SONNO
+        if avg_metrics.get('sleep_duration', 0) > 0:
+            metrics_row3 = [
+                ("Sonno Totale", f"{avg_metrics.get('sleep_duration', 0):.1f}h", (63, 81, 181)),
+                ("Efficienza", f"{avg_metrics.get('sleep_efficiency', 0):.0f}%", (136, 14, 79)),
+                ("Battito Sonno", f"{avg_metrics.get('sleep_hr', 0):.0f} bpm", (230, 81, 0)),
+                ("Sonno REM", f"{avg_metrics.get('sleep_rem', 0):.1f}h", (0, 77, 64))
+            ]
+            
+            for i, (label, value, color) in enumerate(metrics_row3):
+                pdf.set_fill_color(*color)
+                pdf.rect(10 + i*47, 170, 45, 20, 'F')
+                pdf.set_font('Arial', 'B', 8)
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_xy(10 + i*47, 172)
+                pdf.cell(45, 8, label, 0, 1, 'C')
+                pdf.set_font('Arial', 'B', 10)
+                pdf.set_xy(10 + i*47, 180)
+                pdf.cell(45, 8, value, 0, 1, 'C')
+        
+        pdf.ln(25)
         
         # =============================================================================
-        # ANALISI GIORNALIERA DETTAGLIATA
+        # ANALISI GIORNALIERA DETTAGLIATA CON TUTTI I DATI
         # =============================================================================
         if daily_metrics:
             pdf.set_font('Arial', 'B', 16)
@@ -1516,34 +1559,125 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
                 day_str = day_dt.strftime('%d/%m/%Y')
                 
                 # Header giorno
-                pdf.set_fill_color(189, 189, 189)
+                pdf.set_fill_color(57, 107, 177)
                 pdf.rect(10, pdf.get_y(), 190, 8, 'F')
                 pdf.set_font('Arial', 'B', 12)
                 pdf.set_text_color(255, 255, 255)
-                pdf.cell(0, 8, f"Data: {day_str}", 0, 1, 'L')
+                pdf.cell(0, 8, f"GIORNO: {day_str}", 0, 1, 'L')
                 pdf.ln(2)
                 
-                # Metriche del giorno
-                day_data = [
+                # 🆕 ATTIVITÀ DEL GIORNO
+                day_activities = []
+                for activity in activities:
+                    if activity['start_time'].date() == day_dt.date():
+                        day_activities.append(activity)
+                
+                if day_activities:
+                    pdf.set_font('Arial', 'B', 10)
+                    pdf.set_text_color(57, 107, 177)
+                    pdf.cell(0, 8, "Attivita registrate:", 0, 1, 'L')
+                    
+                    for activity in day_activities:
+                        pdf.set_font('Arial', '', 8)
+                        pdf.set_text_color(0, 0, 0)
+                        activity_time = activity['start_time'].strftime('%H:%M')
+                        pdf.cell(0, 6, f"  {activity_time} - {activity['name']} ({activity['duration']}min - {activity['intensity']})", 0, 1, 'L')
+                    
+                    pdf.ln(2)
+                
+                # 🆕 TABELLA METRICHE COMPLETA
+                col_widths = [47, 47, 47, 47]
+                
+                # Intestazione tabella
+                pdf.set_fill_color(189, 189, 189)
+                pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+                pdf.set_font('Arial', 'B', 8)
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_xy(10, pdf.get_y())
+                pdf.cell(col_widths[0], 8, "METRICA", 0, 0, 'C')
+                pdf.cell(col_widths[1], 8, "VALORE", 0, 0, 'C')
+                pdf.cell(col_widths[2], 8, "METRICA", 0, 0, 'C')
+                pdf.cell(col_widths[3], 8, "VALORE", 0, 1, 'C')
+                
+                # Dati metriche - PRIMA COLONNA
+                metrics_left = [
                     ("Battito Medio", f"{day_metrics.get('hr_mean', 0):.1f} bpm"),
                     ("SDNN", f"{day_metrics.get('sdnn', 0):.1f} ms"),
                     ("RMSSD", f"{day_metrics.get('rmssd', 0):.1f} ms"),
                     ("Coerenza", f"{day_metrics.get('coherence', 0):.1f}%"),
-                    ("LF/HF", f"{day_metrics.get('lf_hf_ratio', 0):.2f}")
+                    ("Potenza Totale", f"{day_metrics.get('total_power', 0):.0f}"),
+                    ("LF Power", f"{day_metrics.get('lf', 0):.0f}"),
+                    ("HF Power", f"{day_metrics.get('hf', 0):.0f}"),
+                    ("LF/HF Ratio", f"{day_metrics.get('lf_hf_ratio', 0):.2f}")
                 ]
                 
-                for i, (label, value) in enumerate(day_data):
+                # Dati metriche - SECONDA COLONNA (SONNO E ALTRI)
+                metrics_right = []
+                if day_metrics.get('sleep_duration', 0) > 0:
+                    metrics_right.extend([
+                        ("Sonno Totale", f"{day_metrics.get('sleep_duration', 0):.1f} h"),
+                        ("Efficienza Sonno", f"{day_metrics.get('sleep_efficiency', 0):.0f}%"),
+                        ("Battito Sonno", f"{day_metrics.get('sleep_hr', 0):.0f} bpm"),
+                        ("Sonno Leggero", f"{day_metrics.get('sleep_light', 0):.1f} h"),
+                        ("Sonno Profondo", f"{day_metrics.get('sleep_deep', 0):.1f} h"),
+                        ("Sonno REM", f"{day_metrics.get('sleep_rem', 0):.1f} h"),
+                        ("Risvegli", f"{day_metrics.get('sleep_awake', 0):.1f} h")
+                    ])
+                else:
+                    metrics_right.extend([
+                        ("Sonno", "Dati non disp."),
+                        ("", ""),
+                        ("", ""),
+                        ("", ""),
+                        ("", ""),
+                        ("", ""),
+                        ("", "")
+                    ])
+                
+                # Stampa righe alternate
+                max_rows = max(len(metrics_left), len(metrics_right))
+                
+                for i in range(max_rows):
+                    # Colore riga alternato
                     if i % 2 == 0:
                         pdf.set_fill_color(245, 245, 245)
                     else:
                         pdf.set_fill_color(255, 255, 255)
                     
                     pdf.rect(10, pdf.get_y(), 190, 8, 'F')
-                    pdf.set_font('Arial', '', 10)
+                    pdf.set_font('Arial', '', 8)
                     pdf.set_text_color(0, 0, 0)
-                    pdf.cell(95, 8, f"  {label}:", 0, 0, 'L')
-                    pdf.cell(95, 8, value, 0, 1, 'R')
+                    
+                    # Colonna sinistra
+                    if i < len(metrics_left):
+                        label, value = metrics_left[i]
+                        pdf.set_xy(10, pdf.get_y())
+                        pdf.cell(col_widths[0], 8, f"  {label}", 0, 0, 'L')
+                        pdf.cell(col_widths[1], 8, value, 0, 0, 'C')
+                    else:
+                        pdf.set_xy(10, pdf.get_y())
+                        pdf.cell(col_widths[0] + col_widths[1], 8, "", 0, 0, 'L')
+                    
+                    # Colonna destra
+                    if i < len(metrics_right):
+                        label, value = metrics_right[i]
+                        pdf.set_xy(10 + col_widths[0] + col_widths[1], pdf.get_y())
+                        pdf.cell(col_widths[2], 8, f"  {label}", 0, 0, 'L')
+                        pdf.cell(col_widths[3], 8, value, 0, 1, 'C')
+                    else:
+                        pdf.cell(col_widths[2] + col_widths[3], 8, "", 0, 1, 'L')
                 
+                pdf.ln(8)
+                
+                # 🆕 SEZIONE GRAFICO (placeholder - nella realtà salveresti l'immagine)
+                pdf.set_font('Arial', 'I', 9)
+                pdf.set_text_color(128, 128, 128)
+                pdf.cell(0, 8, "GRAFICO: Andamento HRV giornaliero con attivita registrate", 0, 1, 'L')
+                pdf.ln(5)
+                
+                # Linea separatrice tra giorni
+                pdf.set_draw_color(200, 200, 200)
+                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
                 pdf.ln(8)
         
         # =============================================================================
@@ -1559,15 +1693,17 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
             "Prioritizza il sonno e il recupero - Considera tecniche di respirazione",
             "Pratica regolarmente tecniche di rilassamento (meditazione, respirazione)",
             "Mantieni una buona idratazione - Bere 2L di acqua al giorno",
-            "Dieta mediterranea - Ricca in omega-3, verdure e grassi buoni"
+            "Dieta mediterranea - Ricca in omega-3, verdure e grassi buoni",
+            "Bilancia allenamento e recupero - Ascolta il tuo corpo",
+            "Riduci lo stress digitale - Pause regolari dagli schermi"
         ]
         
         for i, rec in enumerate(recommendations):
-            pdf.set_font('Arial', '', 10)
+            pdf.set_font('Arial', '', 9)
             pdf.set_text_color(0, 0, 0)
-            pdf.cell(0, 8, f"- {rec}", 0, 1, 'L')
+            pdf.multi_cell(0, 6, f"- {rec}")
         
-        pdf.ln(10)
+        pdf.ln(8)
         
         # =============================================================================
         # RIFERIMENTI SCIENTIFICI
@@ -1581,11 +1717,12 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
             "Task Force of the European Society of Cardiology (1996) - Heart rate variability standards",
             "Shaffer F. et al. (2017) - A Healthy Heart is Not a Metronome",
             "McCraty R. et al. (2014) - The Coherent Heart",
-            "Laborde S. et al. (2017) - Heart Rate Variability and Cardiac Vagal Tone"
+            "Laborde S. et al. (2017) - Heart Rate Variability and Cardiac Vagal Tone",
+            "Vanderlei et al. (2009) - Basic notions of heart rate variability"
         ]
         
         for i, ref in enumerate(references):
-            pdf.set_font('Arial', 'I', 9)
+            pdf.set_font('Arial', 'I', 8)
             pdf.set_text_color(128, 128, 128)
             pdf.multi_cell(0, 6, f"- {ref}")
         
@@ -1593,17 +1730,16 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
         # FOOTER
         # =============================================================================
         pdf.set_y(265)
-        pdf.set_font('Arial', 'I', 10)
+        pdf.set_font('Arial', 'I', 8)
         pdf.set_text_color(128, 128, 128)
         pdf.cell(0, 10, f"Report generato il {datetime.now().strftime('%d/%m/%Y %H:%M')} - HRV Analytics", 0, 1, 'C')
         
-        # Salvataggio sicuro senza emoji
+        # Salvataggio sicuro
         pdf_output = BytesIO()
         try:
             pdf_bytes = pdf.output(dest='S')
             pdf_output.write(pdf_bytes.encode('latin-1'))
         except UnicodeEncodeError:
-            # Fallback: rimuovi tutti i caratteri problematici
             pdf_bytes = pdf.output(dest='S')
             pdf_output.write(pdf_bytes.encode('latin-1', 'ignore'))
         
@@ -1613,26 +1749,6 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
     except Exception as e:
         st.error(f"Errore nella generazione del PDF: {e}")
         return None
-        
-        # =============================================================================
-        # FOOTER
-        # =============================================================================
-        pdf.set_y(265)
-        pdf.set_font('Arial', 'I', 10)
-        pdf.set_text_color(128, 128, 128)
-        pdf.cell(0, 10, f"Report generato il {datetime.now().strftime('%d/%m/%Y %H:%M')} - HRV Analytics", 0, 1, 'C')
-        
-        # Salva il PDF
-        pdf_output = BytesIO()
-        pdf_output.write(pdf.output(dest='S').encode('latin-1'))
-        pdf_output.seek(0)
-        
-        return pdf_output
-        
-    except Exception as e:
-        st.error(f"Errore nella generazione del PDF: {e}")
-        return None
-
 def display_pdf_download_button(pdf_buffer, filename):
     pdf_b64 = base64.b64encode(pdf_buffer.getvalue()).decode()
     
