@@ -389,22 +389,6 @@ def get_user_key(user_profile):
         surname = user_profile.get('surname', '').strip().lower()
         birth_date = user_profile.get('birth_date')
         
-        if not name or not surname or not birth_date:
-            st.error("❌ Nome, cognome e data di nascita sono obbligatori")
-            return None
-        
-        # Formatta la data in modo consistente
-        if hasattr(birth_date, 'strftime'):
-            # Se è un oggetto date, formatta come DDMMYYYY
-            birth_str = birth_date.strftime('%d%m%Y')
-        else:
-            # Se è una stringa, prova a parsarladef get_user_key(user_profile):
-    """Crea una chiave univoca per l'utente - VERSIONE ROBUSTA"""
-    try:
-        name = user_profile.get('name', '').strip().lower()
-        surname = user_profile.get('surname', '').strip().lower()
-        birth_date = user_profile.get('birth_date')
-        
         # Debug
         print(f"DEBUG get_user_key - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
         
@@ -445,40 +429,6 @@ def get_user_key(user_profile):
         print(f"DEBUG - Errore in get_user_key: {e}")
         st.error(f"❌ Errore nella generazione della chiave utente: {e}")
         return None
-        
-        # 🆕 FORMATTA DATA IN MODO CONSISTENTE
-        if hasattr(birth_date, 'strftime'):
-            # Se è un oggetto date, formatta come DDMMYYYY
-            birth_str = birth_date.strftime('%d%m%Y')
-        else:
-            # Se è una stringa, prova a parsarla
-            try:
-                # Prova formato italiano DD/MM/YYYY
-                date_obj = datetime.strptime(str(birth_date), '%d/%m/%Y').date()
-                birth_str = date_obj.strftime('%d%m%Y')
-            except ValueError:
-                try:
-                    # Prova formato YYYY-MM-DD
-                    date_obj = datetime.strptime(str(birth_date), '%Y-%m-%d').date()
-                    birth_str = date_obj.strftime('%d%m%Y')
-                except ValueError:
-                    # Usa la stringa originale pulita
-                    birth_str = str(birth_date).replace('-', '').replace('/', '').replace(' ', '')
-        
-        # 🆕 PULIZIA CONSISTENTE
-        name_clean = re.sub(r'[^a-zA-Z0-9]', '', name)
-        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', surname)
-        birth_clean = re.sub(r'[^0-9]', '', birth_str)
-        
-        user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
-        
-        print(f"DEBUG - User Key generata: {user_key}")
-        return user_key
-        
-    except Exception as e:
-        print(f"DEBUG - Errore in get_user_key: {e}")
-        return None
-
 def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
     # Carica il database all'inizio
