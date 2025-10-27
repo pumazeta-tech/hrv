@@ -358,10 +358,10 @@ def save_user_database():
         return False
 
 def save_current_user():
-    """Salva l'utente corrente nel database - VERSIONE SEMPLIFICATA"""
+    """Salva l'utente corrente nel database - VERSIONE MIGLIORATA"""
     user_profile = st.session_state.user_profile
     
-    # Validazione base
+    # Validazione completa
     if not user_profile.get('name') or not user_profile.get('surname') or not user_profile.get('birth_date'):
         st.error("❌ Inserisci nome, cognome e data di nascita")
         return False
@@ -372,19 +372,16 @@ def save_current_user():
         return False
     
     # Salva/aggiorna nel database
-    if user_key not in st.session_state.user_database:
-        st.session_state.user_database[user_key] = {
-            'profile': user_profile.copy(),
-            'analyses': []
-        }
-    else:
-        st.session_state.user_database[user_key]['profile'] = user_profile.copy()
+    st.session_state.user_database[user_key] = {
+        'profile': user_profile.copy(),
+        'analyses': st.session_state.user_database.get(user_key, {}).get('analyses', [])
+    }
     
     success = save_user_database()
     if success:
-        st.success("✅ Utente salvato nel database!")
-    return success
-
+        st.success(f"✅ Utente {user_profile['name']} {user_profile['surname']} salvato nel database!")
+        return True
+    return False
 def get_user_key(user_profile):
     """Crea una chiave univoca per l'utente - VERSIONE ROBUSTA"""
     try:
@@ -392,11 +389,41 @@ def get_user_key(user_profile):
         surname = user_profile.get('surname', '').strip().lower()
         birth_date = user_profile.get('birth_date')
         
-        # Debug
-        print(f"DEBUG get_user_key - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
-        
         if not name or not surname or not birth_date:
+            st.error("❌ Nome, cognome e data di nascita sono obbligatori")
             return None
+        
+        # Formatta la data in modo consistente
+        if hasattr(birth_date, 'strftime'):
+            # Se è un oggetto date, formatta come DDMMYYYY
+            birth_str = birth_date.strftime('%d%m%Y')
+        else:
+            # Se è una stringa, prova a parsarla
+            try:
+                # Prova formato italiano DD/MM/YYYY
+                date_obj = datetime.strptime(str(birth_date), '%d/%m/%Y').date()
+                birth_str = date_obj.strftime('%d%m%Y')
+            except ValueError:
+                try:
+                    # Prova formato YYYY-MM-DD
+                    date_obj = datetime.strptime(str(birth_date), '%Y-%m-%d').date()
+                    birth_str = date_obj.strftime('%d%m%Y')
+                except ValueError:
+                    # Usa la stringa originale pulita
+                    birth_str = str(birth_date).replace('-', '').replace('/', '').replace(' ', '')
+        
+        # Pulisci i caratteri speciali
+        name_clean = re.sub(r'[^a-zA-Z0-9]', '', name)
+        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', surname)
+        birth_clean = re.sub(r'[^0-9]', '', birth_str)
+        
+        user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
+        
+        return user_key.lower()
+        
+    except Exception as e:
+        st.error(f"❌ Errore nella generazione della chiave utente: {e}")
+        return None
         
         # 🆕 FORMATTA DATA IN MODO CONSISTENTE
         if hasattr(birth_date, 'strftime'):
@@ -2084,21 +2111,31 @@ def main():
             st.session_state.user_profile['age'] = age
             st.info(f"Età: {age} anni")
         
-        # PULSANTE SALVA UTENTE - SEMPLICE
+        # PULSANTE SALVA UTENTE - MIGLIORATO
         st.divider()
         st.header("💾 Salvataggio")
         
-        if st.button("💾 Salva/Modifica Utente", type="primary", use_container_width=True):
-            if save_current_user():
-                st.success("✅ Utente salvato!")
-            else:
-                st.error("❌ Inserisci nome, cognome e data di nascita")
-            
-            user_key = get_user_key(st.session_state.user_profile)
-            st.write(f"**User Key generata:** {user_key}")
-            
-            if st.button("🔄 Forza Ricarica Pagina"):
+        # Usa columns per mettere i pulsanti affiancati
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("💾 Salva/Modifica Utente", type="primary", use_container_width=True):
+                if save_current_user():
+                    st.success("✅ Utente salvato!")
+                else:
+                    st.error("❌ Inserisci nome, cognome e data di nascita")
+                
+                user_key = get_user_key(st.session_state.user_profile)
+                st.write(f"**User Key generata:** {user_key}")
+        
+        with col2:
+            if st.button("🔄 Ricarica Pagina", use_container_width=True):
                 st.rerun()
+        
+        # Debug info
+        if st.session_state.user_profile.get('name'):
+            user_key = get_user_key(st.session_state.user_profile)
+            st.info(f"🔑 Chiave corrente: {user_key}")
       
         # Solo le attività
         create_activity_tracker()
@@ -2744,29 +2781,48 @@ def main():
                     with col4:
                         st.metric("Battiti Totali", len(rr_intervals))
             
-            # 5. SALVATAGGIO ANALISI - VERSIONE CON DEBUG TEMPORANEO
-            if st.button("💾 Salva Analisi nel Database", type="primary"):
-                user_key = get_user_key(st.session_state.user_profile)
-                
-                # 🆕 DEBUG TEMPORANEO
-                st.write(f"🔍 User Key: {user_key}")
-                st.write(f"🔍 Utenti nel database: {list(st.session_state.user_database.keys())}")
-                
-                if user_key and user_key in st.session_state.user_database:
-                    analysis_data = {
-                        'timestamp': datetime.now().isoformat(),
-                        'recording_start': timeline['start_time'].isoformat(),
-                        'recording_end': timeline['end_time'].isoformat(),
-                        'recording_duration_hours': timeline['total_duration_hours'],
-                        'rr_intervals_count': len(rr_intervals),
-                        'overall_metrics': avg_metrics,
-                        'daily_metrics': daily_metrics
-                    }
-                    st.session_state.user_database[user_key]['analyses'].append(analysis_data)
-                    save_user_database()
-                    st.success("✅ Analisi salvata nel database!")
-                else:
-                    st.error("❌ Utente non trovato nel database di sessione")
+# 5. SALVATAGGIO ANALISI - VERSIONE MIGLIORATA
+if st.button("💾 Salva Analisi nel Database", type="primary"):
+    # PRIMA SALVA L'UTENTE SE NON ESISTE
+    user_key = get_user_key(st.session_state.user_profile)
+    
+    st.write(f"🔍 User Key: {user_key}")
+    st.write(f"🔍 Utenti nel database: {list(st.session_state.user_database.keys())}")
+    
+    # Se l'utente non esiste nel database, salvalo prima
+    if user_key and user_key not in st.session_state.user_database:
+        st.info("🔄 Utente non trovato, salvo prima il profilo...")
+        if save_current_user():
+            st.success("✅ Profilo utente salvato!")
+        else:
+            st.error("❌ Errore nel salvare il profilo utente")
+            return
+    
+    if user_key and user_key in st.session_state.user_database:
+        analysis_data = {
+            'timestamp': datetime.now().isoformat(),
+            'recording_start': timeline['start_time'].isoformat(),
+            'recording_end': timeline['end_time'].isoformat(),
+            'recording_duration_hours': timeline['total_duration_hours'],
+            'rr_intervals_count': len(rr_intervals),
+            'overall_metrics': avg_metrics,
+            'daily_metrics': daily_metrics
+        }
+        
+        # Inizializza la lista analyses se non esiste
+        if 'analyses' not in st.session_state.user_database[user_key]:
+            st.session_state.user_database[user_key]['analyses'] = []
+        
+        st.session_state.user_database[user_key]['analyses'].append(analysis_data)
+        
+        if save_user_database():
+            st.success("✅ Analisi salvata nel database!")
+            st.rerun()
+        else:
+            st.error("❌ Errore nel salvare il database")
+    else:
+        st.error("❌ Utente non trovato nel database di sessione")
+        st.info("💡 Prima salva il profilo utente con il pulsante 'Salva/Modifica Utente'")
 
             # 6. REPORT BELLO PDF COLORATO
             st.header("🎨 Report Super Colorato")
