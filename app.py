@@ -1354,41 +1354,7 @@ def create_user_selector():
     
     return selected_user_display
 
-def load_user_into_session(user_data):
-    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE DEBUG"""
-    import copy
-    
-    # 🆕 DEBUG PRIMA DEL CARICAMENTO
-    print(f"DEBUG load_user - Dati ricevuti: {user_data}")
-    
-    st.session_state.user_profile = copy.deepcopy(user_data['profile'])
-    
-    # 🆕 DEBUG DOPO IL CARICAMENTO
-    print(f"DEBUG load_user - Profilo caricato: {st.session_state.user_profile}")
-    
-    # CALCOLA ETÀ
-    if st.session_state.user_profile['birth_date']:
-        age = datetime.now().year - st.session_state.user_profile['birth_date'].year
-        if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
-            age -= 1
-        st.session_state.user_profile['age'] = age
-    
-    # 🆕 DEBUG PRIMA DEL SALVATAGGIO
-    user_key = get_user_key(st.session_state.user_profile)
-    print(f"DEBUG load_user - User Key calcolata: {user_key}")
-    
-    # AGGIUNGI AL DATABASE DI SESSIONE
-    if user_key and user_key not in st.session_state.user_database:
-        st.session_state.user_database[user_key] = {
-            'profile': copy.deepcopy(st.session_state.user_profile),
-            'analyses': []
-        }
-        print(f"DEBUG load_user - Utente aggiunto al database: {user_key}")
-        st.success("✅ Utente caricato e aggiunto al database automaticamente!")
-    else:
-        st.success("✅ Utente caricato!")
-    
-    st.rerun()
+load_user_into_session
 
 def delete_user_from_database(user_key):
     """Elimina un utente dal database"""
@@ -1595,19 +1561,16 @@ def main():
         st.divider()
         st.header("💾 Salvataggio")
         
-        # Aggiungi un controllo per evitare duplicati
-        user_key = get_user_key(st.session_state.user_profile)
-        user_exists = user_key and user_key in st.session_state.user_database
-        
-        if user_exists:
-            st.info("ℹ️ Utente già presente nel database")
+        # 🆕 SEMPLIFICA: MOSTRA SEMPRE ENTRAMBI I PULSANTI
+        col1, col2 = st.columns(2)
+        with col1:
             if st.button("🔄 Aggiorna Utente", type="primary", use_container_width=True):
                 if save_current_user():
                     st.success("✅ Utente aggiornato!")
                 else:
                     st.error("❌ Inserisci nome, cognome e data di nascita")
-        else:
-            if st.button("💾 SALVA NUOVO UTENTE", type="primary", use_container_width=True):
+        with col2:
+            if st.button("💾 Nuovo Utente", type="secondary", use_container_width=True):
                 if save_current_user():
                     st.success("✅ Nuovo utente salvato!")
                 else:
