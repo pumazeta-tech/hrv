@@ -361,38 +361,65 @@ def save_current_user():
     """Salva l'utente corrente nel database"""
     user_profile = st.session_state.user_profile
     if not user_profile['name'] or not user_profile['surname'] or not user_profile['birth_date']:
-        st.error("Inserisci nome, cognome e data di nascita")
+        st.error("❌ Inserisci nome, cognome e data di nascita")
         return False
     
     user_key = get_user_key(user_profile)
     if not user_key:
+        st.error("❌ Errore nella creazione della chiave utente")
         return False
+
+    # 🆕 DEBUG: Mostra informazioni utili
+    st.info(f"🔍 Debug - User Key: {user_key}")
+    st.info(f"🔍 Debug - Utente nel database: {user_key in st.session_state.user_database}")
     
     if user_key not in st.session_state.user_database:
         st.session_state.user_database[user_key] = {
             'profile': user_profile.copy(),
             'analyses': []
         }
+        st.info("🆕 Nuovo utente creato nel database di sessione")
+    else:
+        st.info("🔄 Utente esistente aggiornato nel database di sessione")
+        # Aggiorna il profilo mantenendo le analisi esistenti
+        st.session_state.user_database[user_key]['profile'] = user_profile.copy()
     
     success = save_user_database()
     if success:
-        st.success("Utente salvato nel database!")
+        st.success("✅ Utente salvato nel database Google Sheets!")
+    else:
+        st.error("❌ Errore nel salvataggio su Google Sheets")
     return success
 
 def get_user_key(user_profile):
-    """Crea una chiave univoca per l'utente con formato data italiano"""
+    """Crea una chiave univoca per l'utente con formato data italiano - VERSIONE ROBUSTA"""
     if not user_profile['name'] or not user_profile['surname'] or not user_profile['birth_date']:
+        st.error("❌ Profilo utente incompleto per generare chiave")
         return None
     
-    # Converti la data in formato stringa italiano dd/mm/yyyy
-    if hasattr(user_profile['birth_date'], 'strftime'):
-        birth_date_str = user_profile['birth_date'].strftime('%d/%m/%Y')
-    else:
-        # Se già è una stringa, assumiamo sia già nel formato italiano
-        birth_date_str = str(user_profile['birth_date'])
-    
-    return f"{user_profile['name'].lower()}_{user_profile['surname'].lower()}_{birth_date_str}"
-
+    try:
+        # Converti la data in formato stringa italiano dd/mm/yyyy
+        if hasattr(user_profile['birth_date'], 'strftime'):
+            birth_date_str = user_profile['birth_date'].strftime('%d/%m/%Y')
+        else:
+            # Se già è una stringa, assumiamo sia già nel formato italiano
+            birth_date_str = str(user_profile['birth_date'])
+        
+        # Pulizia dei caratteri speciali
+        name_clean = re.sub(r'[^a-zA-Z0-9]', '', user_profile['name'].lower())
+        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', user_profile['surname'].lower())
+        birth_clean = re.sub(r'[^0-9]', '', birth_date_str)
+        
+        user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
+        
+        # �DEBUG
+        st.info(f"🔑 Chiave generata: {user_key}")
+        
+        return user_key
+        
+    except Exception as e:
+        st.error(f"❌ Errore nella generazione della chiave utente: {e}")
+        return None
 def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
     # Carica il database all'inizio
@@ -1322,6 +1349,7 @@ def create_user_selector():
 def load_user_into_session(user_data):
     """Carica i dati dell'utente selezionato nella sessione corrente"""
     st.session_state.user_profile = user_data['profile'].copy()
+    user_key = get_user_key(st.session_state.user_profile)
     st.success(f"✅ Utente {user_data['profile']['name']} {user_data['profile']['surname']} caricato!")
 
 def delete_user_from_database(user_key):
@@ -1532,7 +1560,18 @@ def main():
                     st.success("✅ Nuovo utente salvato!")
                 else:
                     st.error("❌ Inserisci nome, cognome e data di nascita")
-        
+
+        # 🆕 SEZIONE DEBUG (puoi rimuoverla dopo che tutto funziona)
+        with st.sidebar.expander("🐛 Debug Info", expanded=False):
+            if st.button("🔍 Mostra Info Sessione"):
+                user_key = get_user_key(st.session_state.user_profile)
+                st.write(f"**User Key corrente:** {user_key}")
+                st.write(f"**Utente nel database:** {user_key in st.session_state.user_database if user_key else 'No key'}")
+                st.write(f"**Nome:** {st.session_state.user_profile['name']}")
+                st.write(f"**Cognome:** {st.session_state.user_profile['surname']}")
+                st.write(f"**Data di nascita:** {st.session_state.user_profile['birth_date']}")
+                st.write(f"**Numero utenti nel DB:** {len(st.session_state.user_database)}") 
+       
         # Solo le attività
         create_activity_tracker()
     
