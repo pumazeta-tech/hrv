@@ -386,26 +386,42 @@ def save_current_user():
     return success
 
 def get_user_key(user_profile):
-    """Crea una chiave univoca per l'utente - VERSIONE SEMPLICE E SICURA"""
+    """Crea una chiave univoca per l'utente - VERSIONE ULTRA-SICURA"""
     try:
-        name = user_profile.get('name', '').strip()
-        surname = user_profile.get('surname', '').strip() 
+        # 🆕 ESTRAI I VALORI IN MODO SICURO
+        name = str(user_profile.get('name', '')).strip()
+        surname = str(user_profile.get('surname', '')).strip()
         birth_date = user_profile.get('birth_date')
         
         # Debug
-        print(f"DEBUG - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
+        print(f"DEBUG get_user_key - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
         
-        if not name or not surname or not birth_date:
+        # 🆕 CONTROLLO MOLTO LASCO
+        if not name or name.isspace() or not surname or surname.isspace() or not birth_date:
+            print("DEBUG - Campi mancanti")
             return None
         
-        # Formatta la data
+        # 🆕 FORMATTA DATA IN MODO ROBUSTO
         if hasattr(birth_date, 'strftime'):
             birth_str = birth_date.strftime('%d%m%Y')
+        elif isinstance(birth_date, str):
+            # Prova a parsare se è stringa
+            try:
+                date_obj = datetime.strptime(birth_date, '%Y-%m-%d').date()
+                birth_str = date_obj.strftime('%d%m%Y')
+            except:
+                birth_str = birth_date.replace('-', '').replace('/', '').replace(' ', '')
         else:
-            birth_str = str(birth_date).replace('-', '').replace('/', '')
+            birth_str = str(birth_date).replace('-', '').replace('/', '').replace(' ', '')
         
-        # Crea chiave semplice
-        user_key = f"{name.lower()}_{surname.lower()}_{birth_str}"
+        # 🆕 PULIZIA EXTRA
+        name_clean = re.sub(r'[^a-zA-Z0-9]', '', name.lower())
+        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', surname.lower())
+        birth_clean = re.sub(r'[^0-9]', '', birth_str)
+        
+        user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
+        
+        print(f"DEBUG - User Key generata: {user_key}")
         return user_key
         
     except Exception as e:
@@ -1339,29 +1355,41 @@ def create_user_selector():
     return selected_user_display
 
 def load_user_into_session(user_data):
-    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE AUTOMATICA"""
+    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE DEBUG"""
     import copy
+    
+    # 🆕 DEBUG PRIMA DEL CARICAMENTO
+    print(f"DEBUG load_user - Dati ricevuti: {user_data}")
+    
     st.session_state.user_profile = copy.deepcopy(user_data['profile'])
     
-    # 🆕 CALCOLA ETÀ
+    # 🆕 DEBUG DOPO IL CARICAMENTO
+    print(f"DEBUG load_user - Profilo caricato: {st.session_state.user_profile}")
+    
+    # CALCOLA ETÀ
     if st.session_state.user_profile['birth_date']:
         age = datetime.now().year - st.session_state.user_profile['birth_date'].year
         if (datetime.now().month, datetime.now().day) < (st.session_state.user_profile['birth_date'].month, st.session_state.user_profile['birth_date'].day):
             age -= 1
         st.session_state.user_profile['age'] = age
     
-    # 🆕 AGGIUNGI AUTOMATICAMENTE AL DATABASE DI SESSIONE
+    # 🆕 DEBUG PRIMA DEL SALVATAGGIO
     user_key = get_user_key(st.session_state.user_profile)
+    print(f"DEBUG load_user - User Key calcolata: {user_key}")
+    
+    # AGGIUNGI AL DATABASE DI SESSIONE
     if user_key and user_key not in st.session_state.user_database:
         st.session_state.user_database[user_key] = {
             'profile': copy.deepcopy(st.session_state.user_profile),
             'analyses': []
         }
+        print(f"DEBUG load_user - Utente aggiunto al database: {user_key}")
         st.success("✅ Utente caricato e aggiunto al database automaticamente!")
     else:
         st.success("✅ Utente caricato!")
     
     st.rerun()
+
 def delete_user_from_database(user_key):
     """Elimina un utente dal database"""
     if user_key in st.session_state.user_database:
