@@ -386,37 +386,40 @@ def save_current_user():
     return success
 
 def get_user_key(user_profile):
-    """Crea una chiave univoca per l'utente - VERSIONE ULTRA-SICURA"""
+    """Crea una chiave univoca per l'utente - VERSIONE ROBUSTA"""
     try:
-        # 🆕 ESTRAI I VALORI IN MODO SICURO
-        name = str(user_profile.get('name', '')).strip()
-        surname = str(user_profile.get('surname', '')).strip()
+        name = user_profile.get('name', '').strip().lower()
+        surname = user_profile.get('surname', '').strip().lower()
         birth_date = user_profile.get('birth_date')
         
         # Debug
         print(f"DEBUG get_user_key - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
         
-        # 🆕 CONTROLLO MOLTO LASCO
-        if not name or name.isspace() or not surname or surname.isspace() or not birth_date:
-            print("DEBUG - Campi mancanti")
+        if not name or not surname or not birth_date:
             return None
         
-        # 🆕 FORMATTA DATA IN MODO ROBUSTO
+        # 🆕 FORMATTA DATA IN MODO CONSISTENTE
         if hasattr(birth_date, 'strftime'):
+            # Se è un oggetto date, formatta come DDMMYYYY
             birth_str = birth_date.strftime('%d%m%Y')
-        elif isinstance(birth_date, str):
-            # Prova a parsare se è stringa
-            try:
-                date_obj = datetime.strptime(birth_date, '%Y-%m-%d').date()
-                birth_str = date_obj.strftime('%d%m%Y')
-            except:
-                birth_str = birth_date.replace('-', '').replace('/', '').replace(' ', '')
         else:
-            birth_str = str(birth_date).replace('-', '').replace('/', '').replace(' ', '')
+            # Se è una stringa, prova a parsarla
+            try:
+                # Prova formato italiano DD/MM/YYYY
+                date_obj = datetime.strptime(str(birth_date), '%d/%m/%Y').date()
+                birth_str = date_obj.strftime('%d%m%Y')
+            except ValueError:
+                try:
+                    # Prova formato YYYY-MM-DD
+                    date_obj = datetime.strptime(str(birth_date), '%Y-%m-%d').date()
+                    birth_str = date_obj.strftime('%d%m%Y')
+                except ValueError:
+                    # Usa la stringa originale pulita
+                    birth_str = str(birth_date).replace('-', '').replace('/', '').replace(' ', '')
         
-        # 🆕 PULIZIA EXTRA
-        name_clean = re.sub(r'[^a-zA-Z0-9]', '', name.lower())
-        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', surname.lower())
+        # 🆕 PULIZIA CONSISTENTE
+        name_clean = re.sub(r'[^a-zA-Z0-9]', '', name)
+        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', surname)
         birth_clean = re.sub(r'[^0-9]', '', birth_str)
         
         user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
@@ -1962,6 +1965,30 @@ def display_complete_analysis_history(user_key):
     st.plotly_chart(fig_coherence, use_container_width=True)
 
 # =============================================================================
+# 🐛 FUNZIONI DI DEBUG
+# =============================================================================
+
+def debug_user_profile():
+    """Debug per vedere i dati reali del profilo"""
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🐛 Debug Profilo")
+    
+    st.sidebar.write("**Dati Session State:**")
+    st.sidebar.json(st.session_state.user_profile)
+    
+    user_key = get_user_key(st.session_state.user_profile)
+    st.sidebar.write(f"**User Key:** {user_key}")
+    
+    # Mostra tutte le keys nel database
+    if st.session_state.user_database:
+        st.sidebar.write("**Keys nel DB:**")
+        for key in st.session_state.user_database.keys():
+            st.sidebar.write(f"- {key}")
+    
+    if st.sidebar.button("🔄 Forza Ricarica"):
+        st.rerun()
+
+# =============================================================================
 # FUNZIONE PRINCIPALE - VERSIONE CORRETTA
 # =============================================================================
 
@@ -2022,19 +2049,9 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            # 🆕 USA KEY UNICA PER FORZARE AGGIORNAMENTO
-            name = st.text_input("Nome", 
-                               value=st.session_state.user_profile['name'] or "",
-                               key=f"name_input_{datetime.now().timestamp()}")
-            if name != st.session_state.user_profile['name']:
-                st.session_state.user_profile['name'] = name
-                
+            st.session_state.user_profile['name'] = st.text_input("Nome", value=st.session_state.user_profile['name'], key="name_input")
         with col2:
-            surname = st.text_input("Cognome", 
-                                  value=st.session_state.user_profile['surname'] or "", 
-                                  key=f"surname_input_{datetime.now().timestamp()}")
-            if surname != st.session_state.user_profile['surname']:
-                st.session_state.user_profile['surname'] = surname
+            st.session_state.user_profile['surname'] = st.text_input("Cognome", value=st.session_state.user_profile['surname'], key="surname_input")
         
         # Data di nascita - 🆕 CORREGGI IL BINDING
         current_birth_date = st.session_state.user_profile['birth_date']
@@ -2085,7 +2102,8 @@ def main():
       
         # Solo le attività
         create_activity_tracker()
-    
+        debug_user_profile() 
+   
     # =============================================================================
     # CONTENUTO PRINCIPALE - VERSIONE CORRETTA
     # =============================================================================
