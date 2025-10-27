@@ -2803,6 +2803,9 @@ def main():
                             
                     except Exception as e:
                         st.error(f"❌ Errore durante la creazione del report: {e}")
+
+    except Exception as e:
+        st.error(f"❌ Errore nel processare il file: {e}")
     
     else:
         # Schermata iniziale
