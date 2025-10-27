@@ -1304,29 +1304,30 @@ def delete_activity(index):
 # =============================================================================
 
 def create_user_selector():
-    """Crea un selettore per gli utenti già registrati - VERSIONE CORRETTA"""
+    """Crea un selettore per gli utenti già registrati - MOSTRA SOLO NOME E COGNOME"""
     if not st.session_state.user_database:
         st.sidebar.info("📝 Nessun utente registrato nel database")
         return None
     
     st.sidebar.header("👥 Utenti Registrati")
     
-    # Crea lista di utenti per il dropdown
+    # Crea lista di utenti UNICI per il dropdown (solo nome e cognome)
     user_list = ["-- Seleziona un utente --"]
-    user_data_list = []
+    user_data_map = {}  # Mappa nome_completo -> (user_key, user_data)
     
     for user_key, user_data in st.session_state.user_database.items():
         profile = user_data['profile']
         
-        # Formatta la data in italiano
-        if hasattr(profile['birth_date'], 'strftime'):
-            birth_date_display = profile['birth_date'].strftime('%d/%m/%Y')
-        else:
-            birth_date_display = str(profile['birth_date'])
+        # Crea il nome completo per il display
+        display_name = f"{profile['surname']} {profile['name']}"
         
-        display_name = f"{profile['name']} {profile['surname']} - {birth_date_display} - {profile['age']} anni"
+        # Usa solo nome e cognome come chiave per evitare duplicati
+        if display_name not in user_data_map:
+            user_data_map[display_name] = (user_key, user_data)
+    
+    # Aggiungi i nomi unici alla lista
+    for display_name in sorted(user_data_map.keys()):
         user_list.append(display_name)
-        user_data_list.append({user_key: user_data})  # 🆕 SALVA LA CHIAVE ORIGINALE
     
     # Dropdown per selezione utente
     selected_user_display = st.sidebar.selectbox(
@@ -1336,15 +1337,13 @@ def create_user_selector():
     )
     
     if selected_user_display != "-- Seleziona un utente --":
-        selected_index = user_list.index(selected_user_display) - 1
-        selected_user_data = user_data_list[selected_index]
-        
         # Mostra info utente selezionato
         st.sidebar.success(f"✅ {selected_user_display}")
         
         # Pulsante per caricare questo utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
-            load_user_into_session(selected_user_data)  # 🆕 PASSA I DATI CORRETTI
+            user_key, user_data = user_data_map[selected_user_display]
+            load_user_into_session({user_key: user_data})
             st.rerun()
     
     return selected_user_display
