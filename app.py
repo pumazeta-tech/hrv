@@ -3319,7 +3319,6 @@ def main():
             
             if st.button("🎨 Genera Report PDF Colorato", type="primary", use_container_width=True):
                 with st.spinner("🎨 Sto creando il report colorato..."):
-                    try:
                         from fpdf import FPDF
                         import base64
                         from io import BytesIO
