@@ -1425,8 +1425,8 @@ def delete_user_from_database(user_key):
 # =============================================================================
 
 def create_daily_plots(daily_metrics, timeline, activities):
-    """Crea grafici giornalieri per il report"""
-    plots = {}
+    """Crea grafici giornalieri e li salva come immagini per il PDF"""
+    plot_files = {}
     
     for day_date, day_metrics in daily_metrics.items():
         day_dt = datetime.fromisoformat(day_date)
@@ -1450,12 +1450,18 @@ def create_daily_plots(daily_metrics, timeline, activities):
             yaxis=dict(title='Battito (bpm)', color='#e74c3c'),
             yaxis2=dict(title='SDNN (ms)', color='#3498db', overlaying='y', side='right'),
             yaxis3=dict(title='RMSSD (ms)', color='#2ecc71', overlaying='y', side='right', position=0.85),
-            height=250
+            height=250,
+            width=400
         )
         
-        plots[day_date] = fig
+        # Salva il grafico come immagine
+        try:
+            img_bytes = fig.to_image(format="png", width=500, height=300)
+            plot_files[day_date] = img_bytes
+        except Exception as e:
+            print(f"Errore nel salvare il grafico per {day_date}: {e}")
     
-    return plots
+    return plot_files
 
 def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_metrics, activities, rr_intervals):
     """Genera un report HRV bellissimo e colorato con TUTTI i dati e grafici"""
@@ -1586,6 +1592,52 @@ def generate_beautiful_pdf_report(user_profile, timeline, daily_metrics, avg_met
             
             pdf.ln(25)
         else:
+            pdf.ln(10)
+
+        # =============================================================================
+        # GRAFICI GIORNALIERI
+        # =============================================================================
+        if daily_metrics:
+            pdf.add_page()
+            
+            pdf.set_font('Arial', 'B', 16)
+            pdf.set_text_color(57, 107, 177)
+            pdf.cell(0, 10, "GRAFICI GIORNALIERI HRV", 0, 1, 'L')
+            pdf.ln(5)
+            
+            # 🆕 CREA E AGGIUNGI I GRAFICI
+            plot_files = create_daily_plots(daily_metrics, timeline, activities)
+            
+            for i, (day_date, img_bytes) in enumerate(plot_files.items()):
+                day_dt = datetime.fromisoformat(day_date)
+                day_str = day_dt.strftime('%d/%m/%Y')
+                
+                # Salva l'immagine temporaneamente
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                    tmp_file.write(img_bytes)
+                    tmp_file_path = tmp_file.name
+                
+                # Aggiungi il grafico al PDF
+                pdf.set_font('Arial', 'B', 12)
+                pdf.set_text_color(57, 107, 177)
+                pdf.cell(0, 8, f"Giorno: {day_str}", 0, 1, 'L')
+                
+                try:
+                    pdf.image(tmp_file_path, x=10, y=pdf.get_y(), w=190)
+                    pdf.ln(60)  # Spazio dopo il grafico
+                except Exception as e:
+                    pdf.cell(0, 8, f"Errore nel caricare il grafico: {e}", 0, 1, 'L')
+                
+                # Pulisci il file temporaneo
+                try:
+                    os.unlink(tmp_file_path)
+                except:
+                    pass
+                
+                # Aggiungi una nuova pagina ogni 2 grafici
+                if (i + 1) % 2 == 0 and (i + 1) < len(plot_files):
+                    pdf.add_page()
+            
             pdf.ln(10)
         
         # =============================================================================
