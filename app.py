@@ -548,9 +548,10 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, recordi
     # Coerenza cardiaca realistica
     coherence = calculate_hrv_coherence(clean_rr, hr_mean, user_age)
     
-    # 🆕 MODIFICA: Calcola il sonno SOLO se la registrazione è abbastanza lunga e probabilmente include la notte
+    # 🆕 MODIFICA: Calcola il sonno SOLO se la registrazione è abbastanza lunga
     sleep_metrics = None
-    if recording_duration_hours and recording_duration_hours >= 8:  # Solo se registrazione di almeno 8 ore
+    recording_hours = len(clean_rr) * rr_mean / (1000 * 60 * 60)
+    if recording_hours >= 6:  # Solo se registrazione di almeno 6 ore (probabilmente include notte)
         sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age)
     
     # 🆕 MODIFICA: Prepara il risultato con o senza metriche sonno
@@ -559,7 +560,7 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, recordi
         'rmssd': max(15, min(120, rmssd)),
         'hr_mean': max(45, min(100, hr_mean)),
         'coherence': max(20, min(95, coherence)),
-        'recording_hours': len(clean_rr) * rr_mean / (1000 * 60 * 60),
+        'recording_hours': recording_hours,
         'total_power': max(800, min(8000, total_power)),
         'vlf': max(100, min(2500, vlf)),
         'lf': max(200, min(4000, lf)),
@@ -2113,11 +2114,9 @@ def calculate_daily_metrics(days_data, user_age, user_gender):
     
     for day_date, day_rr_intervals in days_data.items():
         if len(day_rr_intervals) >= 10:  # Solo giorni con dati sufficienti
-            # 🆕 MODIFICA: Passa la durata stimata della registrazione
-            recording_duration_hours = len(day_rr_intervals) * np.mean(day_rr_intervals) / (1000 * 60 * 60)
-            
+            # 🆕 MODIFICA: Non passiamo più recording_duration_hours, la funzione lo calcola internamente
             daily_metrics[day_date] = calculate_realistic_hrv_metrics(
-                day_rr_intervals, user_age, user_gender, recording_duration_hours
+                day_rr_intervals, user_age, user_gender
             )
     
     return daily_metrics
@@ -2827,7 +2826,7 @@ def main():
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
                         
-                        # Controlla se ci sono dati di sonno validi (più di 0 ore)
+                        # 🆕 MODIFICA: Controlla se ci sono dati di sonno (usa .get() per sicurezza)
                         has_sleep_data = day_metrics.get('sleep_duration', 0) > 0
                         
                         if has_sleep_data:
@@ -2836,10 +2835,10 @@ def main():
                                 'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
                                 'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
                                 'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
-                                'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
-                                'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                                'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                                'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}",
+                                'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
+                                'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
+                                'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
+                                'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}",
                                 'Leggero (%)': f"{(day_metrics.get('sleep_light', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
                                 'Profondo (%)': f"{(day_metrics.get('sleep_deep', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
                                 'REM (%)': f"{(day_metrics.get('sleep_rem', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}"
