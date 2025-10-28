@@ -1376,23 +1376,23 @@ def create_user_selector():
         # Pulsante per caricare questo utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
             user_key, user_data = user_data_map[selected_user_display]
-            load_user_into_session({user_key: user_data})
+            load_user_into_session({user_key})
             st.rerun()
     
     return selected_user_display
 
-def load_user_into_session(user_data):
+def load_user_into_session(user_key):
     """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE CORRETTA"""
-    import copy
     
-    # 🆕 CARICA ESATTAMENTE I DATI DELL'UTENTE SELEZIONATO
-    user_key_selected = list(user_data.keys())[0]  # Prende la chiave originale
-    user_data_selected = user_data[user_key_selected]
+    # 🆕 VERIFICA CHE L'UTENTE ESISTA NEL DATABASE
+    if user_key not in st.session_state.user_database:
+        st.error("❌ Utente non trovato nel database")
+        return
+    
+    user_data = st.session_state.user_database[user_key]  # ← Recupera i dati DAL DATABASE
+    profile = user_data['profile']
     
     # 🆕 AGGIORNA TUTTI I CAMPI DEL PROFILO
-    profile = user_data_selected['profile']
-    
-    # Aggiorna i campi del profilo nella sessione
     st.session_state.user_profile = {
         'name': profile.get('name', ''),
         'surname': profile.get('surname', ''),
@@ -1402,7 +1402,6 @@ def load_user_into_session(user_data):
     }
     
     # 🆕 FORZA L'AGGIORNAMENTO DEI WIDGET STREAMLIT
-    # Usiamo session state per forzare l'aggiornamento
     st.session_state.name_input = profile.get('name', '')
     st.session_state.surname_input = profile.get('surname', '')
     st.session_state.birth_date_input = profile.get('birth_date')
