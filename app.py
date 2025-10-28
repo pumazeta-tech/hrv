@@ -2112,6 +2112,15 @@ def main():
         if st.session_state.user_profile.get('name'):
             user_key = get_user_key(st.session_state.user_profile)
             st.info(f"🔑 Chiave corrente: {user_key}")
+        
+        # 🆕 PULSANTE FORZA AGGIORNAMENTO ANALISI
+        st.divider()
+        if st.session_state.get('file_uploaded'):
+            if st.button("🔄 FORZA AGGIORNAMENTO ANALISI", use_container_width=True, type="secondary"):
+                st.session_state.analysis_history = []
+                st.session_state.last_analysis_metrics = None
+                st.session_state.current_file_hash = None
+                st.rerun()
       
         # Solo le attività
         create_activity_tracker()
@@ -2127,46 +2136,27 @@ def main():
     
     if uploaded_file is not None:
         try:
-            # 🆕 CONTROLLA SE È UN FILE NUOVO
-            current_file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()
+            # 🆕 SEMPRE PROCESSARE IL FILE DA ZERO - NESSUNA CACHE
+            content = uploaded_file.getvalue().decode('utf-8')
+            lines = content.strip().split('\n')
             
-            if hasattr(st.session_state, 'current_file_hash') and st.session_state.current_file_hash == current_file_hash:
-                # Stesso file, usa i dati esistenti
-                st.info("📁 File già analizzato - caricando dati esistenti")
-                # 🆕 DEVI RIPRENDERE I DATI DAL SESSION STATE O RILEGGERE IL FILE
-                content = uploaded_file.getvalue().decode('utf-8')
-                lines = content.strip().split('\n')
-                
-                rr_intervals = []
-                for line in lines:
-                    if line.strip():
-                        try:
-                            rr_intervals.append(float(line.strip()))
-                        except ValueError:
-                            continue
-            else:
-                # Nuovo file, resetta i dati
-                st.session_state.current_file_hash = current_file_hash
-                st.session_state.analysis_history = []
-                st.session_state.last_analysis_metrics = None
-                st.session_state.file_uploaded = True
-                
-                content = uploaded_file.getvalue().decode('utf-8')
-                lines = content.strip().split('\n')
-                
-                rr_intervals = []
-                for line in lines:
-                    if line.strip():
-                        try:
-                            rr_intervals.append(float(line.strip()))
-                        except ValueError:
-                            continue
-                
-                if len(rrr_intervals) == 0:
-                    st.error("❌ Nessun dato IBI valido trovato nel file")
-                    return
-                
-                st.success(f"✅ Nuovo file caricato con successo! {len(rr_intervals)} intervalli RR trovati")
+            rr_intervals = []
+            for line in lines:
+                if line.strip():
+                    try:
+                        rr_intervals.append(float(line.strip()))
+                    except ValueError:
+                        continue
+            
+            if len(rr_intervals) == 0:
+                st.error("❌ Nessun dato IBI valido trovato nel file")
+                return
+            
+            st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
+            
+            # 🆕 FORZA IL RESET DELLE ANALISI PRECEDENTI
+            st.session_state.analysis_history = []
+            st.session_state.last_analysis_metrics = None
             
             # 🔽🔽🔽 NUOVA ANALISI COMPLETA - CORRETTAMENTE INDENTATA 🔽🔽🔽
             st.header("📊 Analisi HRV Completa")
@@ -2216,6 +2206,14 @@ def main():
                     'sleep_duration': 7.2, 'sleep_efficiency': 85.0, 'sleep_hr': 62.0,
                     'sleep_light': 3.6, 'sleep_deep': 1.4, 'sleep_rem': 1.4, 'sleep_awake': 0.8
                 }
+
+            # 🆕 DEBUG ANALISI
+            st.sidebar.markdown("---")
+            st.sidebar.subheader("🐛 Debug Analisi")
+            st.sidebar.write(f"File: {uploaded_file.name}")
+            st.sidebar.write(f"RR Intervals: {len(rr_intervals)}")
+            st.sidebar.write(f"Giorni analizzati: {len(daily_metrics)}")
+            st.sidebar.write(f"Metriche calcolate: {len(avg_metrics) if avg_metrics else 0}")
 
             st.subheader("📈 Medie Complessive")
             
