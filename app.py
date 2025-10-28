@@ -2818,7 +2818,7 @@ def main():
                     # Aggiungi spazio tra le tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO ORE NOTTURNE
+                    # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO DATI DI SONNO
                     st.subheader("😴 Metriche Sonno")
 
                     sleep_table_data = []
@@ -2826,8 +2826,8 @@ def main():
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
                         
-                        # 🆕 MODIFICA: Controlla se ci sono dati di sonno (usa .get() per sicurezza)
-                        has_sleep_data = day_metrics.get('sleep_duration', 0) > 0
+                        # 🆕 MODIFICA: Controlla se la chiave 'sleep_duration' esiste E ha valore > 0
+                        has_sleep_data = 'sleep_duration' in day_metrics and day_metrics.get('sleep_duration', 0) > 0
                         
                         if has_sleep_data:
                             row = {
@@ -2855,10 +2855,21 @@ def main():
                             hide_index=True,
                             height=min(300, 50 + len(sleep_df) * 35)
                         )
+                        
+                        # Download della tabella sonno CON CHIAVE UNICA
+                        sleep_csv = sleep_df.to_csv(index=False, sep=';')
+                        st.download_button(
+                            label="📥 Scarica Metriche Sonno",
+                            data=sleep_csv,
+                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                            key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                        )
                     else:
                         st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione (nessuna ora notturna rilevata)")
                     
-                    # Download delle tabelle - SOLO SE CI SONO DATI
+                    # Download delle tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
                     col1, col2 = st.columns(2)
                     
@@ -2874,7 +2885,7 @@ def main():
                         )
                     
                     with col2:
-                        # Mostra il pulsante download sonno SOLO se ci sono dati di sonno
+                        # 🆕 MODIFICA: Mostra il pulsante download sonno SOLO se ci sono dati di sonno
                         if sleep_table_data:
                             sleep_csv = sleep_df.to_csv(index=False, sep=';')
                             st.download_button(
@@ -2883,7 +2894,7 @@ def main():
                                 file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                                 mime="text/csv",
                                 use_container_width=True,
-                                key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                key=f"download_sonno_main_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                             )
                         else:
                             # Se non ci sono dati sonno, mostra un pulsante disabilitato o nulla
