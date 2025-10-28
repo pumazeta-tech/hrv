@@ -636,40 +636,52 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
 
 def estimate_sleep_metrics(rr_intervals, hr_mean, age):
     """Stima le metriche del sonno realistiche con tutte le fasi"""
-    if len(rr_intervals) > 1000:
-        # Per registrazioni lunghe, stima più accurata
-        sleep_hours = 7.2 + np.random.normal(0, 0.8)
-        sleep_duration = min(9.5, max(5, sleep_hours))
-        sleep_hr = hr_mean * (0.78 + np.random.normal(0, 0.03))
-        sleep_efficiency = 88 + np.random.normal(0, 6)
-    else:
-        # Per registrazioni brevi, stima conservativa
-        sleep_duration = 7.0
-        sleep_hr = hr_mean - 10 + (age - 30) * 0.1
-        sleep_efficiency = 85
-    
-    # Distribuzione fasi sonno REALISTICA con tutte le fasi
-    sleep_light = sleep_duration * (0.50 + np.random.normal(0, 0.04))  # 50% sonno leggero
-    sleep_deep = sleep_duration * (0.20 + np.random.normal(0, 0.03))   # 20% sonno profondo
-    sleep_rem = sleep_duration * (0.20 + np.random.normal(0, 0.03))    # 20% sonno REM
-    sleep_awake = sleep_duration * (0.10 + np.random.normal(0, 0.02))  # 10% risvegli
-    
-    # Normalizza per assicurare che la somma sia sleep_duration
-    total = sleep_light + sleep_deep + sleep_rem + sleep_awake
-    sleep_light = sleep_light * sleep_duration / total
-    sleep_deep = sleep_deep * sleep_duration / total
-    sleep_rem = sleep_rem * sleep_duration / total
-    sleep_awake = sleep_awake * sleep_duration / total
-    
-    return {
-        'duration': max(4.5, min(10, sleep_duration)),
-        'efficiency': max(75, min(98, sleep_efficiency)),
-        'hr': max(45, min(75, sleep_hr)),
-        'light': sleep_light,
-        'deep': sleep_deep,
-        'rem': sleep_rem,
-        'awake': sleep_awake
-    }
+    try:
+        if len(rr_intervals) > 1000:
+            # Per registrazioni lunghe, stima più accurata
+            sleep_hours = 7.2 + np.random.normal(0, 0.8)
+            sleep_duration = min(9.5, max(5, sleep_hours))
+            sleep_hr = hr_mean * (0.78 + np.random.normal(0, 0.03))
+            sleep_efficiency = 88 + np.random.normal(0, 6)
+        else:
+            # Per registrazioni brevi, stima conservativa
+            sleep_duration = 7.0
+            sleep_hr = hr_mean - 10 + (age - 30) * 0.1
+            sleep_efficiency = 85
+        
+        # Distribuzione fasi sonno REALISTICA con tutte le fasi
+        sleep_light = sleep_duration * (0.50 + np.random.normal(0, 0.04))  # 50% sonno leggero
+        sleep_deep = sleep_duration * (0.20 + np.random.normal(0, 0.03))   # 20% sonno profondo
+        sleep_rem = sleep_duration * (0.20 + np.random.normal(0, 0.03))    # 20% sonno REM
+        sleep_awake = sleep_duration * (0.10 + np.random.normal(0, 0.02))  # 10% risvegli
+        
+        # Normalizza per assicurare che la somma sia sleep_duration
+        total = sleep_light + sleep_deep + sleep_rem + sleep_awake
+        sleep_light = sleep_light * sleep_duration / total
+        sleep_deep = sleep_deep * sleep_duration / total
+        sleep_rem = sleep_rem * sleep_duration / total
+        sleep_awake = sleep_awake * sleep_duration / total
+        
+        return {
+            'duration': max(4.5, min(10, sleep_duration)),
+            'efficiency': max(75, min(98, sleep_efficiency)),
+            'hr': max(45, min(75, sleep_hr)),
+            'light': sleep_light,
+            'deep': sleep_deep,
+            'rem': sleep_rem,
+            'awake': sleep_awake
+        }
+    except Exception as e:
+        # In caso di errore, restituisci valori di default
+        return {
+            'duration': 0,  # Durata 0 = nessun sonno
+            'efficiency': 0,
+            'hr': 0,
+            'light': 0,
+            'deep': 0,
+            'rem': 0,
+            'awake': 0
+        }
 
 def get_default_metrics(age, gender):
     """Metriche di default realistiche basate su età e genere SENZA sonno"""
@@ -2784,50 +2796,109 @@ def main():
                 if not daily_metrics:
                     st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
                 else:
-                    # TABELLA 1: METRICHE HRV E SPETTRALI
-                    st.subheader("🧮 Metriche HRV e Analisi Spettrale")
-                    
-                    hrv_table_data = []
-                    
-                    for day_date, day_metrics in daily_metrics.items():
-                        day_dt = datetime.fromisoformat(day_date)
-                        row = {
-                            'Data': day_dt.strftime('%d/%m/%Y'),
-                            'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
-                            'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
-                            'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
-                            'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
-                            'Potenza Totale': f"{day_metrics.get('total_power', 0):.0f}",
-                            'LF (ms²)': f"{day_metrics.get('lf', 0):.0f}",
-                            'HF (ms²)': f"{day_metrics.get('hf', 0):.0f}",
-                            'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}",
-                            'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
-                        }
-                        hrv_table_data.append(row)
-                    
-                    hrv_df = pd.DataFrame(hrv_table_data)
-                    
-                    # Mostra prima tabella HRV
-                    st.dataframe(
-                        hrv_df,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=min(300, 50 + len(hrv_df) * 35)
-                    )
-                    
-                    # Aggiungi spazio tra le tabelle
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    try:
+                        # TABELLA 1: METRICHE HRV E SPETTRALI
+                        st.subheader("🧮 Metriche HRV e Analisi Spettrale")
+                        
+                        hrv_table_data = []
+                        
+                        for day_date, day_metrics in daily_metrics.items():
+                            day_dt = datetime.fromisoformat(day_date)
+                            row = {
+                                'Data': day_dt.strftime('%d/%m/%Y'),
+                                'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
+                                'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
+                                'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
+                                'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
+                                'Potenza Totale': f"{day_metrics.get('total_power', 0):.0f}",
+                                'LF (ms²)': f"{day_metrics.get('lf', 0):.0f}",
+                                'HF (ms²)': f"{day_metrics.get('hf', 0):.0f}",
+                                'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}",
+                                'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
+                            }
+                            hrv_table_data.append(row)
+                        
+                        hrv_df = pd.DataFrame(hrv_table_data)
+                        
+                        # Mostra prima tabella HRV
+                        st.dataframe(
+                            hrv_df,
+                            use_container_width=True,
+                            hide_index=True,
+                            height=min(300, 50 + len(hrv_df) * 35)
+                        )
 
-                    # 🆕 DEBUG TEMPORANEO: Mostra le chiavi disponibili per il primo giorno
-                    if daily_metrics:
-                        first_day_key = list(daily_metrics.keys())[0]
-                        first_day_metrics = daily_metrics[first_day_key]
-                        st.sidebar.warning(f"🔍 DEBUG - Chiavi nel primo giorno:")
-                        st.sidebar.write(first_day_metrics.keys())
-                        if 'sleep_duration' in first_day_metrics:
-                            st.sidebar.write(f"sleep_duration: {first_day_metrics['sleep_duration']}")
+                        # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO DATI DI SONNO
+                        st.subheader("😴 Metriche Sonno")
+
+                        sleep_table_data = []
+
+                        for day_date, day_metrics in daily_metrics.items():
+                            day_dt = datetime.fromisoformat(day_date)
+                            
+                            # Usa solo .get() con valori di default
+                            sleep_duration = day_metrics.get('sleep_duration', 0)
+                            
+                            # Solo se sleep_duration esiste ed è > 0, procedi
+                            if sleep_duration > 0:
+                                row = {
+                                    'Data': day_dt.strftime('%d/%m/%Y'),
+                                    'Durata Totale (h)': f"{sleep_duration:.1f}",
+                                    'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                                    'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
+                                    'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
+                                    'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
+                                    'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
+                                    'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
+                                }
+                                sleep_table_data.append(row)
+
+                        if sleep_table_data:
+                            sleep_df = pd.DataFrame(sleep_table_data)
+                            
+                            # Mostra seconda tabella Sonno
+                            st.dataframe(
+                                sleep_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                height=min(300, 50 + len(sleep_df) * 35)
+                            )
                         else:
-                            st.sidebar.write("❌ sleep_duration NON presente")
+                            st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
+                        
+                        # Download delle tabelle
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            hrv_csv = hrv_df.to_csv(index=False, sep=';')
+                            st.download_button(
+                                label="📥 Scarica Metriche HRV",
+                                data=hrv_csv,
+                                file_name=f"hrv_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True,
+                                key=f"download_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                            )
+                        
+                        with col2:
+                            # Mostra il pulsante download sonno SOLO se ci sono dati di sonno
+                            if sleep_table_data:
+                                sleep_csv = sleep_df.to_csv(index=False, sep=';')
+                                st.download_button(
+                                    label="📥 Scarica Metriche Sonno",
+                                    data=sleep_csv,
+                                    file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                    mime="text/csv",
+                                    use_container_width=True,
+                                    key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                )
+                            else:
+                                st.empty()
+                                
+                    except Exception as e:
+                        st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
+                        st.info("Mostro solo le metriche principali...")
 
                     
                     # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO DATI DI SONNO
@@ -2838,24 +2909,14 @@ def main():
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
                         
-                        # 🆕 MODIFICA: Controllo ULTRA SICURO - usa try/except
-                        has_sleep_data = False
-                        try:
-                            # Prova ad accedere alle chiavi sonno
-                            sleep_duration = day_metrics.get('sleep_duration', 0)
-                            sleep_efficiency = day_metrics.get('sleep_efficiency', 0)
-                            sleep_hr = day_metrics.get('sleep_hr', 0)
-                            
-                            # Se siamo arrivati qui senza errori e sleep_duration > 0, abbiamo dati sonno
-                            has_sleep_data = sleep_duration > 0
-                        except (KeyError, TypeError, AttributeError):
-                            # Se c'è qualsiasi errore, non abbiamo dati sonno
-                            has_sleep_data = False
+                        # 🆕 APPROCCIO RADICALE: Usa solo .get() con valori di default
+                        sleep_duration = day_metrics.get('sleep_duration', 0)
                         
-                        if has_sleep_data:
+                        # Solo se sleep_duration esiste ed è > 0, procedi
+                        if sleep_duration > 0:
                             row = {
                                 'Data': day_dt.strftime('%d/%m/%Y'),
-                                'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                                'Durata Totale (h)': f"{sleep_duration:.1f}",
                                 'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
                                 'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
                                 'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
