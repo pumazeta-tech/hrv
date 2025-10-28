@@ -450,7 +450,7 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     
     recording_duration_hours = len(clean_rr) * rr_mean / (1000 * 60 * 60)
     
-    # 🆕 CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
+    # CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
     sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age, recording_duration_hours, start_time, end_time)
     
     # Metriche base
@@ -467,7 +467,7 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
         'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio))
     }
     
-    # 🆕 AGGIUNGI SOLO SE CI SONO METRICHE DEL SONNO (non vuoto)
+    # CORREZIONE: AGGIUNGI SOLO SE CI SONO METRICHE DEL SONNO (non vuoto)
     if sleep_metrics:  # Questo sarà True solo se sleep_metrics non è vuoto
         metrics.update(sleep_metrics)
     
@@ -516,27 +516,14 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
     
     return max(25, min(90, coherence))
 
-def calculate_hrv_coherence(rr_intervals, hr_mean, age):
-    """Calcola la coerenza cardiaca realistica"""
-    if len(rr_intervals) < 30:
-        return 55 + np.random.normal(0, 8)
-    
-    base_coherence = 50 + (70 - hr_mean) * 0.3 - (max(20, age) - 20) * 0.2
-    coherence_variation = max(10, min(30, (np.std(rr_intervals) / np.mean(rr_intervals)) * 100))
-    coherence = base_coherence + np.random.normal(0, coherence_variation/3)
-    
-    return max(25, min(90, coherence))
+# CORREZIONE: RIMOSSA LA FUNZIONE DUPLICATA calculate_hrv_coherence
 
 def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
     """Stima le metriche del sonno SOLO se la registrazione include ore notturne (22:00-7:00)"""
     try:
-        # 🆕 LOGICA INTELLIGENTE: Analizza se la registrazione comprende ore notturne
+        # LOGICA INTELLIGENTE: Analizza se la registrazione comprende ore notturne
         start_hour = start_time.hour
         end_hour = end_time.hour
-        
-        # DEBUG: Mostra gli orari per debugging
-        print(f"DEBUG: Start: {start_time}, End: {end_time}, Duration: {recording_duration_hours}h")
-        print(f"DEBUG: Start hour: {start_hour}, End hour: {end_hour}")
         
         # Determina se la registrazione comprende ore notturne (22:00 - 7:00)
         includes_night_hours = False
@@ -544,44 +531,34 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
         # Caso 1: Registrazione lunga che copre sicuramente la notte
         if recording_duration_hours >= 10:
             includes_night_hours = True
-            print("DEBUG: Caso 1 - Registrazione lunga >=10h")
         
         # Caso 2: Inizia di sera (dopo le 20:00) e finisce di notte/mattina
         elif start_hour >= 20 and end_hour <= 12:
             includes_night_hours = True
-            print("DEBUG: Caso 2 - Inizia sera, finisce mattina")
         
         # Caso 3: Inizia di notte (prima delle 7:00)
         elif start_hour < 7:
             includes_night_hours = True
-            print("DEBUG: Caso 3 - Inizia di notte")
             
         # Caso 4: Finisce di notte (dopo le 22:00)
         elif end_hour >= 22:
             includes_night_hours = True
-            print("DEBUG: Caso 4 - Finisce di notte")
         
         # Caso 5: Attraversa completamente la notte (inizia prima delle 22 e finisce dopo le 7)
         elif start_hour < 22 and end_hour > 7 and recording_duration_hours > 8:
             includes_night_hours = True
-            print("DEBUG: Caso 5 - Attraversa la notte")
         
-        print(f"DEBUG: includes_night_hours = {includes_night_hours}")
-        
-        # 🆕 CORREZIONE: Se NON include ore notturne, NON restituire le metriche del sonno
+        # CORREZIONE: Se NON include ore notturne, NON restituire le metriche del sonno
         if not includes_night_hours:
-            print("DEBUG: Nessun sonno rilevato - Registrazione diurna")
-            return {}  # 🆕 RESTITUISCI DIZIONARIO VUOTO invece di valori 0
+            return {}  # RESTITUISCI DIZIONARIO VUOTO invece di valori 0
         
         if len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
-            # 🆕 CALCOLO REALISTICO BASATO SUGLI ORARI EFFETTIVI
+            # CALCOLO REALISTICO BASATO SUGLI ORARI EFFETTIVI
             # Stima quanta parte della notte è coperta dalla registrazione
             night_hours_total = 9  # 22:00-7:00 = 9 ore
             
             # Calcola quanta parte della notte è coperta
             night_coverage = calculate_night_coverage(start_time, end_time, recording_duration_hours)
-            
-            print(f"DEBUG: Night coverage: {night_coverage}")
             
             # Durata media sonno in base all'età
             if age < 30:
@@ -611,8 +588,6 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
             sleep_rem = total_sleep_minutes * 0.25    # 25% sonno REM
             sleep_awake = total_sleep_minutes * 0.05  # 5% risvegli
             
-            print(f"DEBUG: Sonno rilevato - Durata: {sleep_duration}h, Efficienza: {sleep_efficiency}%")
-            
             return {
                 'sleep_duration': round(sleep_duration, 1),
                 'sleep_efficiency': round(sleep_efficiency, 1),
@@ -624,12 +599,10 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
             }
         else:
             # Nessun sonno rilevato (registrazione troppo corta anche se include notte)
-            print("DEBUG: Nessun sonno rilevato - Registrazione troppo corta")
-            return {}  # 🆕 RESTITUISCI DIZIONARIO VUOTO
+            return {}  # RESTITUISCI DIZIONARIO VUOTO
             
     except Exception as e:
-        print(f"DEBUG: Errore in estimate_sleep_metrics: {e}")
-        return {}  # 🆕 RESTITUISCI DIZIONARIO VUOTO in caso di errore
+        return {}  # RESTITUISCI DIZIONARIO VUOTO in caso di errore
 
 def calculate_night_coverage(start_time, end_time, duration_hours):
     """Calcola quanta parte della notte (22:00-7:00) è coperta dalla registrazione"""
@@ -679,7 +652,7 @@ def get_default_metrics(age, gender):
         base_rmssd = 35 - (age_norm - 20) * 0.3
         base_hr = 72 + (age_norm - 20) * 0.15
     
-    # 🆕 CORREZIONE: Restituisci solo le metriche HRV base, NON quelle del sonno
+    # CORREZIONE: Restituisci solo le metriche HRV base, NON quelle del sonno
     metrics = {
         'sdnn': max(28, base_sdnn),
         'rmssd': max(20, base_rmssd),
@@ -691,7 +664,7 @@ def get_default_metrics(age, gender):
         'lf': 1000 - (age_norm - 20) * 15,
         'hf': 1400 - (age_norm - 20) * 20,
         'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01
-        # 🆕 RIMOSSE le metriche del sonno dai default
+        # RIMOSSE le metriche del sonno dai default
     }
     
     return metrics
@@ -1535,12 +1508,12 @@ def calculate_daily_metrics(days_data, user_age, user_gender):
     
     for day_date, day_rr_intervals in days_data.items():
         if len(day_rr_intervals) >= 10:
-            # 🆕 CORREZIONE: Crea datetime di inizio e fine per ogni giorno
+            # CORREZIONE: Crea datetime di inizio e fine per ogni giorno
             day_start = datetime.fromisoformat(day_date)
             day_end = day_start + timedelta(hours=24)
             
             daily_metrics[day_date] = calculate_realistic_hrv_metrics(
-                day_rr_intervals, user_age, user_gender, day_start, day_end  # 🆕 PASSAGGIO ORARI
+                day_rr_intervals, user_age, user_gender, day_start, day_end  # PASSAGGIO ORARI
             )
     
     return daily_metrics
@@ -1603,9 +1576,9 @@ def create_user_selector():
         
         st.sidebar.success(f"✅ {selected_user_display}")
         
-        # 🆕 CORREZIONE: Salva la user_key nella sessione quando carichi l'utente
+        # CORREZIONE: Salva la user_key nella sessione quando carichi l'utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
-            load_user_into_session(selected_user_data, selected_user_key)  # 🆕 Passa anche la key
+            load_user_into_session(selected_user_data, selected_user_key)  # Passa anche la key
             st.rerun()
         
         if st.sidebar.button("🗑️ Elimina questo utente", use_container_width=True):
@@ -1618,11 +1591,18 @@ def load_user_into_session(user_data, user_key=None):
     """Carica i dati dell'utente selezionato nella sessione corrente"""
     st.session_state.user_profile = user_data['profile'].copy()
     
-    # 🆕 CORREZIONE: Salva la user_key nella sessione per usi futuri
+    # CORREZIONE: Salva la user_key nella sessione per usi futuri
     if user_key:
         st.session_state.current_user_key = user_key
     
     st.success(f"✅ Utente {user_data['profile']['name']} {user_data['profile']['surname']} caricato!")
+
+def delete_user_from_database(user_key):
+    """Elimina un utente dal database"""
+    if user_key in st.session_state.user_database:
+        del st.session_state.user_database[user_key]
+        save_user_database()
+        st.success("Utente eliminato dal database!")
 
 # =============================================================================
 # FUNZIONI PER GESTIONE STORICO ANALISI
@@ -1630,7 +1610,7 @@ def load_user_into_session(user_data, user_key=None):
 
 def save_analysis_to_history(analysis_data):
     """Salva l'analisi corrente nello storico - VERSIONE CORRETTA"""
-    # 🆕 CORREZIONE: Usa multiple strategie per trovare la user_key
+    # CORREZIONE: Usa multiple strategie per trovare la user_key
     user_key = None
     
     # Strategia 1: Usa la key salvata quando si carica un utente
@@ -1655,7 +1635,7 @@ def save_analysis_to_history(analysis_data):
         analysis_data['analysis_id'] = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         analysis_data['saved_at'] = datetime.now().isoformat()
         
-        # 🆕 CORREZIONE: Assicurati che 'analyses' esista
+        # CORREZIONE: Assicurati che 'analyses' esista
         if 'analyses' not in st.session_state.user_database[user_key]:
             st.session_state.user_database[user_key]['analyses'] = []
         
@@ -1700,9 +1680,8 @@ def display_analysis_history():
             for day_date, day_metrics in daily_metrics.items():
                 day_dt = datetime.fromisoformat(day_date)
                 
-                includes_night = False
-                if day_metrics.get('sleep_duration', 0) > 0:
-                    includes_night = True
+                # CORREZIONE: Controlla se ci sono metriche del sonno
+                has_sleep_metrics = any(key.startswith('sleep_') for key in day_metrics.keys())
                 
                 row = {
                     'Data Inserimento': data_inserimento,
@@ -1718,7 +1697,8 @@ def display_analysis_history():
                     'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
                 }
                 
-                if includes_night and day_metrics.get('sleep_duration', 0) > 0:
+                # CORREZIONE: Aggiungi metriche sonno solo se presenti
+                if has_sleep_metrics:
                     row.update({
                         'Sonno Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
                         'Efficienza Sonno (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
@@ -1744,9 +1724,8 @@ def display_analysis_history():
         elif overall_metrics:
             recording_start = datetime.fromisoformat(analysis['recording_start'])
             
-            includes_night = False
-            if overall_metrics.get('sleep_duration', 0) > 0:
-                includes_night = True
+            # CORREZIONE: Controlla se ci sono metriche del sonno
+            has_sleep_metrics = any(key.startswith('sleep_') for key in overall_metrics.keys())
             
             row = {
                 'Data Inserimento': data_inserimento,
@@ -1762,7 +1741,8 @@ def display_analysis_history():
                 'VLF (ms²)': f"{overall_metrics.get('vlf', 0):.0f}"
             }
             
-            if includes_night and overall_metrics.get('sleep_duration', 0) > 0:
+            # CORREZIONE: Aggiungi metriche sonno solo se presenti
+            if has_sleep_metrics:
                 row.update({
                     'Sonno Totale (h)': f"{overall_metrics.get('sleep_duration', 0):.1f}",
                     'Efficienza Sonno (%)': f"{overall_metrics.get('sleep_efficiency', 0):.1f}",
@@ -1920,20 +1900,20 @@ def main():
             st.session_state.user_profile['name'] = st.text_input(
                 "Nome", 
                 value=st.session_state.user_profile['name'], 
-                key=f"name_input_{st.session_state.user_profile.get('name', '')}"  # 🆕 CHIAVE UNICA
+                key=f"name_input_{st.session_state.user_profile.get('name', '')}"  # CHIAVE UNICA
             )
         with col2:
             st.session_state.user_profile['surname'] = st.text_input(
                 "Cognome", 
                 value=st.session_state.user_profile['surname'], 
-                key=f"surname_input_{st.session_state.user_profile.get('surname', '')}"  # 🆕 CHIAVE UNICA
+                key=f"surname_input_{st.session_state.user_profile.get('surname', '')}"  # CHIAVE UNICA
             )
         
         birth_date = st.session_state.user_profile['birth_date']
         if birth_date is None:
             birth_date = datetime(1980, 1, 1).date()
 
-        # 🆕 CHIAVE UNICA PER DATA DI NASCITA
+        # CHIAVE UNICA PER DATA DI NASCITA
         birth_date_key = f"birth_date_{birth_date.strftime('%Y%m%d') if hasattr(birth_date, 'strftime') else 'none'}"
         
         st.session_state.user_profile['birth_date'] = st.date_input(
@@ -1941,19 +1921,19 @@ def main():
             value=birth_date,
             min_value=datetime(1900, 1, 1).date(),
             max_value=datetime.now().date(),
-            key=birth_date_key  # 🆕 CHIAVE UNICA
+            key=birth_date_key  # CHIAVE UNICA
         )
 
         if st.session_state.user_profile['birth_date']:
             st.write(f"Data selezionata: {st.session_state.user_profile['birth_date'].strftime('%d/%m/%Y')}")
         
-        # 🆕 CHIAVE UNICA PER SESSO
+        # CHIAVE UNICA PER SESSO
         gender_key = f"gender_{st.session_state.user_profile.get('gender', 'Uomo')}"
         st.session_state.user_profile['gender'] = st.selectbox(
             "Sesso", 
             ["Uomo", "Donna"], 
             index=0 if st.session_state.user_profile['gender'] == 'Uomo' else 1,
-            key=gender_key  # 🆕 CHIAVE UNICA
+            key=gender_key  # CHIAVE UNICA
         )
         
         if st.session_state.user_profile['birth_date']:
@@ -2037,7 +2017,7 @@ def main():
             
             try:
                 calculated_metrics = calculate_realistic_hrv_metrics(
-                    rr_intervals, user_profile['age'], user_profile['gender']
+                    rr_intervals, user_profile['age'], user_profile['gender'], start_time, timeline['end_time']
                 )
                 if calculated_metrics:
                     avg_metrics = calculated_metrics
@@ -2048,9 +2028,8 @@ def main():
                 avg_metrics = {
                     'sdnn': 45.0, 'rmssd': 35.0, 'hr_mean': 70.0, 'coherence': 60.0,
                     'recording_hours': 24.0, 'total_power': 2500.0, 'vlf': 400.0,
-                    'lf': 1000.0, 'hf': 1100.0, 'lf_hf_ratio': 0.9,
-                    'sleep_duration': 0, 'sleep_efficiency': 0, 'sleep_hr': 0,
-                    'sleep_light': 0, 'sleep_deep': 0, 'sleep_rem': 0, 'sleep_awake': 0
+                    'lf': 1000.0, 'hf': 1100.0, 'lf_hf_ratio': 0.9
+                    # CORREZIONE: NESSUNA METRICA SONNO nei default
                 }
 
             st.subheader("📈 Medie Complessive")
@@ -2103,7 +2082,7 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
-            # SECONDA RIGA: ANALISI SPETTRALE
+            # SECONDA RIGA: ANALISI SPETTRALE E SONNO
             col1, col2, col3, col4, col5 = st.columns(5)
             
             with col1:
@@ -2133,67 +2112,92 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
+            # CORREZIONE: Mostra metriche sonno solo se presenti
+            has_sleep_metrics = any(key.startswith('sleep_') for key in avg_metrics.keys())
+            
             with col4:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">🛌 {avg_metrics['sleep_duration']:.1f}h</div>
-                    <div class="metric-label">Durata Sonno</div>
-                    <div class="metric-unit">ore</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col5:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">📊 {avg_metrics['sleep_efficiency']:.0f}%</div>
-                    <div class="metric-label">Efficienza</div>
-                    <div class="metric-unit">percentuale</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # ANALISI SONNO DETTAGLIATA
-            st.subheader("😴 Analisi Dettagliata del Sonno")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">💤 {avg_metrics.get('sleep_hr', 60):.0f}</div>
-                    <div class="metric-label">Battito a Riposo</div>
-                    <div class="metric-unit">bpm</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                total_sleep = avg_metrics.get('sleep_duration', 7.0)
-                sleep_light = avg_metrics.get('sleep_light', total_sleep * 0.5)
-                sleep_deep = avg_metrics.get('sleep_deep', total_sleep * 0.2)
-                sleep_rem = avg_metrics.get('sleep_rem', total_sleep * 0.2)
-                sleep_awake = avg_metrics.get('sleep_awake', total_sleep * 0.1)
-                
-                if total_sleep > 0:
-                    light_pct = (sleep_light / total_sleep) * 100
-                    deep_pct = (sleep_deep / total_sleep) * 100
-                    rem_pct = (sleep_rem / total_sleep) * 100
-                    awake_pct = (sleep_awake / total_sleep) * 100
-                    
+                if has_sleep_metrics:
                     st.markdown(f"""
                     <div class="compact-metric-card">
-                        <div class="metric-label">Distribuzione Fasi Sonno</div>
-                        <div style="margin-top: 0.5rem;">
-                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem;">
-                                <span>Leggero: {light_pct:.0f}%</span>
-                                <span>Profondo: {deep_pct:.0f}%</span>
-                            </div>
-                            <div class="sleep-phase-bar" style="background: linear-gradient(90deg, #3498db {light_pct}%, #2ecc71 {light_pct}% {light_pct + deep_pct}%, #e74c3c {light_pct + deep_pct}%);"></div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 0.2rem;">
-                                <span>REM: {rem_pct:.0f}%</span>
-                                <span>Risvegli: {awake_pct:.0f}%</span>
-                            </div>
-                        </div>
+                        <div class="metric-value">🛌 {avg_metrics['sleep_duration']:.1f}h</div>
+                        <div class="metric-label">Durata Sonno</div>
+                        <div class="metric-unit">ore</div>
                     </div>
                     """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="compact-metric-card">
+                        <div class="metric-value">☀️ Diurno</div>
+                        <div class="metric-label">Registrazione</div>
+                        <div class="metric-unit">nessun sonno</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            with col5:
+                if has_sleep_metrics:
+                    st.markdown(f"""
+                    <div class="compact-metric-card">
+                        <div class="metric-value">📊 {avg_metrics['sleep_efficiency']:.0f}%</div>
+                        <div class="metric-label">Efficienza Sonno</div>
+                        <div class="metric-unit">percentuale</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="compact-metric-card">
+                        <div class="metric-value">📈 {avg_metrics['vlf']:.0f}</div>
+                        <div class="metric-label">VLF</div>
+                        <div class="metric-unit">ms²</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            # ANALISI SONNO DETTAGLIATA - SOLO SE PRESENTE
+            if has_sleep_metrics:
+                st.subheader("😴 Analisi Dettagliata del Sonno")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown(f"""
+                    <div class="compact-metric-card">
+                        <div class="metric-value">💤 {avg_metrics.get('sleep_hr', 60):.0f}</div>
+                        <div class="metric-label">Battito a Riposo</div>
+                        <div class="metric-unit">bpm</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    total_sleep = avg_metrics.get('sleep_duration', 7.0)
+                    sleep_light = avg_metrics.get('sleep_light', total_sleep * 0.5)
+                    sleep_deep = avg_metrics.get('sleep_deep', total_sleep * 0.2)
+                    sleep_rem = avg_metrics.get('sleep_rem', total_sleep * 0.2)
+                    sleep_awake = avg_metrics.get('sleep_awake', total_sleep * 0.1)
+                    
+                    if total_sleep > 0:
+                        light_pct = (sleep_light / total_sleep) * 100
+                        deep_pct = (sleep_deep / total_sleep) * 100
+                        rem_pct = (sleep_rem / total_sleep) * 100
+                        awake_pct = (sleep_awake / total_sleep) * 100
+                        
+                        st.markdown(f"""
+                        <div class="compact-metric-card">
+                            <div class="metric-label">Distribuzione Fasi Sonno</div>
+                            <div style="margin-top: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem;">
+                                    <span>Leggero: {light_pct:.0f}%</span>
+                                    <span>Profondo: {deep_pct:.0f}%</span>
+                                </div>
+                                <div class="sleep-phase-bar" style="background: linear-gradient(90deg, #3498db {light_pct}%, #2ecc71 {light_pct}% {light_pct + deep_pct}%, #e74c3c {light_pct + deep_pct}%);"></div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 0.2rem;">
+                                    <span>REM: {rem_pct:.0f}%</span>
+                                    <span>Risvegli: {awake_pct:.0f}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.subheader("☀️ Registrazione Diurna")
+                st.info("Questa registrazione non include ore notturne. Nessuna analisi del sonno disponibile.")
             
             # METRICHE DETTAGLIATE PER GIORNO
             with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
@@ -2230,39 +2234,49 @@ def main():
                             height=min(300, 50 + len(hrv_df) * 35)
                         )
 
-                        st.subheader("😴 Metriche Sonno")
+                        # CORREZIONE: Mostra metriche sonno solo se presenti in almeno un giorno
+                        has_any_sleep_data = any(
+                            any(key.startswith('sleep_') for key in day_metrics.keys()) 
+                            for day_metrics in daily_metrics.values()
+                        )
+                        
+                        if has_any_sleep_data:
+                            st.subheader("😴 Metriche Sonno")
 
-                        sleep_table_data = []
+                            sleep_table_data = []
 
-                        for day_date, day_metrics in daily_metrics.items():
-                            day_dt = datetime.fromisoformat(day_date)
-                            
-                            sleep_duration = day_metrics.get('sleep_duration', 0)
-                            
-                            if sleep_duration > 0:
-                                row = {
-                                    'Data': day_dt.strftime('%d/%m/%Y'),
-                                    'Durata Totale (h)': f"{sleep_duration:.1f}",
-                                    'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
-                                    'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
-                                    'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
-                                    'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
-                                    'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
-                                    'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
-                                }
-                                sleep_table_data.append(row)
+                            for day_date, day_metrics in daily_metrics.items():
+                                day_dt = datetime.fromisoformat(day_date)
+                                
+                                # Controlla se ci sono metriche del sonno per questo giorno
+                                has_sleep_data = any(key.startswith('sleep_') for key in day_metrics.keys())
+                                
+                                if has_sleep_data:
+                                    row = {
+                                        'Data': day_dt.strftime('%d/%m/%Y'),
+                                        'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                                        'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                                        'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
+                                        'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
+                                        'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
+                                        'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
+                                        'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
+                                    }
+                                    sleep_table_data.append(row)
 
-                        if sleep_table_data:
-                            sleep_df = pd.DataFrame(sleep_table_data)
-                            
-                            st.dataframe(
-                                sleep_df,
-                                use_container_width=True,
-                                hide_index=True,
-                                height=min(300, 50 + len(sleep_df) * 35)
-                            )
+                            if sleep_table_data:
+                                sleep_df = pd.DataFrame(sleep_table_data)
+                                
+                                st.dataframe(
+                                    sleep_df,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=min(300, 50 + len(sleep_df) * 35)
+                                )
+                            else:
+                                st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
                         else:
-                            st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
+                            st.info("😴 Nessuna analisi del sonno disponibile - registrazione diurna")
                         
                         st.markdown("<br>", unsafe_allow_html=True)
                         col1, col2 = st.columns(2)
@@ -2279,7 +2293,7 @@ def main():
                             )
                         
                         with col2:
-                            if sleep_table_data:
+                            if has_any_sleep_data and sleep_table_data:
                                 sleep_csv = sleep_df.to_csv(index=False, sep=';')
                                 st.download_button(
                                     label="📥 Scarica Metriche Sonno",
