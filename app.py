@@ -2805,37 +2805,55 @@ def main():
                     # Aggiungi spazio tra le tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # TABELLA 2: METRICHE SONNO
+                    # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO ORE NOTTURNE
                     st.subheader("😴 Metriche Sonno")
-                    
+
                     sleep_table_data = []
-                    
+
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
-                        row = {
-                            'Data': day_dt.strftime('%d/%m/%Y'),
-                            'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
-                            'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
-                            'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
-                            'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
-                            'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                            'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
-                            'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}",
-                            'Leggero (%)': f"{(day_metrics.get('sleep_light', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
-                            'Profondo (%)': f"{(day_metrics.get('sleep_deep', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
-                            'REM (%)': f"{(day_metrics.get('sleep_rem', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}"
-                        }
-                        sleep_table_data.append(row)
-                    
-                    sleep_df = pd.DataFrame(sleep_table_data)
-                    
-                    # Mostra seconda tabella Sonno
-                    st.dataframe(
-                        sleep_df,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=min(300, 50 + len(sleep_df) * 35)
-                    )
+                        
+                        # Controlla se ci sono dati di sonno validi (più di 0 ore)
+                        has_sleep_data = day_metrics.get('sleep_duration', 0) > 0
+                        
+                        if has_sleep_data:
+                            row = {
+                                'Data': day_dt.strftime('%d/%m/%Y'),
+                                'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                                'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                                'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
+                                'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', day_metrics.get('sleep_duration', 0) * 0.5):.1f}",
+                                'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                                'Sonno REM (h)': f"{day_metrics.get('sleep_rem', day_metrics.get('sleep_duration', 0) * 0.2):.1f}",
+                                'Risvegli (h)': f"{day_metrics.get('sleep_awake', day_metrics.get('sleep_duration', 0) * 0.1):.1f}",
+                                'Leggero (%)': f"{(day_metrics.get('sleep_light', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
+                                'Profondo (%)': f"{(day_metrics.get('sleep_deep', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
+                                'REM (%)': f"{(day_metrics.get('sleep_rem', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}"
+                            }
+                            sleep_table_data.append(row)
+
+                    if sleep_table_data:
+                        sleep_df = pd.DataFrame(sleep_table_data)
+                        
+                        # Mostra seconda tabella Sonno
+                        st.dataframe(
+                            sleep_df,
+                            use_container_width=True,
+                            hide_index=True,
+                            height=min(300, 50 + len(sleep_df) * 35)
+                        )
+                        
+                        # Download della tabella sonno
+                        sleep_csv = sleep_df.to_csv(index=False, sep=';')
+                        st.download_button(
+                            label="📥 Scarica Metriche Sonno",
+                            data=sleep_csv,
+                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione (nessuna ora notturna rilevata)")
                     
                     # Download delle tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
