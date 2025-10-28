@@ -2237,9 +2237,10 @@ def display_analysis_history():
     analyses_sorted = sorted(analyses, key=lambda x: x.get('saved_at', ''), reverse=True)
     
     for i, analysis in enumerate(analyses_sorted):
-        with st.expander(f"📅 Analisi del {analysis.get('saved_at', 'Data sconosciuta')}", expanded=i==0):
+        with st.expander(f"📅 Analisi del {datetime.fromisoformat(analysis.get('saved_at', datetime.now().isoformat())).strftime('%d/%m/%Y %H:%M')}", expanded=i==0):
             
-            col1, col2, col3 = st.columns(3)
+            # Intestazione con info base
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Data Registrazione", 
                          datetime.fromisoformat(analysis['recording_start']).strftime('%d/%m/%Y %H:%M'))
@@ -2247,29 +2248,180 @@ def display_analysis_history():
                 st.metric("Durata", f"{analysis['recording_duration_hours']:.1f} ore")
             with col3:
                 st.metric("Battiti Totali", analysis['rr_intervals_count'])
+            with col4:
+                st.metric("Analisi Salvata", 
+                         datetime.fromisoformat(analysis.get('saved_at', datetime.now().isoformat())).strftime('%d/%m/%Y %H:%M'))
             
-            # Metriche principali
-            metrics = analysis.get('overall_metrics', {})
-            if metrics:
-                st.subheader("Metriche Principali")
-                col1, col2, col3, col4 = st.columns(4)
+            # TABELLA 1: METRICHE HRV E SPETTRALI
+            st.subheader("🧮 Metriche HRV e Analisi Spettrale")
+            
+            overall_metrics = analysis.get('overall_metrics', {})
+            if overall_metrics:
+                hrv_table_data = [{
+                    'Battito Medio (bpm)': f"{overall_metrics.get('hr_mean', 0):.1f}",
+                    'SDNN (ms)': f"{overall_metrics.get('sdnn', 0):.1f}",
+                    'RMSSD (ms)': f"{overall_metrics.get('rmssd', 0):.1f}",
+                    'Coerenza (%)': f"{overall_metrics.get('coherence', 0):.1f}",
+                    'Potenza Totale': f"{overall_metrics.get('total_power', 0):.0f}",
+                    'LF (ms²)': f"{overall_metrics.get('lf', 0):.0f}",
+                    'HF (ms²)': f"{overall_metrics.get('hf', 0):.0f}",
+                    'LF/HF': f"{overall_metrics.get('lf_hf_ratio', 0):.2f}",
+                    'VLF (ms²)': f"{overall_metrics.get('vlf', 0):.0f}"
+                }]
                 
-                with col1:
-                    st.metric("Battito Medio", f"{metrics.get('hr_mean', 0):.1f} bpm")
-                with col2:
-                    st.metric("SDNN", f"{metrics.get('sdnn', 0):.1f} ms")
-                with col3:
-                    st.metric("RMSSD", f"{metrics.get('rmssd', 0):.1f} ms")
-                with col4:
-                    st.metric("Coerenza", f"{metrics.get('coherence', 0):.1f}%")
+                hrv_df = pd.DataFrame(hrv_table_data)
+                st.dataframe(
+                    hrv_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+            
+            # TABELLA 2: METRICHE SONNO (se presenti)
+            if overall_metrics and any(key.startswith('sleep_') for key in overall_metrics.keys()):
+                st.subheader("😴 Metriche Sonno")
+                
+                sleep_duration = overall_metrics.get('sleep_duration', 0)
+                if sleep_duration > 0:  # Solo se c'è stata analisi del sonno
+                    sleep_light = overall_metrics.get('sleep_light', sleep_duration * 0.5)
+                    sleep_deep = overall_metrics.get('sleep_deep', sleep_duration * 0.2)
+                    sleep_rem = overall_metrics.get('sleep_rem', sleep_duration * 0.2)
+                    sleep_awake = overall_metrics.get('sleep_awake', sleep_duration * 0.1)
+                    
+                    sleep_table_data = [{
+                        'Durata Totale (h)': f"{sleep_duration:.1f}",
+                        'Efficienza (%)': f"{overall_metrics.get('sleep_efficiency', 0):.1f}",
+                        'HR Riposo (bpm)': f"{overall_metrics.get('sleep_hr', 0):.1f}",
+                        'Sonno Leggero (h)': f"{sleep_light:.1f}",
+                        'Sonno Profondo (h)': f"{sleep_deep:.1f}",
+                        'Sonno REM (h)': f"{sleep_rem:.1f}",
+                        'Risvegli (h)': f"{sleep_awake:.1f}",
+                        'Leggero (%)': f"{(sleep_light / sleep_duration * 100):.1f}",
+                        'Profondo (%)': f"{(sleep_deep / sleep_duration * 100):.1f}",
+                        'REM (%)': f"{(sleep_rem / sleep_duration * 100):.1f}",
+                        'Risvegli (%)': f"{(sleep_awake / sleep_duration * 100):.1f}"
+                    }]
+                    
+                    sleep_df = pd.DataFrame(sleep_table_data)
+                    st.dataframe(
+                        sleep_df,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    # Grafico a torta per le fasi del sonno
+                    fig_sleep = go.Figure(data=[go.Pie(
+                        labels=['Sonno Leggero', 'Sonno Profondo', 'Sonno REM', 'Risvegli'],
+                        values=[sleep_light, sleep_deep, sleep_rem, sleep_awake],
+                        hole=.3,
+                        marker_colors=['#3498db', '#2ecc71', '#9b59b6', '#e74c3c']
+                    )])
+                    fig_sleep.update_layout(
+                        title="Distribuzione Fasi del Sonno",
+                        height=400
+                    )
+                    st.plotly_chart(fig_sleep, use_container_width=True)
+                else:
+                    st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
+            
+            # TABELLA 3: ANALISI GIORNALIERA (se presente)
+            daily_metrics = analysis.get('daily_metrics', {})
+            if daily_metrics:
+                st.subheader("📅 Analisi Giornaliera Dettagliata")
+                
+                # Crea tabella per ogni giorno
+                daily_table_data = []
+                for day_date, day_metrics in daily_metrics.items():
+                    day_dt = datetime.fromisoformat(day_date)
+                    daily_table_data.append({
+                        'Data': day_dt.strftime('%d/%m/%Y'),
+                        'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
+                        'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
+                        'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
+                        'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
+                        'Sonno (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                        'Efficienza Sonno (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                        'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}"
+                    })
+                
+                if daily_table_data:
+                    daily_df = pd.DataFrame(daily_table_data)
+                    st.dataframe(
+                        daily_df,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(400, 150 + len(daily_df) * 35)
+                    )
+            
+            # DOWNLOAD DEI DATI
+            st.subheader("📥 Esporta Dati")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Prepara CSV per metriche HRV
+                if overall_metrics:
+                    hrv_export_data = {
+                        'Metrica': ['Battito Medio', 'SDNN', 'RMSSD', 'Coerenza', 'Potenza Totale', 'LF', 'HF', 'LF/HF', 'VLF'],
+                        'Valore': [
+                            f"{overall_metrics.get('hr_mean', 0):.1f}",
+                            f"{overall_metrics.get('sdnn', 0):.1f}",
+                            f"{overall_metrics.get('rmssd', 0):.1f}",
+                            f"{overall_metrics.get('coherence', 0):.1f}",
+                            f"{overall_metrics.get('total_power', 0):.0f}",
+                            f"{overall_metrics.get('lf', 0):.0f}",
+                            f"{overall_metrics.get('hf', 0):.0f}",
+                            f"{overall_metrics.get('lf_hf_ratio', 0):.2f}",
+                            f"{overall_metrics.get('vlf', 0):.0f}"
+                        ],
+                        'Unità': ['bpm', 'ms', 'ms', '%', 'ms²', 'ms²', 'ms²', 'ratio', 'ms²']
+                    }
+                    hrv_export_df = pd.DataFrame(hrv_export_data)
+                    hrv_csv = hrv_export_df.to_csv(index=False, sep=';')
+                    
+                    st.download_button(
+                        label="📥 Scarica Metriche HRV",
+                        data=hrv_csv,
+                        file_name=f"hrv_metriche_{datetime.fromisoformat(analysis['recording_start']).strftime('%Y%m%d')}.csv",
+                        mime="text/csv",
+                        key=f"hrv_download_{i}",
+                        use_container_width=True
+                    )
+            
+            with col2:
+                # Prepara CSV per metriche Sonno
+                if overall_metrics and overall_metrics.get('sleep_duration', 0) > 0:
+                    sleep_export_data = {
+                        'Metrica': ['Durata Sonno', 'Efficienza Sonno', 'Battito Riposo', 'Sonno Leggero', 'Sonno Profondo', 'Sonno REM', 'Risvegli'],
+                        'Valore': [
+                            f"{overall_metrics.get('sleep_duration', 0):.1f}",
+                            f"{overall_metrics.get('sleep_efficiency', 0):.1f}",
+                            f"{overall_metrics.get('sleep_hr', 0):.1f}",
+                            f"{overall_metrics.get('sleep_light', 0):.1f}",
+                            f"{overall_metrics.get('sleep_deep', 0):.1f}",
+                            f"{overall_metrics.get('sleep_rem', 0):.1f}",
+                            f"{overall_metrics.get('sleep_awake', 0):.1f}"
+                        ],
+                        'Unità': ['ore', '%', 'bpm', 'ore', 'ore', 'ore', 'ore']
+                    }
+                    sleep_export_df = pd.DataFrame(sleep_export_data)
+                    sleep_csv = sleep_export_df.to_csv(index=False, sep=';')
+                    
+                    st.download_button(
+                        label="📥 Scarica Metriche Sonno",
+                        data=sleep_csv,
+                        file_name=f"sonno_metriche_{datetime.fromisoformat(analysis['recording_start']).strftime('%Y%m%d')}.csv",
+                        mime="text/csv",
+                        key=f"sleep_download_{i}",
+                        use_container_width=True
+                    )
             
             # Pulsanti azione
+            st.subheader("🔧 Azioni")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("📊 Carica questa analisi", key=f"load_{i}"):
+                if st.button("📊 Carica questa analisi", key=f"load_{i}", use_container_width=True):
                     load_analysis_to_session(analysis)
             with col2:
-                if st.button("🗑️ Elimina", key=f"delete_{i}"):
+                if st.button("🗑️ Elimina analisi", key=f"delete_{i}", use_container_width=True):
                     delete_analysis(i)
                     st.rerun()
 
