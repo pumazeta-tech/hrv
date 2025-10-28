@@ -2133,6 +2133,17 @@ def main():
             if hasattr(st.session_state, 'current_file_hash') and st.session_state.current_file_hash == current_file_hash:
                 # Stesso file, usa i dati esistenti
                 st.info("📁 File già analizzato - caricando dati esistenti")
+                # 🆕 DEVI RIPRENDERE I DATI DAL SESSION STATE O RILEGGERE IL FILE
+                content = uploaded_file.getvalue().decode('utf-8')
+                lines = content.strip().split('\n')
+                
+                rr_intervals = []
+                for line in lines:
+                    if line.strip():
+                        try:
+                            rr_intervals.append(float(line.strip()))
+                        except ValueError:
+                            continue
             else:
                 # Nuovo file, resetta i dati
                 st.session_state.current_file_hash = current_file_hash
@@ -2151,7 +2162,7 @@ def main():
                         except ValueError:
                             continue
                 
-                if len(rr_intervals) == 0:
+                if len(rrr_intervals) == 0:
                     st.error("❌ Nessun dato IBI valido trovato nel file")
                     return
                 
