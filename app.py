@@ -1771,28 +1771,44 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            st.session_state.user_profile['name'] = st.text_input("Nome", value=st.session_state.user_profile['name'], key="name_input")
+            st.session_state.user_profile['name'] = st.text_input(
+                "Nome", 
+                value=st.session_state.user_profile['name'], 
+                key=f"name_input_{st.session_state.user_profile.get('name', '')}"  # 🆕 CHIAVE UNICA
+            )
         with col2:
-            st.session_state.user_profile['surname'] = st.text_input("Cognome", value=st.session_state.user_profile['surname'], key="surname_input")
+            st.session_state.user_profile['surname'] = st.text_input(
+                "Cognome", 
+                value=st.session_state.user_profile['surname'], 
+                key=f"surname_input_{st.session_state.user_profile.get('surname', '')}"  # 🆕 CHIAVE UNICA
+            )
         
         birth_date = st.session_state.user_profile['birth_date']
         if birth_date is None:
             birth_date = datetime(1980, 1, 1).date()
 
+        # 🆕 CHIAVE UNICA PER DATA DI NASCITA
+        birth_date_key = f"birth_date_{birth_date.strftime('%Y%m%d') if hasattr(birth_date, 'strftime') else 'none'}"
+        
         st.session_state.user_profile['birth_date'] = st.date_input(
             "Data di nascita", 
             value=birth_date,
             min_value=datetime(1900, 1, 1).date(),
             max_value=datetime.now().date(),
-            key="birth_date_input"
+            key=birth_date_key  # 🆕 CHIAVE UNICA
         )
 
         if st.session_state.user_profile['birth_date']:
             st.write(f"Data selezionata: {st.session_state.user_profile['birth_date'].strftime('%d/%m/%Y')}")
         
-        st.session_state.user_profile['gender'] = st.selectbox("Sesso", ["Uomo", "Donna"], 
-                                                             index=0 if st.session_state.user_profile['gender'] == 'Uomo' else 1,
-                                                             key="gender_select")
+        # 🆕 CHIAVE UNICA PER SESSO
+        gender_key = f"gender_{st.session_state.user_profile.get('gender', 'Uomo')}"
+        st.session_state.user_profile['gender'] = st.selectbox(
+            "Sesso", 
+            ["Uomo", "Donna"], 
+            index=0 if st.session_state.user_profile['gender'] == 'Uomo' else 1,
+            key=gender_key  # 🆕 CHIAVE UNICA
+        )
         
         if st.session_state.user_profile['birth_date']:
             age = datetime.now().year - st.session_state.user_profile['birth_date'].year
