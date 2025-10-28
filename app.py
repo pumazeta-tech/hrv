@@ -491,7 +491,7 @@ def init_session_state():
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
 # =============================================================================
 
-def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, recording_duration_hours=None):
+def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
@@ -548,13 +548,10 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, recordi
     # Coerenza cardiaca realistica
     coherence = calculate_hrv_coherence(clean_rr, hr_mean, user_age)
     
-    # 🆕 MODIFICA: Calcola il sonno SOLO se la registrazione è abbastanza lunga
-    sleep_metrics = None
+    # 🆕 MODIFICA: Calcola la durata della registrazione
     recording_hours = len(clean_rr) * rr_mean / (1000 * 60 * 60)
-    if recording_hours >= 6:  # Solo se registrazione di almeno 6 ore (probabilmente include notte)
-        sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age)
     
-    # 🆕 MODIFICA: Prepara il risultato con o senza metriche sonno
+    # 🆕 MODIFICA: Prepara il risultato BASE (senza sonno)
     result = {
         'sdnn': max(25, min(180, sdnn)),
         'rmssd': max(15, min(120, rmssd)),
@@ -568,8 +565,9 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, recordi
         'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio))
     }
     
-    # 🆕 MODIFICA: Aggiungi metriche sonno solo se calcolate
-    if sleep_metrics:
+    # 🆕 MODIFICA: Aggiungi metriche sonno SOLO se la registrazione è abbastanza lunga (> 6 ore)
+    if recording_hours >= 6:
+        sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age)
         result.update({
             'sleep_duration': sleep_metrics['duration'],
             'sleep_efficiency': sleep_metrics['efficiency'],
@@ -2826,8 +2824,8 @@ def main():
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
                         
-                        # 🆕 MODIFICA: Controlla se la chiave 'sleep_duration' esiste E ha valore > 0
-                        has_sleep_data = 'sleep_duration' in day_metrics and day_metrics.get('sleep_duration', 0) > 0
+                        # 🆕 MODIFICA: Controllo SUPER SICURO - verifica che TUTTE le chiavi sonno esistano
+                        has_sleep_data = all(key in day_metrics for key in ['sleep_duration', 'sleep_efficiency', 'sleep_hr']) and day_metrics.get('sleep_duration', 0) > 0
                         
                         if has_sleep_data:
                             row = {
@@ -2838,10 +2836,7 @@ def main():
                                 'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
                                 'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
                                 'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
-                                'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}",
-                                'Leggero (%)': f"{(day_metrics.get('sleep_light', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
-                                'Profondo (%)': f"{(day_metrics.get('sleep_deep', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}",
-                                'REM (%)': f"{(day_metrics.get('sleep_rem', 0) / day_metrics.get('sleep_duration', 1) * 100):.1f}"
+                                'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
                             }
                             sleep_table_data.append(row)
 
@@ -2855,19 +2850,8 @@ def main():
                             hide_index=True,
                             height=min(300, 50 + len(sleep_df) * 35)
                         )
-                        
-                        # Download della tabella sonno CON CHIAVE UNICA
-                        sleep_csv = sleep_df.to_csv(index=False, sep=';')
-                        st.download_button(
-                            label="📥 Scarica Metriche Sonno",
-                            data=sleep_csv,
-                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                            key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                        )
                     else:
-                        st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione (nessuna ora notturna rilevata)")
+                        st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
                     
                     # Download delle tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -2885,7 +2869,7 @@ def main():
                         )
                     
                     with col2:
-                        # 🆕 MODIFICA: Mostra il pulsante download sonno SOLO se ci sono dati di sonno
+                        # Mostra il pulsante download sonno SOLO se ci sono dati di sonno
                         if sleep_table_data:
                             sleep_csv = sleep_df.to_csv(index=False, sep=';')
                             st.download_button(
@@ -2894,10 +2878,9 @@ def main():
                                 file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                                 mime="text/csv",
                                 use_container_width=True,
-                                key=f"download_sonno_main_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                             )
                         else:
-                            # Se non ci sono dati sonno, mostra un pulsante disabilitato o nulla
                             st.empty()
                     
                     # Grafico dettagliato con zoom interattivo e attività
