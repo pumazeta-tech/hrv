@@ -431,25 +431,11 @@ def get_user_key(user_profile):
         return None
 def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
-    # Carica il database all'inizio
+    # Carica il database all'inizio - MAI RESETTARE
     if 'user_database' not in st.session_state:
         st.session_state.user_database = load_user_database()
     
-    # Reset delle variabili di analisi quando si carica un nuovo file
-    if 'current_file_hash' not in st.session_state:
-        st.session_state.current_file_hash = None
-    
-    if 'activities' not in st.session_state:
-        st.session_state.activities = []
-    if 'analysis_history' not in st.session_state:
-        st.session_state.analysis_history = []
-    if 'file_uploaded' not in st.session_state:
-        st.session_state.file_uploaded = False
-    if 'analysis_datetimes' not in st.session_state:
-        st.session_state.analysis_datetimes = {
-            'start_datetime': datetime.now(),
-            'end_datetime': datetime.now() + timedelta(hours=24)
-        }
+    # 🆕 PRIMA INIZIALIZZA TUTTO, POI EVENTUALMENTE RESETTA
     if 'user_profile' not in st.session_state:
         st.session_state.user_profile = {
             'name': '',
@@ -457,6 +443,23 @@ def init_session_state():
             'birth_date': None,
             'gender': 'Uomo',
             'age': 0
+        }
+    
+    if 'activities' not in st.session_state:
+        st.session_state.activities = []
+    
+    if 'editing_activity_index' not in st.session_state:
+        st.session_state.editing_activity_index = None
+    
+    # 🆕 SOLO DOPO INIZIALIZZA LE VARIABILI TEMPORANEE
+    if 'file_uploaded' not in st.session_state:
+        st.session_state.file_uploaded = False
+    if 'analysis_history' not in st.session_state:
+        st.session_state.analysis_history = []
+    if 'analysis_datetimes' not in st.session_state:
+        st.session_state.analysis_datetimes = {
+            'start_datetime': datetime.now(),
+            'end_datetime': datetime.now() + timedelta(hours=24)
         }
     if 'datetime_initialized' not in st.session_state:
         st.session_state.datetime_initialized = False
@@ -470,8 +473,7 @@ def init_session_state():
         st.session_state.last_analysis_end = None
     if 'last_analysis_duration' not in st.session_state:
         st.session_state.last_analysis_duration = None
-    if 'editing_activity_index' not in st.session_state:
-        st.session_state.editing_activity_index = None
+
 
 # =============================================================================
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
@@ -2121,6 +2123,17 @@ def main():
                 st.session_state.last_analysis_metrics = None
                 st.session_state.current_file_hash = None
                 st.rerun()
+
+        # 🆕 PULSANTE EMERGENZA - FORZA REFRESH COMPLETO
+        st.divider()
+        if st.button("🚨 FORZA REFRESH COMPLETO", use_container_width=True, type="secondary"):
+            # Mantieni solo queste
+            persistent_keys = ['user_database', 'user_profile', 'activities', 'editing_activity_index']
+            
+            for key in list(st.session_state.keys()):
+                if key not in persistent_keys:
+                    del st.session_state[key]
+            st.rerun()
       
         # Solo le attività
         create_activity_tracker()
@@ -2136,7 +2149,11 @@ def main():
     
     if uploaded_file is not None:
         try:
-            # 🆕 SEMPRE PROCESSARE IL FILE DA ZERO - NESSUNA CACHE
+            # 🆕 FORZA IL RESET COMPLETO
+            st.session_state.analysis_history = []
+            st.session_state.last_analysis_metrics = None
+            st.session_state.current_file_hash = None
+            
             content = uploaded_file.getvalue().decode('utf-8')
             lines = content.strip().split('\n')
             
@@ -2154,9 +2171,8 @@ def main():
             
             st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
             
-            # 🆕 FORZA IL RESET DELLE ANALISI PRECEDENTI
-            st.session_state.analysis_history = []
-            st.session_state.last_analysis_metrics = None
+            # 🆕 USA UN KEY UNIVOCO BASATO SUL FILE
+            file_key = f"{uploaded_file.name}_{len(rr_intervals)}"
             
             # 🔽🔽🔽 NUOVA ANALISI COMPLETA - CORRETTAMENTE INDENTATA 🔽🔽🔽
             st.header("📊 Analisi HRV Completa")
