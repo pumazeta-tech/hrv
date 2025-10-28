@@ -1337,7 +1337,7 @@ def delete_activity(index):
 # =============================================================================
 
 def create_user_selector():
-    """Crea un selettore per gli utenti già registrati - MOSTRA SOLO NOME E COGNOME"""
+    """Crea un selettore per gli utenti già registrati - VERSIONE CORRETTA"""
     if not st.session_state.user_database:
         st.sidebar.info("📝 Nessun utente registrato nel database")
         return None
@@ -1376,39 +1376,47 @@ def create_user_selector():
         # Pulsante per caricare questo utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
             user_key, user_data = user_data_map[selected_user_display]
-            load_user_into_session(user_key)
-            st.rerun()
+            
+            # 🆕 CORREZIONE: Carica il profilo direttamente dal database COMPLETO
+            if user_key in st.session_state.user_database:
+                user_data_from_db = st.session_state.user_database[user_key]
+                profile = user_data_from_db['profile']
+                
+                # Aggiorna il profilo nella sessione
+                st.session_state.user_profile = {
+                    'name': profile.get('name', ''),
+                    'surname': profile.get('surname', ''),
+                    'birth_date': profile.get('birth_date'),
+                    'gender': profile.get('gender', 'Uomo'),
+                    'age': profile.get('age', 0)
+                }
+                
+                # Forza l'aggiornamento dei widget
+                st.session_state.name_input = profile.get('name', '')
+                st.session_state.surname_input = profile.get('surname', '')
+                st.session_state.birth_date_input = profile.get('birth_date')
+                st.session_state.gender_select = profile.get('gender', 'Uomo')
+                
+                st.success(f"✅ {profile.get('name', '')} {profile.get('surname', '')} caricato!")
+                st.rerun()
+            else:
+                st.error("❌ Utente non trovato nel database")
     
     return selected_user_display
 
-def load_user_into_session(user_key):
-    """Carica i dati dell'utente selezionato nella sessione corrente - VERSIONE CORRETTA"""
+def debug_database():
+    """Debug per vedere il contenuto del database"""
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🐛 Debug Database")
     
-    # 🆕 VERIFICA CHE L'UTENTE ESISTA NEL DATABASE
-    if user_key not in st.session_state.user_database:
-        st.error("❌ Utente non trovato nel database")
-        return
-    
-    user_data = st.session_state.user_database[user_key]  # ← Recupera i dati DAL DATABASE
-    profile = user_data['profile']
-    
-    # 🆕 AGGIORNA TUTTI I CAMPI DEL PROFILO
-    st.session_state.user_profile = {
-        'name': profile.get('name', ''),
-        'surname': profile.get('surname', ''),
-        'birth_date': profile.get('birth_date'),
-        'gender': profile.get('gender', 'Uomo'),
-        'age': profile.get('age', 0)
-    }
-    
-    # 🆕 FORZA L'AGGIORNAMENTO DEI WIDGET STREAMLIT
-    st.session_state.name_input = profile.get('name', '')
-    st.session_state.surname_input = profile.get('surname', '')
-    st.session_state.birth_date_input = profile.get('birth_date')
-    st.session_state.gender_select = profile.get('gender', 'Uomo')
-    
-    st.success(f"✅ {profile.get('name', '')} {profile.get('surname', '')} caricato!")
-    st.rerun()
+    if st.session_state.user_database:
+        st.sidebar.write(f"**Utenti nel DB:** {len(st.session_state.user_database)}")
+        for user_key, user_data in st.session_state.user_database.items():
+            profile = user_data['profile']
+            analyses_count = len(user_data.get('analyses', []))
+            st.sidebar.write(f"- {profile['name']} {profile['surname']}: {analyses_count} analisi")
+    else:
+        st.sidebar.write("**Database vuoto**")
 
 def delete_user_from_database(user_key):
     """Elimina un utente dal database"""
@@ -2115,7 +2123,7 @@ def main():
     with st.sidebar:
         # SELEZIONE UTENTI ESISTENTI
         create_user_selector()
-        
+        debug_database()       
         st.header("👤 Profilo Paziente")
         
         col1, col2 = st.columns(2)
