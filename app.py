@@ -435,6 +435,10 @@ def init_session_state():
     if 'user_database' not in st.session_state:
         st.session_state.user_database = load_user_database()
     
+    # Reset delle variabili di analisi quando si carica un nuovo file
+    if 'current_file_hash' not in st.session_state:
+        st.session_state.current_file_hash = None
+    
     if 'activities' not in st.session_state:
         st.session_state.activities = []
     if 'analysis_history' not in st.session_state:
@@ -2123,22 +2127,35 @@ def main():
     
     if uploaded_file is not None:
         try:
-            content = uploaded_file.getvalue().decode('utf-8')
-            lines = content.strip().split('\n')
+            # 🆕 CONTROLLA SE È UN FILE NUOVO
+            current_file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()
             
-            rr_intervals = []
-            for line in lines:
-                if line.strip():
-                    try:
-                        rr_intervals.append(float(line.strip()))
-                    except ValueError:
-                        continue
-            
-            if len(rr_intervals) == 0:
-                st.error("❌ Nessun dato IBI valido trovato nel file")
-                return
-            
-            st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
+            if hasattr(st.session_state, 'current_file_hash') and st.session_state.current_file_hash == current_file_hash:
+                # Stesso file, usa i dati esistenti
+                st.info("📁 File già analizzato - caricando dati esistenti")
+            else:
+                # Nuovo file, resetta i dati
+                st.session_state.current_file_hash = current_file_hash
+                st.session_state.analysis_history = []
+                st.session_state.last_analysis_metrics = None
+                st.session_state.file_uploaded = True
+                
+                content = uploaded_file.getvalue().decode('utf-8')
+                lines = content.strip().split('\n')
+                
+                rr_intervals = []
+                for line in lines:
+                    if line.strip():
+                        try:
+                            rr_intervals.append(float(line.strip()))
+                        except ValueError:
+                            continue
+                
+                if len(rr_intervals) == 0:
+                    st.error("❌ Nessun dato IBI valido trovato nel file")
+                    return
+                
+                st.success(f"✅ Nuovo file caricato con successo! {len(rr_intervals)} intervalli RR trovati")
             
             # 🔽🔽🔽 NUOVA ANALISI COMPLETA - CORRETTAMENTE INDENTATA 🔽🔽🔽
             st.header("📊 Analisi HRV Completa")
