@@ -361,7 +361,8 @@ def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
     if 'user_database' not in st.session_state:
         st.session_state.user_database = load_user_database()
-    
+    if 'current_user_key' not in st.session_state:
+        st.session_state.current_user_key = None
     if 'activities' not in st.session_state:
         st.session_state.activities = []
     if 'analysis_history' not in st.session_state:
@@ -1417,7 +1418,7 @@ def calculate_overall_averages(daily_metrics):
     return avg_metrics
 
 # =============================================================================
-# SELEZIONE UTENTI REGISTRATI
+# SELEZIONE UTENTI REGISTRATI - FUNZIONE CORRETTA
 # =============================================================================
 
 def create_user_selector():
@@ -1456,8 +1457,9 @@ def create_user_selector():
         
         st.sidebar.success(f"✅ {selected_user_display}")
         
+        # 🆕 CORREZIONE: Salva la user_key nella sessione quando carichi l'utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
-            load_user_into_session(selected_user_data)
+            load_user_into_session(selected_user_data, selected_user_key)  # 🆕 Passa anche la key
             st.rerun()
         
         if st.sidebar.button("🗑️ Elimina questo utente", use_container_width=True):
@@ -1466,35 +1468,63 @@ def create_user_selector():
     
     return selected_user_display
 
-def load_user_into_session(user_data):
+def load_user_into_session(user_data, user_key=None):
     """Carica i dati dell'utente selezionato nella sessione corrente"""
     st.session_state.user_profile = user_data['profile'].copy()
+    
+    # 🆕 CORREZIONE: Salva la user_key nella sessione per usi futuri
+    if user_key:
+        st.session_state.current_user_key = user_key
+    
     st.success(f"✅ Utente {user_data['profile']['name']} {user_data['profile']['surname']} caricato!")
-
-def delete_user_from_database(user_key):
-    """Elimina un utente dal database"""
-    if user_key in st.session_state.user_database:
-        user_name = f"{st.session_state.user_database[user_key]['profile']['name']} {st.session_state.user_database[user_key]['profile']['surname']}"
-        del st.session_state.user_database[user_key]
-        save_user_database()
-        st.success(f"✅ Utente {user_name} eliminato dal database!")
-        st.rerun()
 
 # =============================================================================
 # FUNZIONI PER GESTIONE STORICO ANALISI
 # =============================================================================
 
 def save_analysis_to_history(analysis_data):
-    """Salva l'analisi corrente nello storico"""
-    user_key = get_user_key(st.session_state.user_profile)
+    """Salva l'analisi corrente nello storico - VERSIONE CORRETTA"""
+    # 🆕 CORREZIONE: Usa multiple strategie per trovare la user_key
+    user_key = None
+    
+    # Strategia 1: Usa la key salvata quando si carica un utente
+    if hasattr(st.session_state, 'current_user_key') and st.session_state.current_user_key:
+        user_key = st.session_state.current_user_key
+    
+    # Strategia 2: Genera la key dal profilo corrente
+    if not user_key:
+        user_key = get_user_key(st.session_state.user_profile)
+    
+    # Strategia 3: Cerca nel database per match
+    if not user_key and st.session_state.user_database:
+        for key, user_data in st.session_state.user_database.items():
+            if (user_data['profile']['name'] == st.session_state.user_profile['name'] and 
+                user_data['profile']['surname'] == st.session_state.user_profile['surname'] and
+                user_data['profile']['birth_date'] == st.session_state.user_profile['birth_date']):
+                user_key = key
+                st.session_state.current_user_key = key  # Salva per usi futuri
+                break
+    
     if user_key and user_key in st.session_state.user_database:
         analysis_data['analysis_id'] = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         analysis_data['saved_at'] = datetime.now().isoformat()
         
+        # 🆕 CORREZIONE: Assicurati che 'analyses' esista
+        if 'analyses' not in st.session_state.user_database[user_key]:
+            st.session_state.user_database[user_key]['analyses'] = []
+        
         st.session_state.user_database[user_key]['analyses'].append(analysis_data)
-        save_user_database()
-        return True
-    return False
+        success = save_user_database()
+        
+        if success:
+            st.sidebar.success(f"✅ Analisi salvata per {st.session_state.user_profile['name']} {st.session_state.user_profile['surname']}")
+            return True
+        else:
+            st.error("❌ Errore nel salvataggio sul database")
+            return False
+    else:
+        st.error("❌ Utente non trovato nel database. Salva prima il profilo utente!")
+        return False
 
 def get_analysis_history():
     """Recupera lo storico delle analisi per l'utente corrente"""
@@ -2279,10 +2309,12 @@ def main():
                     with col4:
                         st.metric("Battiti Totali", len(rr_intervals))
             
-            # SALVATAGGIO ANALISI
+            # SALVATAGGIO ANALISI - VERSIONE CORRETTA
             if st.button("💾 Salva Analisi nel Database", type="primary"):
-                user_key = get_user_key(user_profile)
-                if user_key and user_key in st.session_state.user_database:
+                # Verifica che il profilo utente sia completo
+                if not st.session_state.user_profile['name'] or not st.session_state.user_profile['surname'] or not st.session_state.user_profile['birth_date']:
+                    st.error("❌ Completa il profilo utente (nome, cognome e data di nascita) prima di salvare l'analisi")
+                else:
                     analysis_data = {
                         'timestamp': datetime.now().isoformat(),
                         'recording_start': timeline['start_time'].isoformat(),
@@ -2296,9 +2328,7 @@ def main():
                     if save_analysis_to_history(analysis_data):
                         st.success("✅ Analisi salvata nello storico!")
                     else:
-                        st.error("❌ Errore nel salvataggio")
-                else:
-                    st.error("❌ Salva prima il profilo utente!")
+                        st.error("❌ Errore nel salvataggio dell'analisi")
 
             # ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
