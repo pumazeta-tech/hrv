@@ -448,13 +448,12 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     
     coherence = calculate_hrv_coherence(clean_rr, hr_mean, user_age)
     
-    # 🆕 CORREZIONE: CALCOLA IL SONNO BASATO SU ORARI REALI
     recording_duration_hours = len(clean_rr) * rr_mean / (1000 * 60 * 60)
     
-    # 🆕 PASSAGGIO DEGLI ORARI REALI ALLA FUNZIONE SONNO
+    # 🆕 CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
     sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age, recording_duration_hours, start_time, end_time)
     
-    # Metriche base + sonno
+    # Metriche base
     metrics = {
         'sdnn': max(25, min(180, sdnn)),
         'rmssd': max(15, min(120, rmssd)),
@@ -468,8 +467,9 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
         'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio))
     }
     
-    # 🆕 AGGIUNGI LE METRICHE DEL SONNO (anche se sono 0)
-    metrics.update(sleep_metrics)
+    # 🆕 AGGIUNGI SOLO SE CI SONO METRICHE DEL SONNO (non vuoto)
+    if sleep_metrics:  # Questo sarà True solo se sleep_metrics non è vuoto
+        metrics.update(sleep_metrics)
     
     return metrics
 
@@ -568,7 +568,12 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
         
         print(f"DEBUG: includes_night_hours = {includes_night_hours}")
         
-        if includes_night_hours and len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
+        # 🆕 CORREZIONE: Se NON include ore notturne, NON restituire le metriche del sonno
+        if not includes_night_hours:
+            print("DEBUG: Nessun sonno rilevato - Registrazione diurna")
+            return {}  # 🆕 RESTITUISCI DIZIONARIO VUOTO invece di valori 0
+        
+        if len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
             # 🆕 CALCOLO REALISTICO BASATO SUGLI ORARI EFFETTIVI
             # Stima quanta parte della notte è coperta dalla registrazione
             night_hours_total = 9  # 22:00-7:00 = 9 ore
@@ -618,29 +623,13 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
                 'sleep_awake': round(sleep_awake / 60, 1)
             }
         else:
-            # Nessun sonno rilevato (registrazione diurna o troppo corta)
-            print("DEBUG: Nessun sonno rilevato - Registrazione diurna o troppo corta")
-            return {
-                'sleep_duration': 0,
-                'sleep_efficiency': 0,
-                'sleep_hr': 0,
-                'sleep_light': 0,
-                'sleep_deep': 0,
-                'sleep_rem': 0,
-                'sleep_awake': 0
-            }
+            # Nessun sonno rilevato (registrazione troppo corta anche se include notte)
+            print("DEBUG: Nessun sonno rilevato - Registrazione troppo corta")
+            return {}  # 🆕 RESTITUISCI DIZIONARIO VUOTO
             
     except Exception as e:
         print(f"DEBUG: Errore in estimate_sleep_metrics: {e}")
-        return {
-            'sleep_duration': 0,
-            'sleep_efficiency': 0,
-            'sleep_hr': 0,
-            'sleep_light': 0,
-            'sleep_deep': 0,
-            'sleep_rem': 0,
-            'sleep_awake': 0
-        }
+        return {}  # 🆕 RESTITUISCI DIZIONARIO VUOTO in caso di errore
 
 def calculate_night_coverage(start_time, end_time, duration_hours):
     """Calcola quanta parte della notte (22:00-7:00) è coperta dalla registrazione"""
@@ -679,10 +668,6 @@ def calculate_night_coverage(start_time, end_time, duration_hours):
 
 def get_default_metrics(age, gender):
     """Metriche di default realistiche basate su età e genere"""
-    # ... il resto del codice che già hai ...
-
-def get_default_metrics(age, gender):
-    """Metriche di default realistiche basate su età e genere"""
     age_norm = max(20, min(80, age))
     
     if gender == 'Uomo':
@@ -694,6 +679,7 @@ def get_default_metrics(age, gender):
         base_rmssd = 35 - (age_norm - 20) * 0.3
         base_hr = 72 + (age_norm - 20) * 0.15
     
+    # 🆕 CORREZIONE: Restituisci solo le metriche HRV base, NON quelle del sonno
     metrics = {
         'sdnn': max(28, base_sdnn),
         'rmssd': max(20, base_rmssd),
@@ -704,15 +690,8 @@ def get_default_metrics(age, gender):
         'vlf': 400 - (age_norm - 20) * 5,
         'lf': 1000 - (age_norm - 20) * 15,
         'hf': 1400 - (age_norm - 20) * 20,
-        'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01,
-        # Metriche sonno vuote
-        'sleep_duration': 0,
-        'sleep_efficiency': 0,
-        'sleep_hr': 0,
-        'sleep_light': 0,
-        'sleep_deep': 0,
-        'sleep_rem': 0,
-        'sleep_awake': 0
+        'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01
+        # 🆕 RIMOSSE le metriche del sonno dai default
     }
     
     return metrics
