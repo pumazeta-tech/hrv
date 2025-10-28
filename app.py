@@ -2843,21 +2843,10 @@ def main():
                             hide_index=True,
                             height=min(300, 50 + len(sleep_df) * 35)
                         )
-                        
-                        # Download della tabella sonno CON CHIAVE UNICA
-                        sleep_csv = sleep_df.to_csv(index=False, sep=';')
-                        st.download_button(
-                            label="📥 Scarica Metriche Sonno",
-                            data=sleep_csv,
-                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                            key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # CHIAVE UNICA
-                        )
                     else:
                         st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione (nessuna ora notturna rilevata)")
                     
-                    # Download delle tabelle
+                    # Download delle tabelle - SOLO SE CI SONO DATI
                     st.markdown("<br>", unsafe_allow_html=True)
                     col1, col2 = st.columns(2)
                     
@@ -2869,18 +2858,24 @@ def main():
                             file_name=f"hrv_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                             mime="text/csv",
                             use_container_width=True,
-                            key=f"download_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # CHIAVE UNICA
+                            key=f"download_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                         )
                     
                     with col2:
-                        sleep_csv = sleep_df.to_csv(index=False, sep=';')
-                        st.download_button(
-                            label="📥 Scarica Metriche Sonno",
-                            data=sleep_csv,
-                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
-                            mime="text/csv",
-                            use_container_width=True
-                        )
+                        # Mostra il pulsante download sonno SOLO se ci sono dati di sonno
+                        if sleep_table_data:
+                            sleep_csv = sleep_df.to_csv(index=False, sep=';')
+                            st.download_button(
+                                label="📥 Scarica Metriche Sonno",
+                                data=sleep_csv,
+                                file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True,
+                                key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                            )
+                        else:
+                            # Se non ci sono dati sonno, mostra un pulsante disabilitato o nulla
+                            st.empty()
                     
                     # Grafico dettagliato con zoom interattivo e attività
                     st.subheader("📈 Andamento Dettagliato HRV con Attività")
