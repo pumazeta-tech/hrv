@@ -665,7 +665,7 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age):
     }
 
 def get_default_metrics(age, gender):
-    """Metriche di default realistiche basate su età e genere con tutte le fasi sonno"""
+    """Metriche di default realistiche basate su età e genere SENZA sonno"""
     age_norm = max(20, min(80, age))
     
     if gender == 'Uomo':
@@ -677,13 +677,7 @@ def get_default_metrics(age, gender):
         base_rmssd = 35 - (age_norm - 20) * 0.3
         base_hr = 72 + (age_norm - 20) * 0.15
     
-    # Distribuzione fasi sonno di default
-    sleep_duration = 7.2
-    sleep_light = sleep_duration * 0.50  # 50% sonno leggero
-    sleep_deep = sleep_duration * 0.20   # 20% sonno profondo  
-    sleep_rem = sleep_duration * 0.20    # 20% sonno REM
-    sleep_awake = sleep_duration * 0.10  # 10% risvegli
-    
+    # 🆕 MODIFICA: Restituisci SOLO metriche base, NESSUNA metrica sonno
     return {
         'sdnn': max(28, base_sdnn),
         'rmssd': max(20, base_rmssd),
@@ -694,14 +688,8 @@ def get_default_metrics(age, gender):
         'vlf': 400 - (age_norm - 20) * 5,
         'lf': 1000 - (age_norm - 20) * 15,
         'hf': 1400 - (age_norm - 20) * 20,
-        'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01,
-        'sleep_duration': sleep_duration,
-        'sleep_efficiency': 87,
-        'sleep_hr': base_hr - 8,
-        'sleep_light': sleep_light,
-        'sleep_deep': sleep_deep,
-        'sleep_rem': sleep_rem,
-        'sleep_awake': sleep_awake
+        'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01
+        # 🆕 NESSUNA metrica sonno qui!
     }
 
 # =============================================================================
@@ -2815,6 +2803,18 @@ def main():
                     
                     # Aggiungi spazio tra le tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
+
+                    # 🆕 DEBUG TEMPORANEO: Mostra le chiavi disponibili per il primo giorno
+                    if daily_metrics:
+                        first_day_key = list(daily_metrics.keys())[0]
+                        first_day_metrics = daily_metrics[first_day_key]
+                        st.sidebar.warning(f"🔍 DEBUG - Chiavi nel primo giorno:")
+                        st.sidebar.write(first_day_metrics.keys())
+                        if 'sleep_duration' in first_day_metrics:
+                            st.sidebar.write(f"sleep_duration: {first_day_metrics['sleep_duration']}")
+                        else:
+                            st.sidebar.write("❌ sleep_duration NON presente")
+
                     
                     # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO DATI DI SONNO
                     st.subheader("😴 Metriche Sonno")
@@ -2824,8 +2824,19 @@ def main():
                     for day_date, day_metrics in daily_metrics.items():
                         day_dt = datetime.fromisoformat(day_date)
                         
-                        # 🆕 MODIFICA: Controllo SUPER SICURO - verifica che TUTTE le chiavi sonno esistano
-                        has_sleep_data = all(key in day_metrics for key in ['sleep_duration', 'sleep_efficiency', 'sleep_hr']) and day_metrics.get('sleep_duration', 0) > 0
+                        # 🆕 MODIFICA: Controllo ULTRA SICURO - usa try/except
+                        has_sleep_data = False
+                        try:
+                            # Prova ad accedere alle chiavi sonno
+                            sleep_duration = day_metrics.get('sleep_duration', 0)
+                            sleep_efficiency = day_metrics.get('sleep_efficiency', 0)
+                            sleep_hr = day_metrics.get('sleep_hr', 0)
+                            
+                            # Se siamo arrivati qui senza errori e sleep_duration > 0, abbiamo dati sonno
+                            has_sleep_data = sleep_duration > 0
+                        except (KeyError, TypeError, AttributeError):
+                            # Se c'è qualsiasi errore, non abbiamo dati sonno
+                            has_sleep_data = False
                         
                         if has_sleep_data:
                             row = {
