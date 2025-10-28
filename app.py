@@ -460,11 +460,17 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     
     recording_duration_hours = len(clean_rr) * rr_mean / (1000 * 60 * 60)
     
+    # DEBUG: Stampa gli orari per capire se dovrebbe esserci sonno
+    print(f"DEBUG calculate_realistic_hrv_metrics:")
+    print(f"  Start: {start_time}, End: {end_time}")
+    print(f"  Duration: {recording_duration_hours:.2f}h")
+    print(f"  Start hour: {start_time.hour}, End hour: {end_time.hour}")
+    
     # CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
     sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age, recording_duration_hours, start_time, end_time)
     
     # DEBUG: Verifica cosa restituisce estimate_sleep_metrics
-    print(f"DEBUG sleep_metrics: {sleep_metrics}")
+    print(f"  sleep_metrics returned: {sleep_metrics}")
     
     # Metriche base
     metrics = {
@@ -481,11 +487,20 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     }
     
     # CORREZIONE: AGGIUNGI SOLO SE CI SONO METRICHE DEL SONNO (non vuoto)
-    if sleep_metrics:  # Questo sarà True solo se sleep_metrics non è vuoto
+    if sleep_metrics and any(value > 0 for value in sleep_metrics.values() if isinstance(value, (int, float))):
         metrics.update(sleep_metrics)
-        print(f"DEBUG: Aggiunte metriche sonno: {sleep_metrics}")
+        print(f"  ✅ Aggiunte metriche sonno: {sleep_metrics}")
     else:
-        print("DEBUG: Nessuna metrica sonno aggiunta")
+        print(f"  ❌ Nessuna metrica sonno aggiunta (vuoto o tutti zero)")
+        # ASSICURIAMOCI che non ci siano metriche sonno nel dizionario
+        # Rimuovi esplicitamente qualsiasi metrica sonno che potrebbe essere presente
+        sleep_keys_to_remove = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 
+                               'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
+        for key in sleep_keys_to_remove:
+            metrics.pop(key, None)
+    
+    print(f"  Final metrics keys: {list(metrics.keys())}")
+    print(f"  Sleep-related keys in final metrics: {[k for k in metrics.keys() if 'sleep' in k]}")
     
     return metrics
 
@@ -541,40 +556,56 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
         start_hour = start_time.hour
         end_hour = end_time.hour
         
+        # DEBUG
+        print(f"DEBUG estimate_sleep_metrics:")
+        print(f"  Start: {start_time} (hour: {start_hour}), End: {end_time} (hour: {end_hour})")
+        print(f"  Duration: {recording_duration_hours:.2f}h")
+        
         # Determina se la registrazione comprende ore notturne (22:00 - 7:00)
         includes_night_hours = False
         
         # Caso 1: Registrazione lunga che copre sicuramente la notte
         if recording_duration_hours >= 10:
             includes_night_hours = True
+            print("  Caso 1 - Registrazione lunga >=10h")
         
         # Caso 2: Inizia di sera (dopo le 20:00) e finisce di notte/mattina
         elif start_hour >= 20 and end_hour <= 12:
             includes_night_hours = True
+            print("  Caso 2 - Inizia sera, finisce mattina")
         
         # Caso 3: Inizia di notte (prima delle 7:00)
         elif start_hour < 7:
             includes_night_hours = True
+            print("  Caso 3 - Inizia di notte")
             
         # Caso 4: Finisce di notte (dopo le 22:00)
         elif end_hour >= 22:
             includes_night_hours = True
+            print("  Caso 4 - Finisce di notte")
         
         # Caso 5: Attraversa completamente la notte (inizia prima delle 22 e finisce dopo le 7)
         elif start_hour < 22 and end_hour > 7 and recording_duration_hours > 8:
             includes_night_hours = True
+            print("  Caso 5 - Attraversa la notte")
+        
+        print(f"  includes_night_hours = {includes_night_hours}")
         
         # CORREZIONE: Se NON include ore notturne, NON restituire le metriche del sonno
         if not includes_night_hours:
+            print("  ❌ Nessun sonno rilevato - Registrazione diurna")
             return {}  # RESTITUISCI DIZIONARIO VUOTO invece di valori 0
         
         if len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
             # CALCOLO REALISTICO BASATO SUGLI ORARI EFFETTIVI
-            # Stima quanta parte della notte è coperta dalla registrazione
-            night_hours_total = 9  # 22:00-7:00 = 9 ore
-            
-            # Calcola quanta parte della notte è coperta
             night_coverage = calculate_night_coverage(start_time, end_time, recording_duration_hours)
+            
+            print(f"  Night coverage: {night_coverage}")
+            
+            # Se la copertura notturna è troppo bassa, non calcolare il sonno
+            if night_coverage < 0.3:  # Meno del 30% della notte coperta
+                print(f"  ❌ Copertura notturna insufficiente: {night_coverage}")
+                return {}
             
             # Durata media sonno in base all'età
             if age < 30:
@@ -587,6 +618,11 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
             # Aggiusta in base alla copertura delle ore notturne
             sleep_duration = base_sleep * night_coverage
             sleep_duration = max(4.0, min(9.0, sleep_duration))
+            
+            # Se la durata del sonno è troppo breve, non considerarla sonno valido
+            if sleep_duration < 5.0:  # Meno di 5 ore di sonno
+                print(f"  ❌ Durata sonno insufficiente: {sleep_duration}h")
+                return {}
             
             # Battito durante il sonno (più basso)
             sleep_hr = hr_mean * (0.75 + np.random.normal(0, 0.03))
@@ -604,7 +640,7 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
             sleep_rem = total_sleep_minutes * 0.25    # 25% sonno REM
             sleep_awake = total_sleep_minutes * 0.05  # 5% risvegli
             
-            return {
+            result = {
                 'sleep_duration': round(sleep_duration, 1),
                 'sleep_efficiency': round(sleep_efficiency, 1),
                 'sleep_hr': round(sleep_hr, 1),
@@ -613,11 +649,16 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
                 'sleep_rem': round(sleep_rem / 60, 1),
                 'sleep_awake': round(sleep_awake / 60, 1)
             }
+            
+            print(f"  ✅ Sonno rilevato: {result}")
+            return result
         else:
             # Nessun sonno rilevato (registrazione troppo corta anche se include notte)
+            print("  ❌ Nessun sonno rilevato - Registrazione troppo corta")
             return {}  # RESTITUISCI DIZIONARIO VUOTO
             
     except Exception as e:
+        print(f"  ❌ Errore in estimate_sleep_metrics: {e}")
         return {}  # RESTITUISCI DIZIONARIO VUOTO in caso di errore
 
 def calculate_night_coverage(start_time, end_time, duration_hours):
@@ -1692,37 +1733,56 @@ def display_analysis_history():
         daily_metrics = analysis.get('daily_metrics', {})
         data_inserimento = datetime.fromisoformat(analysis.get('saved_at', datetime.now().isoformat())).strftime('%d/%m/%Y %H:%M')
         
+        # DEBUG: Verifica i dati
+        print(f"DEBUG display_analysis_history - Analysis: {analysis.get('recording_start')}")
+        print(f"  Has daily_metrics: {bool(daily_metrics)}")
+        print(f"  Has overall_metrics: {bool(overall_metrics)}")
+        
+        # PRIMA processa i daily_metrics (se esistono)
         if daily_metrics:
             for day_date, day_metrics in daily_metrics.items():
                 day_dt = datetime.fromisoformat(day_date)
                 
+                # CORREZIONE: PULIZIA ESPLICITA - rimuovi metriche sonno se non valide
+                cleaned_metrics = day_metrics.copy()
+                if not has_valid_sleep_metrics(cleaned_metrics):
+                    # Rimuovi esplicitamente tutte le metriche del sonno
+                    sleep_keys = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 
+                                'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
+                    for key in sleep_keys:
+                        cleaned_metrics.pop(key, None)
+                
                 # CORREZIONE: Controlla se ci sono metriche del sonno VALIDE (non zero)
-                has_sleep_metrics = has_valid_sleep_metrics(day_metrics)
+                has_sleep_metrics = has_valid_sleep_metrics(cleaned_metrics)
+                
+                print(f"  Day {day_date}: has_sleep_metrics = {has_sleep_metrics}")
+                if has_sleep_metrics:
+                    print(f"    Sleep data: { {k: v for k, v in cleaned_metrics.items() if 'sleep' in k} }")
                 
                 row = {
                     'Data Inserimento': data_inserimento,
                     'Data Registrazione': day_dt.strftime('%d/%m/%Y'),
-                    'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
-                    'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
-                    'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
-                    'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
-                    'Potenza Totale': f"{day_metrics.get('total_power', 0):.0f}",
-                    'LF (ms²)': f"{day_metrics.get('lf', 0):.0f}",
-                    'HF (ms²)': f"{day_metrics.get('hf', 0):.0f}",
-                    'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}",
-                    'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
+                    'Battito (bpm)': f"{cleaned_metrics.get('hr_mean', 0):.1f}",
+                    'SDNN (ms)': f"{cleaned_metrics.get('sdnn', 0):.1f}",
+                    'RMSSD (ms)': f"{cleaned_metrics.get('rmssd', 0):.1f}",
+                    'Coerenza (%)': f"{cleaned_metrics.get('coherence', 0):.1f}",
+                    'Potenza Totale': f"{cleaned_metrics.get('total_power', 0):.0f}",
+                    'LF (ms²)': f"{cleaned_metrics.get('lf', 0):.0f}",
+                    'HF (ms²)': f"{cleaned_metrics.get('hf', 0):.0f}",
+                    'LF/HF': f"{cleaned_metrics.get('lf_hf_ratio', 0):.2f}",
+                    'VLF (ms²)': f"{cleaned_metrics.get('vlf', 0):.0f}"
                 }
                 
                 # CORREZIONE: Aggiungi metriche sonno solo se presenti E VALIDE
                 if has_sleep_metrics:
                     row.update({
-                        'Sonno Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
-                        'Efficienza Sonno (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
-                        'Battito Sonno (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
-                        'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
-                        'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
-                        'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
-                        'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
+                        'Sonno Totale (h)': f"{cleaned_metrics.get('sleep_duration', 0):.1f}",
+                        'Efficienza Sonno (%)': f"{cleaned_metrics.get('sleep_efficiency', 0):.1f}",
+                        'Battito Sonno (bpm)': f"{cleaned_metrics.get('sleep_hr', 0):.1f}",
+                        'Sonno Leggero (h)': f"{cleaned_metrics.get('sleep_light', 0):.1f}",
+                        'Sonno Profondo (h)': f"{cleaned_metrics.get('sleep_deep', 0):.1f}",
+                        'Sonno REM (h)': f"{cleaned_metrics.get('sleep_rem', 0):.1f}",
+                        'Risvegli (h)': f"{cleaned_metrics.get('sleep_awake', 0):.1f}"
                     })
                 else:
                     row.update({
@@ -1737,36 +1797,50 @@ def display_analysis_history():
                 
                 table_data.append(row)
         
+        # POI processa overall_metrics SOLO se non ci sono daily_metrics
         elif overall_metrics:
             recording_start = datetime.fromisoformat(analysis['recording_start'])
             
+            # CORREZIONE: PULIZIA ESPLICITA - rimuovi metriche sonno se non valide
+            cleaned_metrics = overall_metrics.copy()
+            if not has_valid_sleep_metrics(cleaned_metrics):
+                # Rimuovi esplicitamente tutte le metriche del sonno
+                sleep_keys = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 
+                            'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
+                for key in sleep_keys:
+                    cleaned_metrics.pop(key, None)
+            
             # CORREZIONE: Controlla se ci sono metriche del sonno VALIDE (non zero)
-            has_sleep_metrics = has_valid_sleep_metrics(overall_metrics)
+            has_sleep_metrics = has_valid_sleep_metrics(cleaned_metrics)
+            
+            print(f"  Overall metrics: has_sleep_metrics = {has_sleep_metrics}")
+            if has_sleep_metrics:
+                print(f"    Sleep data: { {k: v for k, v in cleaned_metrics.items() if 'sleep' in k} }")
             
             row = {
                 'Data Inserimento': data_inserimento,
                 'Data Registrazione': recording_start.strftime('%d/%m/%Y'),
-                'Battito (bpm)': f"{overall_metrics.get('hr_mean', 0):.1f}",
-                'SDNN (ms)': f"{overall_metrics.get('sdnn', 0):.1f}",
-                'RMSSD (ms)': f"{overall_metrics.get('rmssd', 0):.1f}",
-                'Coerenza (%)': f"{overall_metrics.get('coherence', 0):.1f}",
-                'Potenza Totale': f"{overall_metrics.get('total_power', 0):.0f}",
-                'LF (ms²)': f"{overall_metrics.get('lf', 0):.0f}",
-                'HF (ms²)': f"{overall_metrics.get('hf', 0):.0f}",
-                'LF/HF': f"{overall_metrics.get('lf_hf_ratio', 0):.2f}",
-                'VLF (ms²)': f"{overall_metrics.get('vlf', 0):.0f}"
+                'Battito (bpm)': f"{cleaned_metrics.get('hr_mean', 0):.1f}",
+                'SDNN (ms)': f"{cleaned_metrics.get('sdnn', 0):.1f}",
+                'RMSSD (ms)': f"{cleaned_metrics.get('rmssd', 0):.1f}",
+                'Coerenza (%)': f"{cleaned_metrics.get('coherence', 0):.1f}",
+                'Potenza Totale': f"{cleaned_metrics.get('total_power', 0):.0f}",
+                'LF (ms²)': f"{cleaned_metrics.get('lf', 0):.0f}",
+                'HF (ms²)': f"{cleaned_metrics.get('hf', 0):.0f}",
+                'LF/HF': f"{cleaned_metrics.get('lf_hf_ratio', 0):.2f}",
+                'VLF (ms²)': f"{cleaned_metrics.get('vlf', 0):.0f}"
             }
             
             # CORREZIONE: Aggiungi metriche sonno solo se presenti E VALIDE
             if has_sleep_metrics:
                 row.update({
-                    'Sonno Totale (h)': f"{overall_metrics.get('sleep_duration', 0):.1f}",
-                    'Efficienza Sonno (%)': f"{overall_metrics.get('sleep_efficiency', 0):.1f}",
-                    'Battito Sonno (bpm)': f"{overall_metrics.get('sleep_hr', 0):.1f}",
-                    'Sonno Leggero (h)': f"{overall_metrics.get('sleep_light', 0):.1f}",
-                    'Sonno Profondo (h)': f"{overall_metrics.get('sleep_deep', 0):.1f}",
-                    'Sonno REM (h)': f"{overall_metrics.get('sleep_rem', 0):.1f}",
-                    'Risvegli (h)': f"{overall_metrics.get('sleep_awake', 0):.1f}"
+                    'Sonno Totale (h)': f"{cleaned_metrics.get('sleep_duration', 0):.1f}",
+                    'Efficienza Sonno (%)': f"{cleaned_metrics.get('sleep_efficiency', 0):.1f}",
+                    'Battito Sonno (bpm)': f"{cleaned_metrics.get('sleep_hr', 0):.1f}",
+                    'Sonno Leggero (h)': f"{cleaned_metrics.get('sleep_light', 0):.1f}",
+                    'Sonno Profondo (h)': f"{cleaned_metrics.get('sleep_deep', 0):.1f}",
+                    'Sonno REM (h)': f"{cleaned_metrics.get('sleep_rem', 0):.1f}",
+                    'Risvegli (h)': f"{cleaned_metrics.get('sleep_awake', 0):.1f}"
                 })
             else:
                 row.update({
@@ -1780,6 +1854,9 @@ def display_analysis_history():
                 })
             
             table_data.append(row)
+        
+        else:
+            print(f"  ❌ Nessuna metrica trovata per questa analisi")
     
     table_data_sorted = sorted(table_data, key=lambda x: datetime.strptime(x['Data Registrazione'], '%d/%m/%Y'), reverse=True)
     
