@@ -2354,14 +2354,15 @@ def display_analysis_history():
             height=min(600, 150 + len(df) * 35)
         )
         
-        # Pulsante download
+        # Pulsante download CON CHIAVE UNICA
         csv_data = df.to_csv(index=False, sep=';')
         st.download_button(
             label="📥 Scarica Storico Completo",
             data=csv_data,
-            file_name=f"storico_analisi_hrv_{datetime.now().strftime('%Y%m%d')}.csv",
+            file_name=f"storico_analisi_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
-            use_container_width=True
+            use_container_width=True,
+            key=f"download_storico_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # CHIAVE UNICA
         )
         
         # Statistiche
@@ -2843,14 +2844,15 @@ def main():
                             height=min(300, 50 + len(sleep_df) * 35)
                         )
                         
-                        # Download della tabella sonno
+                        # Download della tabella sonno CON CHIAVE UNICA
                         sleep_csv = sleep_df.to_csv(index=False, sep=';')
                         st.download_button(
                             label="📥 Scarica Metriche Sonno",
                             data=sleep_csv,
-                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
+                            file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                             mime="text/csv",
-                            use_container_width=True
+                            use_container_width=True,
+                            key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # CHIAVE UNICA
                         )
                     else:
                         st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione (nessuna ora notturna rilevata)")
@@ -2864,9 +2866,10 @@ def main():
                         st.download_button(
                             label="📥 Scarica Metriche HRV",
                             data=hrv_csv,
-                            file_name=f"hrv_metriche_{datetime.now().strftime('%Y%m%d')}.csv",
+                            file_name=f"hrv_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                             mime="text/csv",
-                            use_container_width=True
+                            use_container_width=True,
+                            key=f"download_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # CHIAVE UNICA
                         )
                     
                     with col2:
