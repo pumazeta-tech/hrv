@@ -492,14 +492,7 @@ def init_session_state():
 # =============================================================================
 
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
-    """Calcola metriche HRV realistiche e fisiologicamente corrette"""
-
-    # 🆕 DEBUG: Verifica i parametri di input
-    print(f"DEBUG calculate_realistic_hrv_metrics:")
-    print(f"  - rr_intervals length: {len(rr_intervals) if rr_intervals else 0}")
-    print(f"  - user_age: {user_age}")
-    print(f"  - user_gender: {user_gender}")
-
+    """Calcola metriche HRV realistiche e fisiologicamente corrette SENZA SONNO"""
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
     
@@ -555,37 +548,20 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     # Coerenza cardiaca realistica
     coherence = calculate_hrv_coherence(clean_rr, hr_mean, user_age)
     
-    # 🆕 MODIFICA: Calcola la durata della registrazione
-    recording_hours = len(clean_rr) * rr_mean / (1000 * 60 * 60)
-    
-    # 🆕 MODIFICA: Prepara il risultato BASE (senza sonno)
-    result = {
+    # 🆕 MODIFICA: RESTITUISCI SOLO METRICHE BASE, NIENTE SONNO
+    return {
         'sdnn': max(25, min(180, sdnn)),
         'rmssd': max(15, min(120, rmssd)),
         'hr_mean': max(45, min(100, hr_mean)),
         'coherence': max(20, min(95, coherence)),
-        'recording_hours': recording_hours,
+        'recording_hours': len(clean_rr) * rr_mean / (1000 * 60 * 60),
         'total_power': max(800, min(8000, total_power)),
         'vlf': max(100, min(2500, vlf)),
         'lf': max(200, min(4000, lf)),
         'hf': max(200, min(4000, hf)),
         'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio))
+        # 🆕 NESSUNA METRICA SONNO!
     }
-    
-    # 🆕 MODIFICA: Aggiungi metriche sonno SOLO se la registrazione è abbastanza lunga (> 6 ore)
-    if recording_hours >= 6:
-        sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age)
-        result.update({
-            'sleep_duration': sleep_metrics['duration'],
-            'sleep_efficiency': sleep_metrics['efficiency'],
-            'sleep_hr': sleep_metrics['hr'],
-            'sleep_light': sleep_metrics['light'],
-            'sleep_deep': sleep_metrics['deep'],
-            'sleep_rem': sleep_metrics['rem'],
-            'sleep_awake': sleep_metrics['awake']
-        })
-    
-    return result
 
 def filter_rr_outliers(rr_intervals):
     """Filtra gli artefatti in modo conservativo"""
@@ -685,10 +661,6 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age):
 
 def get_default_metrics(age, gender):
     """Metriche di default realistiche basate su età e genere SENZA sonno"""
-    
-    # 🆕 DEBUG
-    print(f"DEBUG get_default_metrics: age={age}, gender={gender}")
-    
     age_norm = max(20, min(80, age))
     
     if gender == 'Uomo':
@@ -700,8 +672,8 @@ def get_default_metrics(age, gender):
         base_rmssd = 35 - (age_norm - 20) * 0.3
         base_hr = 72 + (age_norm - 20) * 0.15
     
-    # 🆕 MODIFICA: Restituisci SOLO metriche base, NESSUNA metrica sonno
-    metrics = {
+    # 🆕 MODIFICA: SOLO METRICHE BASE
+    return {
         'sdnn': max(28, base_sdnn),
         'rmssd': max(20, base_rmssd),
         'hr_mean': base_hr,
@@ -712,7 +684,7 @@ def get_default_metrics(age, gender):
         'lf': 1000 - (age_norm - 20) * 15,
         'hf': 1400 - (age_norm - 20) * 20,
         'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01
-        # 🆕 NESSUNA metrica sonno qui!
+        # 🆕 NESSUNA METRICA SONNO!
     }
     
     print(f"DEBUG get_default_metrics output keys: {list(metrics.keys())}")
@@ -2899,45 +2871,6 @@ def main():
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
                         st.info("Mostro solo le metriche principali...")
-
-                    
-                    # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO DATI DI SONNO
-                    st.subheader("😴 Metriche Sonno")
-
-                    sleep_table_data = []
-
-                    for day_date, day_metrics in daily_metrics.items():
-                        day_dt = datetime.fromisoformat(day_date)
-                        
-                        # 🆕 APPROCCIO RADICALE: Usa solo .get() con valori di default
-                        sleep_duration = day_metrics.get('sleep_duration', 0)
-                        
-                        # Solo se sleep_duration esiste ed è > 0, procedi
-                        if sleep_duration > 0:
-                            row = {
-                                'Data': day_dt.strftime('%d/%m/%Y'),
-                                'Durata Totale (h)': f"{sleep_duration:.1f}",
-                                'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
-                                'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
-                                'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
-                                'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
-                                'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
-                                'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
-                            }
-                            sleep_table_data.append(row)
-
-                    if sleep_table_data:
-                        sleep_df = pd.DataFrame(sleep_table_data)
-                        
-                        # Mostra seconda tabella Sonno
-                        st.dataframe(
-                            sleep_df,
-                            use_container_width=True,
-                            hide_index=True,
-                            height=min(300, 50 + len(sleep_df) * 35)
-                        )
-                    else:
-                        st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
                     
                     # Download delle tabelle
                     st.markdown("<br>", unsafe_allow_html=True)
