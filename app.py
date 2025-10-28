@@ -2200,6 +2200,100 @@ def delete_user_from_database(user_key):
         st.rerun()
 
 # =============================================================================
+# FUNZIONI PER GESTIONE STORICO ANALISI
+# =============================================================================
+
+def save_analysis_to_history(analysis_data):
+    """Salva l'analisi corrente nello storico"""
+    user_key = get_user_key(st.session_state.user_profile)
+    if user_key and user_key in st.session_state.user_database:
+        # Aggiungi timestamp univoco
+        analysis_data['analysis_id'] = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        analysis_data['saved_at'] = datetime.now().isoformat()
+        
+        st.session_state.user_database[user_key]['analyses'].append(analysis_data)
+        save_user_database()
+        return True
+    return False
+
+def get_analysis_history():
+    """Recupera lo storico delle analisi per l'utente corrente"""
+    user_key = get_user_key(st.session_state.user_profile)
+    if user_key and user_key in st.session_state.user_database:
+        return st.session_state.user_database[user_key].get('analyses', [])
+    return []
+
+def display_analysis_history():
+    """Mostra lo storico delle analisi nell'interfaccia principale"""
+    analyses = get_analysis_history()
+    
+    if not analyses:
+        st.info("📝 Nessuna analisi precedente trovata. Carica un file IBI per creare la prima analisi.")
+        return
+    
+    st.header("📊 Storico Analisi HRV")
+    
+    # Ordina le analisi per data (più recente prima)
+    analyses_sorted = sorted(analyses, key=lambda x: x.get('saved_at', ''), reverse=True)
+    
+    for i, analysis in enumerate(analyses_sorted):
+        with st.expander(f"📅 Analisi del {analysis.get('saved_at', 'Data sconosciuta')}", expanded=i==0):
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Data Registrazione", 
+                         datetime.fromisoformat(analysis['recording_start']).strftime('%d/%m/%Y %H:%M'))
+            with col2:
+                st.metric("Durata", f"{analysis['recording_duration_hours']:.1f} ore")
+            with col3:
+                st.metric("Battiti Totali", analysis['rr_intervals_count'])
+            
+            # Metriche principali
+            metrics = analysis.get('overall_metrics', {})
+            if metrics:
+                st.subheader("Metriche Principali")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Battito Medio", f"{metrics.get('hr_mean', 0):.1f} bpm")
+                with col2:
+                    st.metric("SDNN", f"{metrics.get('sdnn', 0):.1f} ms")
+                with col3:
+                    st.metric("RMSSD", f"{metrics.get('rmssd', 0):.1f} ms")
+                with col4:
+                    st.metric("Coerenza", f"{metrics.get('coherence', 0):.1f}%")
+            
+            # Pulsanti azione
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("📊 Carica questa analisi", key=f"load_{i}"):
+                    load_analysis_to_session(analysis)
+            with col2:
+                if st.button("🗑️ Elimina", key=f"delete_{i}"):
+                    delete_analysis(i)
+                    st.rerun()
+
+def load_analysis_to_session(analysis):
+    """Carica un'analisi specifica nella sessione corrente"""
+    st.session_state.last_analysis_metrics = analysis.get('overall_metrics')
+    st.session_state.analysis_datetimes = {
+        'start_datetime': datetime.fromisoformat(analysis['recording_start']),
+        'end_datetime': datetime.fromisoformat(analysis['recording_end'])
+    }
+    st.success("✅ Analisi caricata!")
+
+def delete_analysis(analysis_index):
+    """Elimina un'analisi dallo storico"""
+    user_key = get_user_key(st.session_state.user_profile)
+    if user_key and user_key in st.session_state.user_database:
+        analyses = st.session_state.user_database[user_key].get('analyses', [])
+        if 0 <= analysis_index < len(analyses):
+            deleted_analysis = analyses.pop(analysis_index)
+            st.session_state.user_database[user_key]['analyses'] = analyses
+            save_user_database()
+            st.success(f"✅ Analisi del {deleted_analysis.get('saved_at', '')} eliminata!")
+
+# =============================================================================
 # FUNZIONE PRINCIPALE - SENZA NEUROKIT2
 # =============================================================================
 
@@ -2877,9 +2971,12 @@ def main():
                         'overall_metrics': avg_metrics,
                         'daily_metrics': daily_metrics
                     }
-                    st.session_state.user_database[user_key]['analyses'].append(analysis_data)
-                    save_user_database()
-                    st.success("✅ Analisi salvata nel database!")
+                    
+                    # USA LA NUOVA FUNZIONE
+                    if save_analysis_to_history(analysis_data):
+                        st.success("✅ Analisi salvata nello storico!")
+                    else:
+                        st.error("❌ Errore nel salvataggio")
                 else:
                     st.error("❌ Salva prima il profilo utente!")
 
@@ -2903,6 +3000,9 @@ def main():
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
     
     else:
+        # 🆕 NUOVA SEZIONE: STORICO ANALISI (solo quando non c'è file caricato)
+        display_analysis_history()
+        
         # Schermata iniziale
         st.info("""
         ### 👆 Carica un file IBI per iniziare l'analisi
@@ -2917,6 +3017,7 @@ def main():
         - ✅ **Tracciamento attività** completo con modifica/eliminazione
         - ✅ **Analisi alimentazione** con database nutrizionale ESPANSO
         - ✅ **Persistenza dati** - utenti salvati automaticamente
+        - ✅ **Storico analisi** - confronta tutte le tue registrazioni precedenti
         """)
 
 def main_with_auth():
