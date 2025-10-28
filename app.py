@@ -493,6 +493,13 @@ def init_session_state():
 
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     """Calcola metriche HRV realistiche e fisiologicamente corrette"""
+
+    # 🆕 DEBUG: Verifica i parametri di input
+    print(f"DEBUG calculate_realistic_hrv_metrics:")
+    print(f"  - rr_intervals length: {len(rr_intervals) if rr_intervals else 0}")
+    print(f"  - user_age: {user_age}")
+    print(f"  - user_gender: {user_gender}")
+
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
     
@@ -666,6 +673,10 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age):
 
 def get_default_metrics(age, gender):
     """Metriche di default realistiche basate su età e genere SENZA sonno"""
+    
+    # 🆕 DEBUG
+    print(f"DEBUG get_default_metrics: age={age}, gender={gender}")
+    
     age_norm = max(20, min(80, age))
     
     if gender == 'Uomo':
@@ -678,7 +689,7 @@ def get_default_metrics(age, gender):
         base_hr = 72 + (age_norm - 20) * 0.15
     
     # 🆕 MODIFICA: Restituisci SOLO metriche base, NESSUNA metrica sonno
-    return {
+    metrics = {
         'sdnn': max(28, base_sdnn),
         'rmssd': max(20, base_rmssd),
         'hr_mean': base_hr,
@@ -691,6 +702,9 @@ def get_default_metrics(age, gender):
         'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01
         # 🆕 NESSUNA metrica sonno qui!
     }
+    
+    print(f"DEBUG get_default_metrics output keys: {list(metrics.keys())}")
+    return metrics
 
 # =============================================================================
 # SISTEMA ATTIVITÀ E ALIMENTAZIONE
