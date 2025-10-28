@@ -16,21 +16,19 @@ import re
 import tempfile
 import os
 from scipy import stats
-
-# =============================================================================
-# SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
-# =============================================================================
-
 import hashlib
 import smtplib
 from email.mime.text import MIMEText
 import secrets
 import time
 
+# =============================================================================
+# SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
+# =============================================================================
+
 def get_user_accounts_worksheet():
     """Accede al foglio Google Sheets per gli account utenti"""
     try:
-        # Riutilizza la connessione esistente
         scope = ['https://www.googleapis.com/auth/spreadsheets']
         credentials_dict = {
             "type": "service_account",
@@ -50,13 +48,10 @@ def get_user_accounts_worksheet():
         
         try:
             users_worksheet = spreadsheet.worksheet("Foglio1")
-            # Verifica se ha le colonne giuste
             records = users_worksheet.get_all_records()
             if not records or len(records) == 0:
-                # Aggiungi intestazioni se foglio vuoto
                 users_worksheet.append_row(["Email", "PasswordHash", "Name", "Verified", "CreatedAt", "LastLogin"])
         except:
-            # Crea il worksheet se non esiste
             users_worksheet = spreadsheet.add_worksheet(title="Foglio1", rows=1000, cols=10)
             users_worksheet.append_row(["Email", "PasswordHash", "Name", "Verified", "CreatedAt", "LastLogin"])
         
@@ -77,8 +72,7 @@ def authenticate_user(email, password):
             if user.get('Email') == email:
                 password_hash = hashlib.sha256(password.encode()).hexdigest()
                 if user.get('PasswordHash') == password_hash:
-                    # Aggiorna last login
-                    row_index = records.index(user) + 2  # +2 per header e 1-based index
+                    row_index = records.index(user) + 2
                     worksheet.update_cell(row_index, 6, datetime.now().isoformat())
                     return True, f"Benvenuto {user.get('Name', '')}!"
         
@@ -94,12 +88,10 @@ def register_user(email, password, name):
     
     try:
         records = worksheet.get_all_records()
-        # Controlla se l'email esiste già
         for user in records:
             if user.get('Email') == email:
                 return False, "Email già registrata"
         
-        # Aggiungi nuovo utente
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         new_user = [
             email,
@@ -135,14 +127,12 @@ def send_password_reset_email(email):
         if not user_exists:
             return False, "Email non trovata"
         
-        # Genera token sicuro
         token = secrets.token_urlsafe(32)
         PASSWORD_RESET_TOKENS[token] = {
             "email": email,
-            "expires_at": time.time() + 3600  # 1 ora
+            "expires_at": time.time() + 3600
         }
         
-        # Crea il contenuto dell'email
         reset_link = f"https://hrv-analytics.streamlit.app/?token={token}"
         
         message = f"""
@@ -162,12 +152,10 @@ def send_password_reset_email(email):
         """
         
         try:
-            # Configura server SMTP
             server = smtplib.SMTP(EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"])
             server.starttls()
             server.login(EMAIL_CONFIG["sender_email"], EMAIL_CONFIG["sender_password"])
             
-            # Invia email
             msg = MIMEText(message)
             msg["Subject"] = "Reset Password - HRV Analytics"
             msg["From"] = EMAIL_CONFIG["sender_email"]
@@ -184,17 +172,6 @@ def send_password_reset_email(email):
     except Exception as e:
         return False, f"Errore durante il reset password: {str(e)}"
 
-# Configurazione email (per il reset password)
-EMAIL_CONFIG = {
-    "smtp_server": "smtp.libero.it",
-    "smtp_port": 587,
-    "sender_email": "robertocolucci@libero.it",
-    "sender_password": "Hrvanalytics2025@"  # In produzione usa variabili d'ambiente!
-}
-
-# Token per reset password
-PASSWORD_RESET_TOKENS = {}
-
 def reset_password(token, new_password):
     """Reimposta la password con il token"""
     if token not in PASSWORD_RESET_TOKENS:
@@ -202,7 +179,6 @@ def reset_password(token, new_password):
     
     token_data = PASSWORD_RESET_TOKENS[token]
     
-    # Controlla scadenza
     if time.time() > token_data["expires_at"]:
         del PASSWORD_RESET_TOKENS[token]
         return False, "Token scaduto"
@@ -217,11 +193,9 @@ def reset_password(token, new_password):
         records = worksheet.get_all_records()
         for i, user in enumerate(records):
             if user.get('Email') == email:
-                # Aggiorna password
                 password_hash = hashlib.sha256(new_password.encode()).hexdigest()
-                worksheet.update_cell(i + 2, 2, password_hash)  # +2 per header e 1-based index
+                worksheet.update_cell(i + 2, 2, password_hash)
                 
-                # Rimuovi token usato
                 del PASSWORD_RESET_TOKENS[token]
                 
                 return True, "Password reimpostata con successo!"
@@ -231,60 +205,21 @@ def reset_password(token, new_password):
     except Exception as e:
         return False, f"Errore durante il reset: {str(e)}"
 
-# =============================================================================
-# MODIFICA GLI IMPORT E L'AVVIO
-# =============================================================================
+# Configurazione email
+EMAIL_CONFIG = {
+    "smtp_server": "smtp.libero.it",
+    "smtp_port": 587,
+    "sender_email": "robertocolucci@libero.it",
+    "sender_password": "Hrvanalytics2025@"
+}
+
+PASSWORD_RESET_TOKENS = {}
 
 # =============================================================================
-# INIZIALIZZAZIONE SESSION STATE E PERSISTENZA
+# GOOGLE SHEETS DATABASE
 # =============================================================================
 
-# =============================================================================
-# GOOGLE SHEETS DATABASE - SOSTITUISCE IL JSON
-# =============================================================================
-
-def setup_google_sheets():
-    """Configura la connessione a Google Sheets"""
-    try:
-        # Configurazione per Streamlit Cloud (no file credentials)
-        scope = ['https://www.googleapis.com/auth/spreadsheets']
-        
-        # Crea credentials direttamente da environment variables
-        credentials_dict = {
-            "type": "service_account",
-            "project_id": "hrv-analytics",
-            "private_key_id": st.secrets["GOOGLE_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GOOGLE_PRIVATE_KEY"].replace('\\n', '\n'),
-            "client_email": st.secrets["GOOGLE_CLIENT_EMAIL"],
-            "client_id": st.secrets["GOOGLE_CLIENT_ID"],
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-        }
-        
-        creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
-        client = gspread.authorize(creds)
-        
-        # Apri il foglio (sostituisci con il tuo ID)
-        sheet_id = "1y60EPD453xYG8nqb8m4-Xyo6npHZh0ELSh_X4TGRVAw"  # SOSTITUISCI CON IL TUO!
-        spreadsheet = client.open_by_key(sheet_id)
-        
-        # Prendi o crea il worksheet
-        try:
-            worksheet = spreadsheet.worksheet("HRV_Data")
-        except:
-            worksheet = spreadsheet.add_worksheet(title="HRV_Data", rows=1000, cols=20)
-            # Intestazioni
-            worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
-        
-        return worksheet
-    except Exception as e:
-        st.error(f"Errore configurazione Google Sheets: {e}")
-        return None
-# =============================================================================
-# GOOGLE SHEETS DATABASE - SOSTITUISCE IL JSON
-# =============================================================================
-
-def setup_hrv_data_worksheet():  # ✅ RINOMINATA!
+def setup_hrv_data_worksheet():
     """Configura la connessione al foglio HRV_Data per i dati pazienti"""
     try:
         scope = ['https://www.googleapis.com/auth/spreadsheets']
@@ -317,22 +252,6 @@ def setup_hrv_data_worksheet():  # ✅ RINOMINATA!
         st.error(f"Errore configurazione Google Sheets HRV_Data: {e}")
         return None
 
-def test_google_sheets():
-    """Funzione di test per verificare la connessione a Google Sheets"""
-    try:
-        worksheet = setup_google_sheets()
-        if worksheet:
-            # Prova a leggere qualcosa
-            records = worksheet.get_all_records()
-            st.success(f"✅ Connesso a Google Sheets! Trovati {len(records)} record")
-            return True
-        else:
-            st.error("❌ Impossibile connettersi a Google Sheets")
-            return False
-    except Exception as e:
-        st.error(f"❌ Errore connessione Google Sheets: {e}")
-        return False
-
 def load_user_database():
     """Carica il database da Google Sheets con formato data italiano"""
     try:
@@ -344,18 +263,14 @@ def load_user_database():
         user_database = {}
         
         for record in records:
-            if record['User Key']:  # Skip empty rows
-                # Converti la stringa della data in oggetto datetime
+            if record['User Key']:
                 birth_date_str = record['Birth Date']
                 try:
-                    # Prova a parsare il formato italiano dd/mm/yyyy
                     birth_date = datetime.strptime(birth_date_str, '%d/%m/%Y').date()
                 except ValueError:
                     try:
-                        # Se fallisce, prova il formato yyyy-mm-dd (per compatibilità)
                         birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
                     except ValueError:
-                        # Se fallisce ancora, usa una data di default
                         st.warning(f"Formato data non riconosciuto: {birth_date_str}")
                         birth_date = datetime(1980, 1, 1).date()
                 
@@ -363,7 +278,7 @@ def load_user_database():
                     'profile': {
                         'name': record['Name'],
                         'surname': record['Surname'],
-                        'birth_date': birth_date,  # Ora è un oggetto date
+                        'birth_date': birth_date,
                         'gender': record['Gender'],
                         'age': record['Age']
                     },
@@ -382,15 +297,12 @@ def save_user_database():
         if not worksheet:
             return False
         
-        # Pulisci il foglio (tranne l'intestazione)
         worksheet.clear()
         worksheet.append_row(["User Key", "Name", "Surname", "Birth Date", "Gender", "Age", "Analyses"])
         
-        # Salva tutti gli utenti con formato data italiano
         for user_key, user_data in st.session_state.user_database.items():
             profile = user_data['profile']
             
-            # Converti la data in formato italiano
             if hasattr(profile['birth_date'], 'strftime'):
                 birth_date_str = profile['birth_date'].strftime('%d/%m/%Y')
             else:
@@ -400,7 +312,7 @@ def save_user_database():
                 user_key,
                 profile['name'],
                 profile['surname'],
-                birth_date_str,  # Ora in formato italiano!
+                birth_date_str,
                 profile['gender'],
                 profile['age'],
                 json.dumps(user_data.get('analyses', []), default=str)
@@ -438,18 +350,15 @@ def get_user_key(user_profile):
     if not user_profile['name'] or not user_profile['surname'] or not user_profile['birth_date']:
         return None
     
-    # Converti la data in formato stringa italiano dd/mm/yyyy
     if hasattr(user_profile['birth_date'], 'strftime'):
         birth_date_str = user_profile['birth_date'].strftime('%d/%m/%Y')
     else:
-        # Se già è una stringa, assumiamo sia già nel formato italiano
         birth_date_str = str(user_profile['birth_date'])
     
     return f"{user_profile['name'].lower()}_{user_profile['surname'].lower()}_{birth_date_str}"
 
 def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
-    # Carica il database all'inizio
     if 'user_database' not in st.session_state:
         st.session_state.user_database = load_user_database()
     
@@ -492,32 +401,26 @@ def init_session_state():
 # =============================================================================
 
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
-    """Calcola metriche HRV realistiche e fisiologicamente corrette SENZA SONNO"""
+    """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
     
-    # Filtraggio outliers più conservativo
     clean_rr = filter_rr_outliers(rr_intervals)
     
     if len(clean_rr) < 10:
         return get_default_metrics(user_age, user_gender)
     
-    # Calcoli fondamentali
     rr_mean = np.mean(clean_rr)
     hr_mean = 60000 / rr_mean
     
-    # SDNN - Variabilità totale
     sdnn = np.std(clean_rr, ddof=1)
     
-    # RMSSD - Variabilità a breve termine
     differences = np.diff(clean_rr)
     rmssd = np.sqrt(np.mean(np.square(differences)))
     
-    # Adjust per età e genere con valori fisiologici corretti
     sdnn = adjust_for_age_gender(sdnn, user_age, user_gender, 'sdnn')
     rmssd = adjust_for_age_gender(rmssd, user_age, user_gender, 'rmssd')
     
-    # CALCOLI SPETTRALI REALISTICI
     if user_age < 30:
         base_power = 3500 + np.random.normal(0, 300)
     elif user_age < 50:
@@ -525,16 +428,13 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     else:
         base_power = 1500 + np.random.normal(0, 200)
     
-    # Adjust per variabilità individuale
     variability_factor = max(0.5, min(2.0, sdnn / 45))
     total_power = base_power * variability_factor
     
-    # Distribuzione spettrale realistica basata su studi
     vlf_percentage = 0.15 + np.random.normal(0, 0.02)
     lf_percentage = 0.35 + np.random.normal(0, 0.04)
     hf_percentage = 0.50 + np.random.normal(0, 0.04)
     
-    # Normalizza le percentuali
     total_percentage = vlf_percentage + lf_percentage + hf_percentage
     vlf_percentage /= total_percentage
     lf_percentage /= total_percentage  
@@ -545,11 +445,10 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     hf = total_power * hf_percentage
     lf_hf_ratio = lf / hf if hf > 0 else 1.2
     
-    # Coerenza cardiaca realistica
     coherence = calculate_hrv_coherence(clean_rr, hr_mean, user_age)
     
-    # 🆕 MODIFICA: RESTITUISCI SOLO METRICHE BASE, NIENTE SONNO
-    return {
+    # Metriche base SENZA sonno
+    metrics = {
         'sdnn': max(25, min(180, sdnn)),
         'rmssd': max(15, min(120, rmssd)),
         'hr_mean': max(45, min(100, hr_mean)),
@@ -560,8 +459,20 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
         'lf': max(200, min(4000, lf)),
         'hf': max(200, min(4000, hf)),
         'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio))
-        # 🆕 NESSUNA METRICA SONNO!
     }
+    
+    # AGGIUNGI METRICHE SONNO VUOTE PER COMPATIBILITÀ
+    metrics.update({
+        'sleep_duration': 0,
+        'sleep_efficiency': 0,
+        'sleep_hr': 0,
+        'sleep_light': 0,
+        'sleep_deep': 0,
+        'sleep_rem': 0,
+        'sleep_awake': 0
+    })
+    
+    return metrics
 
 def filter_rr_outliers(rr_intervals):
     """Filtra gli artefatti in modo conservativo"""
@@ -570,7 +481,6 @@ def filter_rr_outliers(rr_intervals):
     
     rr_array = np.array(rr_intervals)
     
-    # Approccio conservativo per dati reali
     q25, q75 = np.percentile(rr_array, [25, 75])
     iqr = q75 - q25
     
@@ -586,11 +496,9 @@ def adjust_for_age_gender(value, age, gender, metric_type):
     age_norm = max(20, min(80, age))
     
     if metric_type == 'sdnn':
-        # SDNN diminuisce con l'età
         age_factor = 1.0 - (age_norm - 20) * 0.008
         gender_factor = 0.92 if gender == 'Donna' else 1.0
     elif metric_type == 'rmssd':
-        # RMSSD diminuisce più rapidamente con l'età
         age_factor = 1.0 - (age_norm - 20) * 0.012
         gender_factor = 0.88 if gender == 'Donna' else 1.0
     else:
@@ -603,64 +511,14 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
     if len(rr_intervals) < 30:
         return 55 + np.random.normal(0, 8)
     
-    # Coerenza basata su HRV e età
     base_coherence = 50 + (70 - hr_mean) * 0.3 - (max(20, age) - 20) * 0.2
     coherence_variation = max(10, min(30, (np.std(rr_intervals) / np.mean(rr_intervals)) * 100))
     coherence = base_coherence + np.random.normal(0, coherence_variation/3)
     
     return max(25, min(90, coherence))
 
-def estimate_sleep_metrics(rr_intervals, hr_mean, age):
-    """Stima le metriche del sonno realistiche con tutte le fasi"""
-    try:
-        if len(rr_intervals) > 1000:
-            # Per registrazioni lunghe, stima più accurata
-            sleep_hours = 7.2 + np.random.normal(0, 0.8)
-            sleep_duration = min(9.5, max(5, sleep_hours))
-            sleep_hr = hr_mean * (0.78 + np.random.normal(0, 0.03))
-            sleep_efficiency = 88 + np.random.normal(0, 6)
-        else:
-            # Per registrazioni brevi, stima conservativa
-            sleep_duration = 7.0
-            sleep_hr = hr_mean - 10 + (age - 30) * 0.1
-            sleep_efficiency = 85
-        
-        # Distribuzione fasi sonno REALISTICA con tutte le fasi
-        sleep_light = sleep_duration * (0.50 + np.random.normal(0, 0.04))  # 50% sonno leggero
-        sleep_deep = sleep_duration * (0.20 + np.random.normal(0, 0.03))   # 20% sonno profondo
-        sleep_rem = sleep_duration * (0.20 + np.random.normal(0, 0.03))    # 20% sonno REM
-        sleep_awake = sleep_duration * (0.10 + np.random.normal(0, 0.02))  # 10% risvegli
-        
-        # Normalizza per assicurare che la somma sia sleep_duration
-        total = sleep_light + sleep_deep + sleep_rem + sleep_awake
-        sleep_light = sleep_light * sleep_duration / total
-        sleep_deep = sleep_deep * sleep_duration / total
-        sleep_rem = sleep_rem * sleep_duration / total
-        sleep_awake = sleep_awake * sleep_duration / total
-        
-        return {
-            'duration': max(4.5, min(10, sleep_duration)),
-            'efficiency': max(75, min(98, sleep_efficiency)),
-            'hr': max(45, min(75, sleep_hr)),
-            'light': sleep_light,
-            'deep': sleep_deep,
-            'rem': sleep_rem,
-            'awake': sleep_awake
-        }
-    except Exception as e:
-        # In caso di errore, restituisci valori di default
-        return {
-            'duration': 0,  # Durata 0 = nessun sonno
-            'efficiency': 0,
-            'hr': 0,
-            'light': 0,
-            'deep': 0,
-            'rem': 0,
-            'awake': 0
-        }
-
 def get_default_metrics(age, gender):
-    """Metriche di default realistiche basate su età e genere SENZA sonno"""
+    """Metriche di default realistiche basate su età e genere"""
     age_norm = max(20, min(80, age))
     
     if gender == 'Uomo':
@@ -672,8 +530,7 @@ def get_default_metrics(age, gender):
         base_rmssd = 35 - (age_norm - 20) * 0.3
         base_hr = 72 + (age_norm - 20) * 0.15
     
-    # 🆕 MODIFICA: SOLO METRICHE BASE
-    return {
+    metrics = {
         'sdnn': max(28, base_sdnn),
         'rmssd': max(20, base_rmssd),
         'hr_mean': base_hr,
@@ -683,23 +540,24 @@ def get_default_metrics(age, gender):
         'vlf': 400 - (age_norm - 20) * 5,
         'lf': 1000 - (age_norm - 20) * 15,
         'hf': 1400 - (age_norm - 20) * 20,
-        'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01
-        # 🆕 NESSUNA METRICA SONNO!
+        'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01,
+        # Metriche sonno vuote
+        'sleep_duration': 0,
+        'sleep_efficiency': 0,
+        'sleep_hr': 0,
+        'sleep_light': 0,
+        'sleep_deep': 0,
+        'sleep_rem': 0,
+        'sleep_awake': 0
     }
     
-    print(f"DEBUG get_default_metrics output keys: {list(metrics.keys())}")
     return metrics
-
-# =============================================================================
-# SISTEMA ATTIVITÀ E ALIMENTAZIONE
-# =============================================================================
 
 # =============================================================================
 # DATABASE NUTRIZIONALE SUPER DETTAGLIATO
 # =============================================================================
 
 NUTRITION_DB = {
-    # CARBOIDRATI COMPLESSI
     "pasta integrale": {
         "category": "carboidrato", "subcategory": "cereale integrale", "inflammatory_score": -1,
         "glycemic_index": "medio-basso", "glycemic_load": "medio", "recovery_impact": 2,
@@ -736,16 +594,6 @@ NUTRITION_DB = {
         "tags": ["energia rapida", "infiammatorio"]
     },
 
-    "pane bianco": {
-        "category": "carboidrato", "subcategory": "cereale raffinato", "inflammatory_score": 3,
-        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -3,
-        "calories_per_100g": 265, "typical_portion": 50, "protein_g": 9, "carbs_g": 49, "fiber_g": 2.7, "fat_g": 3.2,
-        "micronutrients": ["Calcio", "Ferro"], "allergens": ["glutine"],
-        "best_time": "colazione", "sleep_impact": "negativo", "hrv_impact": "negativo",
-        "tags": ["picco glicemico", "gonfiore"]
-    },
-
-    # PROTEINE ANIMALI
     "salmone": {
         "category": "proteina", "subcategory": "pesce grasso", "inflammatory_score": -4,
         "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 5,
@@ -755,34 +603,6 @@ NUTRITION_DB = {
         "tags": ["anti-infiammatorio", "cervello", "cuore"]
     },
 
-    "tonno": {
-        "category": "proteina", "subcategory": "pesce magro", "inflammatory_score": -2,
-        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
-        "calories_per_100g": 132, "typical_portion": 150, "protein_g": 28, "carbs_g": 0, "fiber_g": 0, "fat_g": 1,
-        "omega3_epa_dha": "300mg", "micronutrients": ["Selenio", "Vitamina B3", "Vitamina B12", "Fosforo"],
-        "allergens": ["pesce"], "best_time": "pranzo", "sleep_impact": "positivo", "hrv_impact": "positivo",
-        "tags": ["proteico", "metabolismo"]
-    },
-
-    "petto di pollo": {
-        "category": "proteina", "subcategory": "carne bianca", "inflammatory_score": 0,
-        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 2,
-        "calories_per_100g": 165, "typical_portion": 150, "protein_g": 31, "carbs_g": 0, "fiber_g": 0, "fat_g": 3.6,
-        "micronutrients": ["Vitamina B6", "Niacina", "Selenio", "Fosforo"], "allergens": [],
-        "best_time": "pranzo/cena", "sleep_impact": "neutro", "hrv_impact": "lieve positivo",
-        "tags": ["magro", "muscoli"]
-    },
-
-    "uova": {
-        "category": "proteina", "subcategory": "uova", "inflammatory_score": -1,
-        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
-        "calories_per_100g": 155, "typical_portion": 100, "protein_g": 13, "carbs_g": 1.1, "fiber_g": 0, "fat_g": 11,
-        "cholesterol_mg": 373, "micronutrients": ["Colina", "Vitamina D", "Selenio", "Luteina"],
-        "allergens": ["uova"], "best_time": "colazione", "sleep_impact": "positivo", "hrv_impact": "positivo",
-        "tags": ["colina", "occhi", "cervello"]
-    },
-
-    # VEGETALI
     "spinaci": {
         "category": "vegetale", "subcategory": "verdura a foglia verde", "inflammatory_score": -5,
         "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 4,
@@ -792,25 +612,6 @@ NUTRITION_DB = {
         "tags": ["antiossidante", "sangue", "visione"]
     },
 
-    "broccoli": {
-        "category": "vegetale", "subcategory": "crucifere", "inflammatory_score": -4,
-        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 4,
-        "calories_per_100g": 34, "typical_portion": 200, "protein_g": 2.8, "carbs_g": 7, "fiber_g": 2.6, "fat_g": 0.4,
-        "micronutrients": ["Vitamina C", "Vitamina K", "Folati", "Potassio"], "allergens": [],
-        "best_time": "cena", "sleep_impact": "positivo", "hrv_impact": "molto positivo",
-        "tags": ["detox", "anti-cancro", "digestivo"]
-    },
-
-    "avocado": {
-        "category": "grasso", "subcategory": "frutta grassa", "inflammatory_score": -3,
-        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
-        "calories_per_100g": 160, "typical_portion": 100, "protein_g": 2, "carbs_g": 9, "fiber_g": 7, "fat_g": 15,
-        "micronutrients": ["Potassio", "Vitamina E", "Vitamina K", "Folati"], "allergens": [],
-        "best_time": "colazione/pranzo", "sleep_impact": "positivo", "hrv_impact": "positivo",
-        "tags": ["grassi buoni", "sazietà", "pelle"]
-    },
-
-    # FRUTTA
     "frutti di bosco": {
         "category": "frutta", "subcategory": "bacche", "inflammatory_score": -4,
         "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 4,
@@ -820,35 +621,6 @@ NUTRITION_DB = {
         "tags": ["antiossidante", "cervello", "anti-age"]
     },
 
-    "banana": {
-        "category": "frutta", "subcategory": "frutta tropicale", "inflammatory_score": 0,
-        "glycemic_index": "medio", "glycemic_load": "medio", "recovery_impact": 2,
-        "calories_per_100g": 89, "typical_portion": 120, "protein_g": 1.1, "carbs_g": 23, "fiber_g": 2.6, "fat_g": 0.3,
-        "micronutrients": ["Potassio", "Vitamina B6", "Magnesio", "Vitamina C"], "allergens": [],
-        "best_time": "pre/post allenamento", "sleep_impact": "positivo", "hrv_impact": "positivo",
-        "tags": ["energia", "crampi", "recupero"]
-    },
-
-    # GRASSI
-    "olio d'oliva extravergine": {
-        "category": "grasso", "subcategory": "olio", "inflammatory_score": -3,
-        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
-        "calories_per_100g": 884, "typical_portion": 10, "protein_g": 0, "carbs_g": 0, "fiber_g": 0, "fat_g": 100,
-        "micronutrients": ["Vitamina E", "Vitamina K", "Polifenoli", "Oleocantale"], "allergens": [],
-        "best_time": "a crudo tutti i pasti", "sleep_impact": "positivo", "hrv_impact": "positivo",
-        "tags": ["anti-infiammatorio", "cuore", "cervello"]
-    },
-
-    "frutta secca (noci/mandorle)": {
-        "category": "grasso", "subcategory": "semi oleosi", "inflammatory_score": -2,
-        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": 3,
-        "calories_per_100g": 607, "typical_portion": 30, "protein_g": 20, "carbs_g": 21, "fiber_g": 7, "fat_g": 54,
-        "micronutrients": ["Magnesio", "Vitamina E", "Selenio", "Omega-3"], "allergens": ["frutta a guscio"],
-        "best_time": "spuntino", "sleep_impact": "positivo", "hrv_impact": "positivo",
-        "tags": ["snack sano", "cuore", "memoria"]
-    },
-
-    # DA LIMITARE
     "zucchero bianco": {
         "category": "zucchero", "subcategory": "zucchero raffinato", "inflammatory_score": 5,
         "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -4,
@@ -856,24 +628,6 @@ NUTRITION_DB = {
         "micronutrients": [], "allergens": [], "best_time": "da evitare",
         "sleep_impact": "molto negativo", "hrv_impact": "molto negativo",
         "tags": ["infiammatorio", "picco glicemico", "dipendenza"]
-    },
-
-    "dolci industriali": {
-        "category": "zucchero", "subcategory": "ultra-processato", "inflammatory_score": 4,
-        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -3,
-        "calories_per_100g": 450, "typical_portion": 100, "protein_g": 5, "carbs_g": 60, "fiber_g": 1, "fat_g": 22,
-        "micronutrients": [], "allergens": ["glutine", "latticini", "soia"], "best_time": "da evitare",
-        "sleep_impact": "negativo", "hrv_impact": "negativo",
-        "tags": ["grassi trans", "additivi", "gonfiore"]
-    },
-
-    "alcolici": {
-        "category": "alcol", "subcategory": "bevanda alcolica", "inflammatory_score": 4,
-        "glycemic_index": "variabile", "glycemic_load": "medio", "recovery_impact": -4,
-        "calories_per_100g": 200, "typical_portion": 150, "protein_g": 0, "carbs_g": 5, "fiber_g": 0, "fat_g": 0,
-        "micronutrients": [], "allergens": [], "best_time": "da limitare",
-        "sleep_impact": "molto negativo", "hrv_impact": "molto negativo",
-        "tags": ["disidrata", "fegato", "qualità sonno"]
     }
 }
 
@@ -927,15 +681,6 @@ ACTIVITY_IMPACT_DB = {
         "risks": ["infortuni", "cortisolo"], "prerequisites": ["tecnica", "recupero"]
     },
     
-    "bodyweight": {
-        "category": "strength", "intensity": "medium", "duration_optimal": (20, 40),
-        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 1,
-        "metabolic_impact": 2, "stress_impact": -1, "sleep_impact": 1,
-        "best_time": "mattina/sera", "frequency": "daily",
-        "hr_zones": ["Z2", "Z3"], "benefits": ["funzionale", "flessibilità"],
-        "risks": ["minimi"], "prerequisites": ["progressività"]
-    },
-
     "yoga": {
         "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
         "hrv_impact_immediate": 2, "hrv_impact_24h": 3, "recovery_impact": 4,
@@ -954,15 +699,6 @@ ACTIVITY_IMPACT_DB = {
         "risks": ["nessuno"], "prerequisites": ["costanza"]
     },
     
-    "respirazione consapevole": {
-        "category": "recovery", "intensity": "light", "duration_optimal": (5, 15),
-        "hrv_impact_immediate": 4, "hrv_impact_24h": 1, "recovery_impact": 2,
-        "metabolic_impact": 0, "stress_impact": -3, "sleep_impact": 1,
-        "best_time": "qualsiasi", "frequency": "multipla giornaliera",
-        "hr_zones": ["Z1"], "benefits": ["coerenza immediata", "ansia", "focus"],
-        "risks": ["nessuno"], "prerequisites": ["tecnica base"]
-    },
-
     "camminata": {
         "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
         "hrv_impact_immediate": 1, "hrv_impact_24h": 2, "recovery_impact": 2,
@@ -970,15 +706,6 @@ ACTIVITY_IMPACT_DB = {
         "best_time": "qualsiasi", "frequency": "daily",
         "hr_zones": ["Z1", "Z2"], "benefits": ["circolazione", "umore", "digestione"],
         "risks": ["minimi"], "prerequisites": ["scarpe adatte"]
-    },
-    
-    "stretching": {
-        "category": "recovery", "intensity": "light", "duration_optimal": (10, 20),
-        "hrv_impact_immediate": 1, "hrv_impact_24h": 1, "recovery_impact": 2,
-        "metabolic_impact": 0, "stress_impact": -1, "sleep_impact": 1,
-        "best_time": "mattina/sera", "frequency": "daily",
-        "hr_zones": ["Z1"], "benefits": ["mobilità", "recupero muscolare"],
-        "risks": ["stiramenti"], "prerequisites": ["riscaldamento"]
     }
 }
 
@@ -1003,14 +730,6 @@ SUPPLEMENTS_DB = {
         "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
     },
     
-    "vitamina D": {
-        "category": "vitamina", "timing": "mattina", "dosage_optimal": (1000, 4000),
-        "hrv_impact": 2, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
-        "mechanism": "modulazione immunitaria, umore", "best_for": ["immunità", "umore", "ossa"],
-        "synergies": ["K2", "magnesio"], "contraindications": ["ipercalcemia"],
-        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
-    },
-    
     "ashwagandha": {
         "category": "adattogeno", "timing": "sera", "dosage_optimal": (300, 600),
         "hrv_impact": 3, "recovery_impact": 2, "sleep_impact": 2, "stress_impact": -4,
@@ -1025,438 +744,11 @@ SUPPLEMENTS_DB = {
         "mechanism": "onde alfa cerebrali, GABA", "best_for": ["ansia", "focus", "rilassamento"],
         "synergies": ["caffeina", "ashwagandha"], "contraindications": ["minime"],
         "evidence": "alta", "onset_time": "30-60 min", "duration": "4-6 ore"
-    },
-    
-    "probiotici": {
-        "category": "digestivo", "timing": "mattina", "dosage_optimal": (1, 10), # miliardi
-        "hrv_impact": 1, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
-        "mechanism": "asse intestino-cervello", "best_for": ["digestione", "umore", "immunità"],
-        "synergies": ["prebiotici"], "contraindications": ["immunodepressione"],
-        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
-    },
-    
-    "melatonina": {
-        "category": "ormone", "timing": "pre-sonno", "dosage_optimal": (0.5, 3),
-        "hrv_impact": 2, "recovery_impact": 2, "sleep_impact": 4, "stress_impact": -2,
-        "mechanism": "ritmo circadiano", "best_for": ["sonno", "jet lag"],
-        "synergies": ["magnesio"], "contraindications": ["autoimmuni"],
-        "evidence": "alta", "onset_time": "30 min", "duration": "6-8 ore"
-    },
-    
-    "creatina": {
-        "category": "performance", "timing": "pre/post workout", "dosage_optimal": (3000, 5000),
-        "hrv_impact": 0, "recovery_impact": 2, "sleep_impact": 0, "stress_impact": 0,
-        "mechanism": "sistema fosfageno", "best_for": ["forza", "potenza"],
-        "synergies": ["carboidrati"], "contraindications": ["renali"],
-        "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
     }
 }
 
 # =============================================================================
 # SISTEMA AVANZATO DI ANALISI IMPATTO
-# =============================================================================
-
-def calculate_comprehensive_impact(activities, daily_metrics, timeline, user_profile):
-    """Analisi completa dell'impatto di tutte le attività sull'HRV"""
-    
-    impact_report = {
-        'daily_summary': calculate_daily_impact_summary(activities, daily_metrics),
-        'activity_analysis': analyze_activities_impact(activities, daily_metrics, timeline),
-        'nutrition_analysis': analyze_nutritional_impact(activities),
-        'supplement_analysis': analyze_supplements_impact(activities),
-        'recovery_analysis': analyze_recovery_status(activities, daily_metrics, user_profile),
-        'personalized_recommendations': generate_comprehensive_recommendations(activities, daily_metrics, user_profile),
-        'risk_factors': identify_risk_factors(activities, daily_metrics),
-        'optimization_opportunities': find_optimization_opportunities(activities, daily_metrics, user_profile)
-    }
-    
-    return impact_report
-
-def calculate_daily_impact_summary(activities, daily_metrics):
-    """Calcola il sommario giornaliero dell'impatto"""
-    return {
-        'net_impact': calculate_net_impact(activities, daily_metrics),
-        'recovery_score': calculate_recovery_score(activities, daily_metrics),
-        'activity_count': len([a for a in activities if a['type'] == 'Allenamento']),
-        'nutrition_score': calculate_nutrition_score(activities)
-    }
-
-def calculate_net_impact(activities, daily_metrics):
-    """Calcola l'impatto netto complessivo"""
-    net_impact = 0
-    for activity in activities:
-        if activity['type'] == 'Allenamento':
-            net_impact += 1  # Placeholder - da implementare
-        elif activity['type'] == 'Alimentazione':
-            net_impact -= 0.5  # Placeholder
-    return net_impact
-
-def calculate_recovery_score(activities, daily_metrics):
-    """Calcola lo score di recupero"""
-    return 7  # Placeholder
-
-def calculate_nutrition_score(activities):
-    """Calcola lo score nutrizionale"""
-    return 8  # Placeholder
-
-def analyze_activities_impact(activities, daily_metrics, timeline):
-    """Analisi dettagliata impatto attività fisiche"""
-    
-    activity_analysis = []
-    
-    for activity in activities:
-        if activity['type'] == "Allenamento":
-            analysis = analyze_training_impact(activity, daily_metrics, timeline)
-            activity_analysis.append(analysis)
-        elif activity['type'] == "Alimentazione":
-            analysis = analyze_nutrition_impact(activity, daily_metrics)
-            activity_analysis.append(analysis)
-        elif activity['type'] == "Riposo":  # 🆕 AGGIUNGI QUESTO!
-            analysis = analyze_recovery_impact(activity, daily_metrics)
-            activity_analysis.append(analysis)
-        elif activity['type'] == "Stress":  # 🆕 E ANCHE QUESTO!
-            analysis = analyze_stress_impact(activity, daily_metrics)
-            activity_analysis.append(analysis)
-        elif activity['type'] == "Altro":  # 🆕 E ANCHE QUESTO!
-            analysis = analyze_other_impact(activity, daily_metrics)
-            activity_analysis.append(analysis)
-    
-    return activity_analysis
-
-def analyze_training_impact(activity, daily_metrics, timeline):
-    """Analisi specifica per allenamenti"""
-    
-    activity_name = activity['name'].lower()
-    impact_data = ACTIVITY_IMPACT_DB.get(activity_name, {})
-    
-    # Trova il giorno dell'attività
-    activity_day = activity['start_time'].date().isoformat()
-    day_metrics = daily_metrics.get(activity_day, {})
-    
-    # Calcola impatto osservato vs atteso
-    expected_impact = impact_data.get('hrv_impact_24h', 0)
-    observed_impact = calculate_observed_hrv_impact(activity, day_metrics, timeline)
-    
-    analysis = {
-        'activity': activity,
-        'expected_impact': expected_impact,
-        'observed_impact': observed_impact,
-        'impact_difference': observed_impact - expected_impact,
-        'recovery_status': assess_recovery_status(activity, day_metrics),
-        'recommendations': generate_training_recommendations(activity, observed_impact, expected_impact)
-    }
-    
-    return analysis
-
-def calculate_observed_hrv_impact(activity, day_metrics, timeline):
-    """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
-    return 0  # Placeholder - da implementare con analisi temporale
-
-def assess_recovery_status(activity, day_metrics):
-    """Valuta lo stato di recupero"""
-    return "good"  # Placeholder
-
-def generate_training_recommendations(activity, observed_impact, expected_impact):
-    """Genera raccomandazioni per l'allenamento"""
-    return ["Mantieni questo tipo di allenamento"]  # Placeholder
-
-def analyze_nutritional_impact(activities):
-    """Analisi impatto nutrizionale"""
-    return {
-        'inflammatory_score': 0,
-        'recovery_score': 0,
-        'sleep_impact': 0,
-        'total_calories': 0
-    }  # Placeholder
-
-def analyze_supplements_impact(activities):
-    """Analisi impatto integratori"""
-    return {
-        'total_hrv_impact': 0,
-        'sleep_impact': 0,
-        'stress_impact': 0
-    }  # Placeholder
-
-def analyze_recovery_status(activities, daily_metrics, user_profile):
-    """Analisi stato di recupero"""
-    return {"status": "good"}  # Placeholder
-
-def generate_comprehensive_recommendations(activities, daily_metrics, user_profile):
-    """Genera raccomandazioni complete"""
-    return [
-        "Continua con l'allenamento moderato",
-        "Migliora l'idratazione durante il giorno",
-        "Considera integratori di magnesio per il sonno"
-    ]  # Placeholder
-
-def identify_risk_factors(activities, daily_metrics):
-    """Identifica fattori di rischio"""
-    return []  # Placeholder
-
-def find_optimization_opportunities(activities, daily_metrics, user_profile):
-    """Trova opportunità di ottimizzazione"""
-    return []  # Placeholder
-
-def display_impact_analysis(impact_report):
-    """Visualizza i risultati dell'analisi di impatto"""
-    
-    # 1. SOMMARIO GIORNALIERO
-    st.subheader("📊 Sommario Giornaliero")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Impatto Attività Netto", 
-                 f"{impact_report['daily_summary'].get('net_impact', 0):+.1f}")
-    
-    with col2:
-        st.metric("Score Recupero", 
-                 f"{impact_report['daily_summary'].get('recovery_score', 0)}/10")
-    
-    with col3:
-        st.metric("Bilancio Nutrizionale", 
-                 f"{impact_report['nutrition_analysis'].get('inflammatory_score', 0):+.1f}")
-    
-    with col4:
-        st.metric("Impatto Integratori", 
-                 f"{impact_report['supplement_analysis'].get('total_hrv_impact', 0):+.1f}")
-    
-    # 2. ANALISI DETTAGLIATA PER CATEGORIA
-    with st.expander("🧘 Analisi Dettagliata Attività", expanded=True):
-        for activity_analysis in impact_report['activity_analysis']:
-            display_activity_analysis(activity_analysis)
-    
-    # 3. RACCOMANDAZIONI PERSONALIZZATE
-    with st.expander("💡 Raccomandazioni Personalizzate", expanded=True):
-        for recommendation in impact_report['personalized_recommendations']:
-            st.write(f"• {recommendation}")
-
-def display_activity_analysis(analysis):
-    """Visualizza l'analisi di una singola attività"""
-    
-    activity = analysis['activity']
-    
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
-    
-    with col1:
-        st.write(f"**{activity['name']}**")
-        st.write(f"{activity['start_time'].strftime('%H:%M')} - {activity['duration']}min")
-    
-    with col2:
-        impact_diff = analysis['impact_difference']
-        color = "green" if impact_diff >= 0 else "red"
-        st.write(f"Impatto: :{color}[{impact_diff:+.1f}]")
-    
-    with col3:
-        st.write(f"Recupero: {analysis['recovery_status']}")
-    
-    with col4:
-        for rec in analysis['recommendations'][:1]:  # Prima raccomandazione
-            st.write(f"💡 {rec}")
-
-def analyze_stress_impact(activity, daily_metrics):
-    """Analisi impatto attività stressanti"""
-    return {
-        'activity': activity,
-        'expected_impact': -2,
-        'observed_impact': -1,
-        'type': 'stress',
-        'recovery_status': 'poor',
-        'recommendations': ["🧘 Considera tecniche di respirazione per gestire lo stress"]
-    }
-
-def analyze_other_impact(activity, daily_metrics):
-    """Analisi impatto altre attività"""
-    return {
-        'activity': activity,
-        'expected_impact': 0,
-        'observed_impact': 0,
-        'type': 'other',
-        'recovery_status': 'unknown',
-        'recommendations': ["📝 Attività registrata"]
-    }
-
-# =============================================================================
-# DATABASE COMPLETO ATTIVITÀ FISICHE + IMPATTO HRV
-# =============================================================================
-
-ACTIVITY_IMPACT_DB = {
-    # ALLENAMENTI CARDIO
-    "corsa leggera": {
-        "category": "cardio", "intensity": "light", "duration_optimal": (30, 45),
-        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 2,
-        "metabolic_impact": 3, "stress_impact": -2, "sleep_impact": 1,
-        "best_time": "mattina", "frequency": "daily",
-        "hr_zones": ["Z2", "Z3"], "benefits": ["cardiovascolare", "umore", "metabolismo"],
-        "risks": ["infortuni overuse"], "prerequisites": ["riscaldamento"]
-    },
-    
-    "corsa intensa": {
-        "category": "cardio", "intensity": "high", "duration_optimal": (20, 35),
-        "hrv_impact_immediate": -3, "hrv_impact_24h": 1, "recovery_impact": -1,
-        "metabolic_impact": 4, "stress_impact": 1, "sleep_impact": -1,
-        "best_time": "mattina", "frequency": "2-3x/settimana",
-        "hr_zones": ["Z4", "Z5"], "benefits": ["VO2max", "performance"],
-        "risks": ["overtraining", "cortisolo"], "prerequisites": ["base aerobica", "recupero"]
-    },
-    
-    "ciclismo": {
-        "category": "cardio", "intensity": "medium", "duration_optimal": (45, 120),
-        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 1,
-        "metabolic_impact": 3, "stress_impact": -2, "sleep_impact": 1,
-        "best_time": "mattina/pomeriggio", "frequency": "3-5x/settimana",
-        "hr_zones": ["Z2", "Z3"], "benefits": ["resistenza", "articolazioni"],
-        "risks": ["postura"], "prerequisites": ["bike fit"]
-    },
-    
-    "nuoto": {
-        "category": "cardio", "intensity": "medium", "duration_optimal": (30, 60),
-        "hrv_impact_immediate": 0, "hrv_impact_24h": 3, "recovery_impact": 3,
-        "metabolic_impact": 2, "stress_impact": -3, "sleep_impact": 2,
-        "best_time": "qualsiasi", "frequency": "daily",
-        "hr_zones": ["Z2", "Z3"], "benefits": ["full body", "low impact", "respirazione"],
-        "risks": ["minimi"], "prerequisites": ["tecnica"]
-    },
-
-    # ALLENAMENTI FORZA
-    "sollevamento pesi": {
-        "category": "strength", "intensity": "high", "duration_optimal": (45, 90),
-        "hrv_impact_immediate": -2, "hrv_impact_24h": 1, "recovery_impact": -1,
-        "metabolic_impact": 4, "stress_impact": 1, "sleep_impact": 0,
-        "best_time": "pomeriggio", "frequency": "3-4x/settimana",
-        "hr_zones": ["Z3", "Z4"], "benefits": ["muscolo", "metabolismo", "ossa"],
-        "risks": ["infortuni", "cortisolo"], "prerequisites": ["tecnica", "recupero"]
-    },
-    
-    "bodyweight": {
-        "category": "strength", "intensity": "medium", "duration_optimal": (20, 40),
-        "hrv_impact_immediate": -1, "hrv_impact_24h": 2, "recovery_impact": 1,
-        "metabolic_impact": 2, "stress_impact": -1, "sleep_impact": 1,
-        "best_time": "mattina/sera", "frequency": "daily",
-        "hr_zones": ["Z2", "Z3"], "benefits": ["funzionale", "flessibilità"],
-        "risks": ["minimi"], "prerequisites": ["progressività"]
-    },
-
-    # ATTIVITÀ RIGENERATIVE
-    "yoga": {
-        "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
-        "hrv_impact_immediate": 2, "hrv_impact_24h": 3, "recovery_impact": 4,
-        "metabolic_impact": 1, "stress_impact": -4, "sleep_impact": 3,
-        "best_time": "mattina/sera", "frequency": "daily",
-        "hr_zones": ["Z1", "Z2"], "benefits": ["flessibilità", "respirazione", "parasimpatico"],
-        "risks": ["minimi"], "prerequisites": ["asana base"]
-    },
-    
-    "meditazione": {
-        "category": "recovery", "intensity": "light", "duration_optimal": (10, 30),
-        "hrv_impact_immediate": 3, "hrv_impact_24h": 2, "recovery_impact": 3,
-        "metabolic_impact": 0, "stress_impact": -5, "sleep_impact": 2,
-        "best_time": "mattina/sera", "frequency": "daily",
-        "hr_zones": ["Z1"], "benefits": ["coerenza cardiaca", "mindfulness", "stress"],
-        "risks": ["nessuno"], "prerequisites": ["costanza"]
-    },
-    
-    "respirazione consapevole": {
-        "category": "recovery", "intensity": "light", "duration_optimal": (5, 15),
-        "hrv_impact_immediate": 4, "hrv_impact_24h": 1, "recovery_impact": 2,
-        "metabolic_impact": 0, "stress_impact": -3, "sleep_impact": 1,
-        "best_time": "qualsiasi", "frequency": "multipla giornaliera",
-        "hr_zones": ["Z1"], "benefits": ["coerenza immediata", "ansia", "focus"],
-        "risks": ["nessuno"], "prerequisites": ["tecnica base"]
-    },
-
-    # ATTIVITÀ RICREATIVE
-    "camminata": {
-        "category": "recovery", "intensity": "light", "duration_optimal": (30, 60),
-        "hrv_impact_immediate": 1, "hrv_impact_24h": 2, "recovery_impact": 2,
-        "metabolic_impact": 1, "stress_impact": -2, "sleep_impact": 1,
-        "best_time": "qualsiasi", "frequency": "daily",
-        "hr_zones": ["Z1", "Z2"], "benefits": ["circolazione", "umore", "digestione"],
-        "risks": ["minimi"], "prerequisites": ["scarpe adatte"]
-    },
-    
-    "stretching": {
-        "category": "recovery", "intensity": "light", "duration_optimal": (10, 20),
-        "hrv_impact_immediate": 1, "hrv_impact_24h": 1, "recovery_impact": 2,
-        "metabolic_impact": 0, "stress_impact": -1, "sleep_impact": 1,
-        "best_time": "mattina/sera", "frequency": "daily",
-        "hr_zones": ["Z1"], "benefits": ["mobilità", "recupero muscolare"],
-        "risks": ["stiramenti"], "prerequisites": ["riscaldamento"]
-    }
-}
-
-# =============================================================================
-# DATABASE INTEGRAZIONI + IMPATTO HRV
-# =============================================================================
-
-SUPPLEMENTS_DB = {
-    "magnesio": {
-        "category": "minerale", "timing": "sera", "dosage_optimal": (200, 400),
-        "hrv_impact": 3, "recovery_impact": 3, "sleep_impact": 4, "stress_impact": -3,
-        "mechanism": "rilassamento muscolare, GABA", "best_for": ["sonno", "crampi", "stress"],
-        "synergies": ["vitamina B6", "taurina"], "contraindications": ["renali"],
-        "evidence": "alta", "onset_time": "1-2 ore", "duration": "8-12 ore"
-    },
-    
-    "omega-3": {
-        "category": "acidi grassi", "timing": "pasto", "dosage_optimal": (1000, 2000),
-        "hrv_impact": 2, "recovery_impact": 2, "sleep_impact": 1, "stress_impact": -2,
-        "mechanism": "anti-infiammatorio, fluidità membranale", "best_for": ["infiammazione", "umore", "cuore"],
-        "synergies": ["vitamina E"], "contraindications": ["anticoagulanti"],
-        "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
-    },
-    
-    "vitamina D": {
-        "category": "vitamina", "timing": "mattina", "dosage_optimal": (1000, 4000),
-        "hrv_impact": 2, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
-        "mechanism": "modulazione immunitaria, umore", "best_for": ["immunità", "umore", "ossa"],
-        "synergies": ["K2", "magnesio"], "contraindications": ["ipercalcemia"],
-        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
-    },
-    
-    "ashwagandha": {
-        "category": "adattogeno", "timing": "sera", "dosage_optimal": (300, 600),
-        "hrv_impact": 3, "recovery_impact": 2, "sleep_impact": 2, "stress_impact": -4,
-        "mechanism": "cortisolo, GABA", "best_for": ["stress", "ansia", "recupero"],
-        "synergies": ["magnesio", "L-teanina"], "contraindications": ["tiroide", "gravidanza"],
-        "evidence": "media", "onset_time": "2-4 settimane", "duration": "cronico"
-    },
-    
-    "L-teanina": {
-        "category": "aminoacido", "timing": "qualsiasi", "dosage_optimal": (100, 200),
-        "hrv_impact": 3, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -3,
-        "mechanism": "onde alfa cerebrali, GABA", "best_for": ["ansia", "focus", "rilassamento"],
-        "synergies": ["caffeina", "ashwagandha"], "contraindications": ["minime"],
-        "evidence": "alta", "onset_time": "30-60 min", "duration": "4-6 ore"
-    },
-    
-    "probiotici": {
-        "category": "digestivo", "timing": "mattina", "dosage_optimal": (1, 10), # miliardi
-        "hrv_impact": 1, "recovery_impact": 1, "sleep_impact": 1, "stress_impact": -1,
-        "mechanism": "asse intestino-cervello", "best_for": ["digestione", "umore", "immunità"],
-        "synergies": ["prebiotici"], "contraindications": ["immunodepressione"],
-        "evidence": "media", "onset_time": "settimane", "duration": "cronico"
-    },
-    
-    "melatonina": {
-        "category": "ormone", "timing": "pre-sonno", "dosage_optimal": (0.5, 3),
-        "hrv_impact": 2, "recovery_impact": 2, "sleep_impact": 4, "stress_impact": -2,
-        "mechanism": "ritmo circadiano", "best_for": ["sonno", "jet lag"],
-        "synergies": ["magnesio"], "contraindications": ["autoimmuni"],
-        "evidence": "alta", "onset_time": "30 min", "duration": "6-8 ore"
-    },
-    
-    "creatina": {
-        "category": "performance", "timing": "pre/post workout", "dosage_optimal": (3000, 5000),
-        "hrv_impact": 0, "recovery_impact": 2, "sleep_impact": 0, "stress_impact": 0,
-        "mechanism": "sistema fosfageno", "best_for": ["forza", "potenza"],
-        "synergies": ["carboidrati"], "contraindications": ["renali"],
-        "evidence": "alta", "onset_time": "settimane", "duration": "cronico"
-    }
-}
-
-# =============================================================================
-# SISTEMA AVANZATO DI ANALISI IMPATTO - FUNZIONI COMPLETE
 # =============================================================================
 
 def calculate_comprehensive_impact(activities, daily_metrics, timeline, user_profile):
@@ -1481,7 +773,6 @@ def calculate_daily_impact_summary(activities, daily_metrics):
     for activity in activities:
         if activity['type'] == 'Allenamento':
             activity_count += 1
-            # Simula impatto basato sull'intensità
             if "leggera" in activity['intensity'].lower() or "leggero" in activity['intensity'].lower():
                 net_impact += 2
             elif "intensa" in activity['intensity'].lower() or "intenso" in activity['intensity'].lower():
@@ -1511,6 +802,12 @@ def analyze_activities_impact(activities, daily_metrics, timeline):
         elif activity['type'] == "Riposo":
             analysis = analyze_recovery_impact(activity, daily_metrics)
             activity_analysis.append(analysis)
+        elif activity['type'] == "Stress":
+            analysis = analyze_stress_impact(activity, daily_metrics)
+            activity_analysis.append(analysis)
+        elif activity['type'] == "Altro":
+            analysis = analyze_other_impact(activity, daily_metrics)
+            activity_analysis.append(analysis)
     
     return activity_analysis
 
@@ -1520,11 +817,9 @@ def analyze_training_impact(activity, daily_metrics, timeline):
     activity_name = activity['name'].lower()
     impact_data = ACTIVITY_IMPACT_DB.get(activity_name, {})
     
-    # Trova il giorno dell'attività
     activity_day = activity['start_time'].date().isoformat()
     day_metrics = daily_metrics.get(activity_day, {})
     
-    # Calcola impatto osservato vs atteso
     expected_impact = impact_data.get('hrv_impact_24h', 0)
     observed_impact = calculate_observed_hrv_impact(activity, day_metrics, timeline)
     
@@ -1574,16 +869,36 @@ def analyze_recovery_impact(activity, daily_metrics):
         'recommendations': ["Ottima scelta per il recupero!"]
     }
 
+def analyze_stress_impact(activity, daily_metrics):
+    """Analisi impatto attività stressanti"""
+    return {
+        'activity': activity,
+        'expected_impact': -2,
+        'observed_impact': -1,
+        'type': 'stress',
+        'recovery_status': 'poor',
+        'recommendations': ["🧘 Considera tecniche di respirazione per gestire lo stress"]
+    }
+
+def analyze_other_impact(activity, daily_metrics):
+    """Analisi impatto altre attività"""
+    return {
+        'activity': activity,
+        'expected_impact': 0,
+        'observed_impact': 0,
+        'type': 'other',
+        'recovery_status': 'unknown',
+        'recommendations': ["📝 Attività registrata"]
+    }
+
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
     """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
     if not day_metrics:
         return 0
     
-    # Simula un impatto basato sulle metriche del giorno
     rmssd = day_metrics.get('rmssd', 0)
     sdnn = day_metrics.get('sdnn', 0)
     
-    # Impatto positivo se HRV è buona
     if rmssd > 40 and sdnn > 50:
         return 2
     elif rmssd > 25 and sdnn > 35:
@@ -1662,7 +977,7 @@ def analyze_nutritional_impact(activities):
         'inflammatory_score': inflammatory_score,
         'recovery_score': recovery_score,
         'meal_count': meal_count,
-        'total_calories': meal_count * 500  # Stima
+        'total_calories': meal_count * 500
     }
 
 def analyze_supplements_impact(activities):
@@ -1695,7 +1010,6 @@ def generate_comprehensive_recommendations(activities, daily_metrics, user_profi
 
     recommendations = []
     
-    # Analizza tutti i pasti
     all_food_items = ""
     for activity in activities:
         if activity['type'] == "Alimentazione" and activity.get('food_items'):
@@ -1705,14 +1019,12 @@ def generate_comprehensive_recommendations(activities, daily_metrics, user_profi
         food_analysis = analyze_food_impact(all_food_items)
         recommendations.extend(food_analysis['recommendations'])
     
-    # Analizza pattern delle attività
     training_count = len([a for a in activities if a['type'] == 'Allenamento'])
     recovery_count = len([a for a in activities if a['type'] == 'Riposo'])
     
     if training_count > 3 and recovery_count < 2:
         recommendations.append("⚖️ Bilanciare più attività di recupero con gli allenamenti")
     
-    # Raccomandazioni basate sull'HRV
     if daily_metrics:
         avg_rmssd = sum(day.get('rmssd', 0) for day in daily_metrics.values()) / len(daily_metrics)
         if avg_rmssd < 25:
@@ -1745,7 +1057,6 @@ def analyze_food_impact(food_items):
         elif inflammatory_score < -2:
             analysis['recovery_foods'].append(food)
         
-        # Impatto sul sonno
         sleep_impact = food_data.get('sleep_impact', 'neutro')
         if sleep_impact == "molto negativo":
             analysis['sleep_impact'] -= 2
@@ -1756,7 +1067,6 @@ def analyze_food_impact(food_items):
         elif sleep_impact == "molto positivo":
             analysis['sleep_impact'] += 2
     
-    # Genera raccomandazioni basate sui cibi
     if analysis['inflammatory_score'] > 5:
         analysis['recommendations'].append("🚨 Alto carico infiammatorio: riduci carboidrati raffinati e alcol")
     
@@ -1766,9 +1076,6 @@ def analyze_food_impact(food_items):
     if "vino" in foods or "alcolici" in foods:
         analysis['recommendations'].append("🍷 L'alcol riduce la qualità del sonno e l'HRV")
     
-    if "torta alla crema" in foods:
-        analysis['recommendations'].append("🍰 Dolci industriali: picco glicemico e infiammazione")
-    
     if not analysis['recommendations']:
         analysis['recommendations'].append("🥦 Buona scelta alimentare!")
     
@@ -1777,7 +1084,6 @@ def analyze_food_impact(food_items):
 def display_impact_analysis(impact_report):
     """Visualizza i risultati dell'analisi di impatto"""
     
-    # 1. SOMMARIO GIORNALIERO
     st.subheader("📊 Sommario Giornaliero")
     
     col1, col2, col3, col4 = st.columns(4)
@@ -1798,7 +1104,6 @@ def display_impact_analysis(impact_report):
         st.metric("Impatto Integratori", 
                  f"{impact_report['supplement_analysis'].get('total_hrv_impact', 0):+.1f}")
     
-    # 2. ANALISI DETTAGLIATA PER CATEGORIA
     if impact_report['activity_analysis']:
         with st.expander("🧘 Analisi Dettagliata Attività", expanded=True):
             for activity_analysis in impact_report['activity_analysis']:
@@ -1806,7 +1111,6 @@ def display_impact_analysis(impact_report):
     else:
         st.info("Nessuna attività da analizzare")
     
-    # 3. RACCOMANDAZIONI PERSONALIZZATE
     with st.expander("💡 Raccomandazioni Personalizzate", expanded=True):
         for recommendation in impact_report['personalized_recommendations']:
             st.write(f"• {recommendation}")
@@ -1839,12 +1143,10 @@ def display_activity_analysis(analysis):
     with col4:
         recommendations = analysis.get('recommendations', [])
         if recommendations:
-            for rec in recommendations[:1]:  # Prima raccomandazione
+            for rec in recommendations[:1]:
                 st.write(f"💡 {rec}")
         else:
             st.write("📝 Nessuna raccomandazione")
-
-# 🎯 FINE DEL NUOVO CODICE - ORA CONTINUA CON ACTIVITY_COLORS
 
 # Colori per i tipi di attività
 ACTIVITY_COLORS = {
@@ -1859,7 +1161,6 @@ def create_activity_tracker():
     """Interfaccia per tracciare attività e alimentazione"""
     st.sidebar.header("🏃‍♂️ Tracker Attività & Alimentazione")
     
-    # Gestione modifica attività
     if st.session_state.get('editing_activity_index') is not None:
         edit_activity_interface()
         return
@@ -1894,7 +1195,6 @@ def create_activity_tracker():
             st.success("Attività salvata!")
             st.rerun()
     
-    # Gestione attività esistenti
     if st.session_state.activities:
         st.sidebar.subheader("📋 Gestione Attività")
         
@@ -2023,17 +1323,14 @@ def parse_starttime_from_file(content):
     for line in lines:
         if line.strip().upper().startswith('STARTTIME'):
             try:
-                # Estrai la stringa temporale
                 time_str = line.split('=')[1].strip()
                 
-                
-                # Prova diversi formati di data IN ORDINE DI PRIORITÀ
                 formats_to_try = [
-                    '%d.%m.%Y %H:%M.%S',  # IL TUO FORMATO: 13.10.2025 19:46.16
-                    '%d.%m.%Y %H:%M:%S',  # Formato con punti ma secondi normali
-                    '%d/%m/%Y %H:%M:%S',  # Formato italiano con slash
-                    '%Y-%m-%dT%H:%M:%S',  # Formato ISO
-                    '%Y-%m-%d %H:%M:%S',  # Formato internazionale
+                    '%d.%m.%Y %H:%M.%S',
+                    '%d.%m.%Y %H:%M:%S',
+                    '%d/%m/%Y %H:%M:%S',
+                    '%Y-%m-%dT%H:%M:%S',
+                    '%Y-%m-%d %H:%M:%S',
                 ]
                 
                 for fmt in formats_to_try:
@@ -2064,7 +1361,6 @@ def calculate_recording_timeline(rr_intervals, start_time):
     total_duration_ms = sum(rr_intervals)
     end_time = start_time + timedelta(milliseconds=total_duration_ms)
     
-    # Dividi per giorni
     days_data = {}
     current_time = start_time
     current_day_start = start_time.date()
@@ -2074,14 +1370,12 @@ def calculate_recording_timeline(rr_intervals, start_time):
         day_rr_intervals.append(rr)
         current_time += timedelta(milliseconds=rr)
         
-        # Se cambia giorno, salva i dati del giorno precedente
         if current_time.date() != current_day_start:
-            if day_rr_intervals:  # Salva solo se ci sono dati
+            if day_rr_intervals:
                 days_data[current_day_start.isoformat()] = day_rr_intervals.copy()
             day_rr_intervals = []
             current_day_start = current_time.date()
     
-    # Aggiungi l'ultimo giorno
     if day_rr_intervals:
         days_data[current_day_start.isoformat()] = day_rr_intervals
     
@@ -2097,8 +1391,7 @@ def calculate_daily_metrics(days_data, user_age, user_gender):
     daily_metrics = {}
     
     for day_date, day_rr_intervals in days_data.items():
-        if len(day_rr_intervals) >= 10:  # Solo giorni con dati sufficienti
-            # 🆕 MODIFICA: Non passiamo più recording_duration_hours, la funzione lo calcola internamente
+        if len(day_rr_intervals) >= 10:
             daily_metrics[day_date] = calculate_realistic_hrv_metrics(
                 day_rr_intervals, user_age, user_gender
             )
@@ -2110,11 +1403,9 @@ def calculate_overall_averages(daily_metrics):
     if not daily_metrics:
         return None
     
-    # Inizializza dizionario per le medie
     avg_metrics = {}
     all_metrics = list(daily_metrics.values())
     
-    # Calcola medie per ogni metrica
     for key in all_metrics[0].keys():
         if key in ['sdnn', 'rmssd', 'hr_mean', 'coherence', 'total_power', 
                   'vlf', 'lf', 'hf', 'lf_hf_ratio', 'sleep_duration', 
@@ -2137,14 +1428,12 @@ def create_user_selector():
     
     st.sidebar.header("👥 Utenti Registrati")
     
-    # Crea lista di utenti per il dropdown
     user_list = ["-- Seleziona un utente --"]
     user_keys = []
     
     for user_key, user_data in st.session_state.user_database.items():
         profile = user_data['profile']
         
-        # Formatta la data in italiano
         if hasattr(profile['birth_date'], 'strftime'):
             birth_date_display = profile['birth_date'].strftime('%d/%m/%Y')
         else:
@@ -2154,7 +1443,6 @@ def create_user_selector():
         user_list.append(display_name)
         user_keys.append(user_key)
     
-    # Dropdown per selezione utente
     selected_user_display = st.sidebar.selectbox(
         "Seleziona utente esistente:",
         options=user_list,
@@ -2166,15 +1454,12 @@ def create_user_selector():
         selected_user_key = user_keys[selected_index]
         selected_user_data = st.session_state.user_database[selected_user_key]
         
-        # Mostra info utente selezionato
         st.sidebar.success(f"✅ {selected_user_display}")
         
-        # Pulsante per caricare questo utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
             load_user_into_session(selected_user_data)
             st.rerun()
         
-        # Pulsante per eliminare utente
         if st.sidebar.button("🗑️ Elimina questo utente", use_container_width=True):
             delete_user_from_database(selected_user_key)
             st.rerun()
@@ -2203,7 +1488,6 @@ def save_analysis_to_history(analysis_data):
     """Salva l'analisi corrente nello storico"""
     user_key = get_user_key(st.session_state.user_profile)
     if user_key and user_key in st.session_state.user_database:
-        # Aggiungi timestamp univoco
         analysis_data['analysis_id'] = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         analysis_data['saved_at'] = datetime.now().isoformat()
         
@@ -2229,7 +1513,6 @@ def display_analysis_history():
     
     st.header("📊 Storico Analisi HRV")
     
-    # Prepara i dati per la tabella unica con giorni separati
     table_data = []
     
     for analysis in analyses:
@@ -2237,18 +1520,14 @@ def display_analysis_history():
         daily_metrics = analysis.get('daily_metrics', {})
         data_inserimento = datetime.fromisoformat(analysis.get('saved_at', datetime.now().isoformat())).strftime('%d/%m/%Y %H:%M')
         
-        # Se ci sono metriche giornaliere, crea una riga per ogni giorno
         if daily_metrics:
             for day_date, day_metrics in daily_metrics.items():
                 day_dt = datetime.fromisoformat(day_date)
                 
-                # Determina se include ore notturne (dalle 23:00 alle 6:00)
                 includes_night = False
-                # Per semplicità, assumiamo che se ci sono dati del sonno, include ore notturne
                 if day_metrics.get('sleep_duration', 0) > 0:
                     includes_night = True
                 
-                # Crea riga della tabella
                 row = {
                     'Data Inserimento': data_inserimento,
                     'Data Registrazione': day_dt.strftime('%d/%m/%Y'),
@@ -2263,7 +1542,6 @@ def display_analysis_history():
                     'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
                 }
                 
-                # Aggiungi metriche sonno solo se include ore notturne
                 if includes_night and day_metrics.get('sleep_duration', 0) > 0:
                     row.update({
                         'Sonno Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
@@ -2275,7 +1553,6 @@ def display_analysis_history():
                         'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
                     })
                 else:
-                    # Se non include sonno, metti valori vuoti
                     row.update({
                         'Sonno Totale (h)': '-',
                         'Efficienza Sonno (%)': '-',
@@ -2288,11 +1565,9 @@ def display_analysis_history():
                 
                 table_data.append(row)
         
-        # Se non ci sono metriche giornaliere ma solo overall, usa quelle
         elif overall_metrics:
             recording_start = datetime.fromisoformat(analysis['recording_start'])
             
-            # Determina se include ore notturne
             includes_night = False
             if overall_metrics.get('sleep_duration', 0) > 0:
                 includes_night = True
@@ -2311,7 +1586,6 @@ def display_analysis_history():
                 'VLF (ms²)': f"{overall_metrics.get('vlf', 0):.0f}"
             }
             
-            # Aggiungi metriche sonno solo se include ore notturne
             if includes_night and overall_metrics.get('sleep_duration', 0) > 0:
                 row.update({
                     'Sonno Totale (h)': f"{overall_metrics.get('sleep_duration', 0):.1f}",
@@ -2323,7 +1597,6 @@ def display_analysis_history():
                     'Risvegli (h)': f"{overall_metrics.get('sleep_awake', 0):.1f}"
                 })
             else:
-                # Se non include sonno, metti valori vuoti
                 row.update({
                     'Sonno Totale (h)': '-',
                     'Efficienza Sonno (%)': '-',
@@ -2336,21 +1609,17 @@ def display_analysis_history():
             
             table_data.append(row)
     
-    # Ordina per data registrazione (più recente prima)
     table_data_sorted = sorted(table_data, key=lambda x: datetime.strptime(x['Data Registrazione'], '%d/%m/%Y'), reverse=True)
     
-    # Crea e mostra la tabella unica
     if table_data_sorted:
         df = pd.DataFrame(table_data_sorted)
         
-        # Formatta la tabella per una migliore visualizzazione
         st.dataframe(
             df,
             use_container_width=True,
             height=min(600, 150 + len(df) * 35)
         )
         
-        # Pulsante download CON CHIAVE UNICA
         csv_data = df.to_csv(index=False, sep=';')
         st.download_button(
             label="📥 Scarica Storico Completo",
@@ -2358,10 +1627,9 @@ def display_analysis_history():
             file_name=f"storico_analisi_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
             use_container_width=True,
-            key=f"download_storico_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # CHIAVE UNICA
+            key=f"download_storico_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         )
         
-        # Statistiche
         st.info(f"**📈 Totale:** {len(table_data_sorted)} giorni di registrazione nel database")
     else:
         st.info("Nessun dato da visualizzare")
@@ -2387,7 +1655,7 @@ def delete_analysis(analysis_index):
             st.success(f"✅ Analisi del {deleted_analysis.get('saved_at', '')} eliminata!")
 
 # =============================================================================
-# FUNZIONE PRINCIPALE - SENZA NEUROKIT2
+# FUNZIONE PRINCIPALE
 # =============================================================================
 
 def main():
@@ -2430,6 +1698,33 @@ def main():
         padding: 0.5rem 1rem;
         font-weight: 600;
     }
+    .compact-metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 12px;
+        color: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border: none;
+        margin-bottom: 0.5rem;
+    }
+    .metric-value {
+        font-size: 1.4rem;
+        font-weight: bold;
+        margin-bottom: 0.2rem;
+    }
+    .metric-label {
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+    .metric-unit {
+        font-size: 0.7rem;
+        opacity: 0.7;
+    }
+    .sleep-phase-bar {
+        height: 8px;
+        border-radius: 4px;
+        margin: 2px 0;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -2437,10 +1732,9 @@ def main():
     st.markdown('<h1 class="main-header">❤️ HRV Analytics ULTIMATE</h1>', unsafe_allow_html=True)
     
     # =============================================================================
-    # SIDEBAR - VERSIONE PULITA
+    # SIDEBAR
     # =============================================================================
     with st.sidebar:
-        # SELEZIONE UTENTI ESISTENTI - AGGIUNGI QUESTA SEZIONE
         create_user_selector()
         
         st.header("👤 Profilo Paziente")
@@ -2451,7 +1745,6 @@ def main():
         with col2:
             st.session_state.user_profile['surname'] = st.text_input("Cognome", value=st.session_state.user_profile['surname'], key="surname_input")
         
-        # Data di nascita
         birth_date = st.session_state.user_profile['birth_date']
         if birth_date is None:
             birth_date = datetime(1980, 1, 1).date()
@@ -2478,11 +1771,9 @@ def main():
             st.session_state.user_profile['age'] = age
             st.info(f"Età: {age} anni")
         
-        # PULSANTE SALVA UTENTE - SEMPLICE E VISIBILE
         st.divider()
         st.header("💾 Salvataggio")
         
-        # Aggiungi un controllo per evitare duplicati
         user_key = get_user_key(st.session_state.user_profile)
         user_exists = user_key and user_key in st.session_state.user_database
         
@@ -2500,21 +1791,12 @@ def main():
                 else:
                     st.error("❌ Inserisci nome, cognome e data di nascita")
         
-        import os
-        if os.path.exists('user_database.json'):
-            st.success("✅ user_database.json ESISTE")
-        else:
-            st.error("❌ user_database.json NON TROVATO")
-        
-        # Solo le attività
         create_activity_tracker()
     
     # =============================================================================
     # CONTENUTO PRINCIPALE
     # =============================================================================
     
-    # Upload file
-        # Upload file
     st.header("📤 Carica File IBI")
     uploaded_file = st.file_uploader("Carica il tuo file .txt, .csv o .sdf con gli intervalli IBI", type=['txt', 'csv', 'sdf'], key="file_uploader")
     
@@ -2537,14 +1819,11 @@ def main():
             
             st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
             
-            # 🔽🔽🔽 NUOVA ANALISI COMPLETA 🔽🔽🔽
             st.header("📊 Analisi HRV Completa")
             
-            # 1. PARSING TIMESTAMP E TIMELINE
             start_time = parse_starttime_from_file(content)
             timeline = calculate_recording_timeline(rr_intervals, start_time)
             
-            # Mostra periodo registrazione
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("📅 Inizio Registrazione", 
@@ -2555,7 +1834,6 @@ def main():
             
             st.metric("⏱️ Durata Totale", f"{timeline['total_duration_hours']:.1f} ore")
             
-            # 2. CALCOLO METRICHE GIORNALIERE
             user_profile = st.session_state.user_profile
             daily_metrics = calculate_daily_metrics(
                 timeline['days_data'], 
@@ -2563,11 +1841,9 @@ def main():
                 user_profile['gender']
             )
             
-            # 3. MEDIE COMPLESSIVE - VERSIONE ULTRA SICURA
             avg_metrics = {}
             
             try:
-                # Prova a calcolare le metriche
                 calculated_metrics = calculate_realistic_hrv_metrics(
                     rr_intervals, user_profile['age'], user_profile['gender']
                 )
@@ -2577,49 +1853,15 @@ def main():
                     raise ValueError("calculate_realistic_hrv_metrics ha restituito None")
             except Exception as e:
                 st.sidebar.warning(f"Calcolo metriche fallito: {e}")
-                # Usa valori di default hardcodati
                 avg_metrics = {
                     'sdnn': 45.0, 'rmssd': 35.0, 'hr_mean': 70.0, 'coherence': 60.0,
                     'recording_hours': 24.0, 'total_power': 2500.0, 'vlf': 400.0,
                     'lf': 1000.0, 'hf': 1100.0, 'lf_hf_ratio': 0.9,
-                    'sleep_duration': 7.2, 'sleep_efficiency': 85.0, 'sleep_hr': 62.0,
-                    'sleep_light': 3.6, 'sleep_deep': 1.4, 'sleep_rem': 1.4, 'sleep_awake': 0.8
+                    'sleep_duration': 0, 'sleep_efficiency': 0, 'sleep_hr': 0,
+                    'sleep_light': 0, 'sleep_deep': 0, 'sleep_rem': 0, 'sleep_awake': 0
                 }
 
             st.subheader("📈 Medie Complessive")
-            
-            # CSS per le card eleganti
-            st.markdown("""
-            <style>
-            .compact-metric-card {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 1rem;
-                border-radius: 12px;
-                color: white;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-                border: none;
-                margin-bottom: 0.5rem;
-            }
-            .metric-value {
-                font-size: 1.4rem;
-                font-weight: bold;
-                margin-bottom: 0.2rem;
-            }
-            .metric-label {
-                font-size: 0.8rem;
-                opacity: 0.9;
-            }
-            .metric-unit {
-                font-size: 0.7rem;
-                opacity: 0.7;
-            }
-            .sleep-phase-bar {
-                height: 8px;
-                border-radius: 4px;
-                margin: 2px 0;
-            }
-            </style>
-            """, unsafe_allow_html=True)
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
@@ -2717,13 +1959,12 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
-            # TERZA RIGA: ANALISI SONNO DETTAGLIATA
+            # ANALISI SONNO DETTAGLIATA
             st.subheader("😴 Analisi Dettagliata del Sonno")
             
             col1, col2 = st.columns(2)
             
             with col1:
-                # Card battito durante il sonno
                 st.markdown(f"""
                 <div class="compact-metric-card">
                     <div class="metric-value">💤 {avg_metrics.get('sleep_hr', 60):.0f}</div>
@@ -2733,7 +1974,6 @@ def main():
                 """, unsafe_allow_html=True)
             
             with col2:
-                # Distribuzione fasi sonno - versione robusta
                 total_sleep = avg_metrics.get('sleep_duration', 7.0)
                 sleep_light = avg_metrics.get('sleep_light', total_sleep * 0.5)
                 sleep_deep = avg_metrics.get('sleep_deep', total_sleep * 0.2)
@@ -2763,13 +2003,12 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
             
-            # 4. METRICHE DETTAGLIATE PER GIORNO - TABELLE SEPARATE
+            # METRICHE DETTAGLIATE PER GIORNO
             with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
                 if not daily_metrics:
                     st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
                 else:
                     try:
-                        # TABELLA 1: METRICHE HRV E SPETTRALI
                         st.subheader("🧮 Metriche HRV e Analisi Spettrale")
                         
                         hrv_table_data = []
@@ -2792,7 +2031,6 @@ def main():
                         
                         hrv_df = pd.DataFrame(hrv_table_data)
                         
-                        # Mostra prima tabella HRV
                         st.dataframe(
                             hrv_df,
                             use_container_width=True,
@@ -2800,7 +2038,6 @@ def main():
                             height=min(300, 50 + len(hrv_df) * 35)
                         )
 
-                        # TABELLA 2: METRICHE SONNO - SOLO SE CI SONO DATI DI SONNO
                         st.subheader("😴 Metriche Sonno")
 
                         sleep_table_data = []
@@ -2808,10 +2045,8 @@ def main():
                         for day_date, day_metrics in daily_metrics.items():
                             day_dt = datetime.fromisoformat(day_date)
                             
-                            # Usa solo .get() con valori di default
                             sleep_duration = day_metrics.get('sleep_duration', 0)
                             
-                            # Solo se sleep_duration esiste ed è > 0, procedi
                             if sleep_duration > 0:
                                 row = {
                                     'Data': day_dt.strftime('%d/%m/%Y'),
@@ -2828,7 +2063,6 @@ def main():
                         if sleep_table_data:
                             sleep_df = pd.DataFrame(sleep_table_data)
                             
-                            # Mostra seconda tabella Sonno
                             st.dataframe(
                                 sleep_df,
                                 use_container_width=True,
@@ -2838,7 +2072,6 @@ def main():
                         else:
                             st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
                         
-                        # Download delle tabelle
                         st.markdown("<br>", unsafe_allow_html=True)
                         col1, col2 = st.columns(2)
                         
@@ -2854,7 +2087,6 @@ def main():
                             )
                         
                         with col2:
-                            # Mostra il pulsante download sonno SOLO se ci sono dati di sonno
                             if sleep_table_data:
                                 sleep_csv = sleep_df.to_csv(index=False, sep=';')
                                 st.download_button(
@@ -2870,44 +2102,11 @@ def main():
                                 
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
-                        st.info("Mostro solo le metriche principali...")
                     
-                    # Download delle tabelle
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        hrv_csv = hrv_df.to_csv(index=False, sep=';')
-                        st.download_button(
-                            label="📥 Scarica Metriche HRV",
-                            data=hrv_csv,
-                            file_name=f"hrv_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv",
-                            use_container_width=True,
-                            key=f"download_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                        )
-                    
-                    with col2:
-                        # Mostra il pulsante download sonno SOLO se ci sono dati di sonno
-                        if sleep_table_data:
-                            sleep_csv = sleep_df.to_csv(index=False, sep=';')
-                            st.download_button(
-                                label="📥 Scarica Metriche Sonno",
-                                data=sleep_csv,
-                                file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                                mime="text/csv",
-                                use_container_width=True,
-                                key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                            )
-                        else:
-                            st.empty()
-                    
-                    # Grafico dettagliato con zoom interattivo e attività
+                    # GRAFICO DETTAGLIATO CON ZOOM INTERATTIVO
                     st.subheader("📈 Andamento Dettagliato HRV con Attività")
                     
-                    # Crea timeline dettagliata dai dati RR
                     if len(rr_intervals) > 0:
-                        # Calcola i timestamp per ogni battito
                         timestamps = []
                         current_time = start_time
                         
@@ -2915,12 +2114,11 @@ def main():
                             timestamps.append(current_time)
                             current_time += timedelta(milliseconds=rr)
                         
-                        # Calcola HRV in finestre mobili (per SDNN e RMSSD)
-                        window_size = min(300, len(rr_intervals) // 10)  # Finestra adattiva
+                        hr_instant = [60000 / rr for rr in rr_intervals]
+                        window_size = min(300, len(rr_intervals) // 10)
                         if window_size < 30:
                             window_size = min(30, len(rr_intervals))
                         
-                        hr_instant = [60000 / rr for rr in rr_intervals]
                         sdnn_moving = []
                         rmssd_moving = []
                         moving_timestamps = []
@@ -2929,7 +2127,6 @@ def main():
                             window_rr = rr_intervals[i:i + window_size]
                             window_hr = hr_instant[i:i + window_size]
                             
-                            # Calcola SDNN e RMSSD per la finestra
                             sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
                             differences = np.diff(window_rr)
                             rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
@@ -2938,19 +2135,15 @@ def main():
                             rmssd_moving.append(rmssd)
                             moving_timestamps.append(timestamps[i + window_size // 2])
                         
-                        # Crea il grafico principale con zoom interattivo
                         fig_main = go.Figure()
                         
-                        # Aggiungi le attività come rettangoli di sfondo PRIMA delle linee
                         if st.session_state.activities:
                             for activity in st.session_state.activities:
                                 activity_start = activity['start_time']
                                 activity_end = activity_start + timedelta(minutes=activity['duration'])
                                 
-                                # Colore in base al tipo di attività
                                 color = activity.get('color', '#95a5a6')
                                 
-                                # Aggiungi rettangolo di sfondo per l'attività
                                 fig_main.add_vrect(
                                     x0=activity_start,
                                     x1=activity_end,
@@ -2960,11 +2153,10 @@ def main():
                                     line_width=0,
                                 )
                                 
-                                # Aggiungi etichetta obliqua al centro dell'attività
                                 activity_center = activity_start + (activity_end - activity_start) / 2
                                 fig_main.add_annotation(
                                     x=activity_center,
-                                    y=1.02,  # Posizione in alto nel grafico
+                                    y=1.02,
                                     yref="paper",
                                     text=activity['name'],
                                     showarrow=False,
@@ -2976,7 +2168,6 @@ def main():
                                     borderpad=2
                                 )
                         
-                        # Aggiungi HR istantaneo (smooth)
                         fig_main.add_trace(go.Scatter(
                             x=timestamps,
                             y=hr_instant,
@@ -2986,7 +2177,6 @@ def main():
                             opacity=0.8
                         ))
                         
-                        # Aggiungi SDNN mobile
                         if sdnn_moving:
                             fig_main.add_trace(go.Scatter(
                                 x=moving_timestamps,
@@ -2997,7 +2187,6 @@ def main():
                                 yaxis='y2'
                             ))
                         
-                        # Aggiungi RMSSD mobile
                         if rmssd_moving:
                             fig_main.add_trace(go.Scatter(
                                 x=moving_timestamps,
@@ -3008,7 +2197,6 @@ def main():
                                 yaxis='y3'
                             ))
                         
-                        # Layout del grafico principale con zoom
                         fig_main.update_layout(
                             title='Andamento Dettagliato HRV - Zoomma con mouse/touch (Aree colorate = Attività)',
                             xaxis=dict(
@@ -3033,13 +2221,12 @@ def main():
                                 side='right',
                                 position=0.15
                             ),
-                            height=600,  # Grafico più alto
+                            height=600,
                             showlegend=True,
                             hovermode='x unified',
                             plot_bgcolor='rgba(240,240,240,0.1)'
                         )
                         
-                        # Aggiungi bottoni per lo zoom
                         fig_main.update_layout(
                             xaxis=dict(
                                 rangeselector=dict(
@@ -3057,7 +2244,6 @@ def main():
                         
                         st.plotly_chart(fig_main, use_container_width=True)
                         
-                        # Istruzioni per l'uso
                         st.caption("""
                         **🔍 Come zoommare:**
                         - **Mouse:** Trascina per selezionare un'area da zoommare
@@ -3066,7 +2252,6 @@ def main():
                         - **Aree colorate:** Periodi di attività (Allenamento=🔴, Alimentazione=🟠, Stress=🟣, Riposo=🔵)
                         """)
                         
-                        # Informazioni sui dati
                         st.info(f"""
                         **📊 Informazioni Dati:**
                         - **Battiti totali:** {len(rr_intervals)}
@@ -3081,7 +2266,6 @@ def main():
                     else:
                         st.warning("Dati insufficienti per l'analisi dettagliata")
                     
-                    # Statistiche generali (non più del periodo selezionato)
                     st.subheader("📊 Statistiche Generali")
                     
                     col1, col2, col3, col4 = st.columns(4)
@@ -3095,7 +2279,7 @@ def main():
                     with col4:
                         st.metric("Battiti Totali", len(rr_intervals))
             
-            # 5. SALVATAGGIO ANALISI
+            # SALVATAGGIO ANALISI
             if st.button("💾 Salva Analisi nel Database", type="primary"):
                 user_key = get_user_key(user_profile)
                 if user_key and user_key in st.session_state.user_database:
@@ -3109,7 +2293,6 @@ def main():
                         'daily_metrics': daily_metrics
                     }
                     
-                    # USA LA NUOVA FUNZIONE
                     if save_analysis_to_history(analysis_data):
                         st.success("✅ Analisi salvata nello storico!")
                     else:
@@ -3117,7 +2300,7 @@ def main():
                 else:
                     st.error("❌ Salva prima il profilo utente!")
 
-            # 🆕 NUOVA SEZIONE: ANALISI IMPATTO ATTIVITÀ
+            # ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
             
             if st.session_state.activities:
@@ -3137,10 +2320,8 @@ def main():
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
     
     else:
-        # 🆕 NUOVA SEZIONE: STORICO ANALISI (solo quando non c'è file caricato)
         display_analysis_history()
         
-        # Schermata iniziale
         st.info("""
         ### 👆 Carica un file IBI per iniziare l'analisi
         
@@ -3160,17 +2341,14 @@ def main():
 def main_with_auth():
     """Versione principale con sistema di autenticazione"""
     
-    # Inizializza session state per auth
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
     if 'current_user' not in st.session_state:
         st.session_state.current_user = None
     
-    # Se non autenticato, mostra login/registrazione
     if not st.session_state.authenticated:
         show_auth_interface()
     else:
-        # Se autenticato, mostra l'app principale
         add_logout_button()
         main()
 
