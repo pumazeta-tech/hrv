@@ -1376,7 +1376,7 @@ def create_user_selector():
         # Pulsante per caricare questo utente
         if st.sidebar.button("🔄 Carica questo utente", use_container_width=True):
             user_key, user_data = user_data_map[selected_user_display]
-            load_user_into_session({user_key})
+            load_user_into_session(user_key)
             st.rerun()
     
     return selected_user_display
