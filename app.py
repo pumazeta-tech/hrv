@@ -491,7 +491,7 @@ def init_session_state():
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
 # =============================================================================
 
-def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
+def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, recording_duration_hours=None):
     """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
@@ -548,10 +548,13 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
     # Coerenza cardiaca realistica
     coherence = calculate_hrv_coherence(clean_rr, hr_mean, user_age)
     
-    # Analisi sonno realistica CON TUTTE LE FASI
-    sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age)
+    # 🆕 MODIFICA: Calcola il sonno SOLO se la registrazione è abbastanza lunga e probabilmente include la notte
+    sleep_metrics = None
+    if recording_duration_hours and recording_duration_hours >= 8:  # Solo se registrazione di almeno 8 ore
+        sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age)
     
-    return {
+    # 🆕 MODIFICA: Prepara il risultato con o senza metriche sonno
+    result = {
         'sdnn': max(25, min(180, sdnn)),
         'rmssd': max(15, min(120, rmssd)),
         'hr_mean': max(45, min(100, hr_mean)),
@@ -561,15 +564,22 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender):
         'vlf': max(100, min(2500, vlf)),
         'lf': max(200, min(4000, lf)),
         'hf': max(200, min(4000, hf)),
-        'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio)),
-        'sleep_duration': sleep_metrics['duration'],
-        'sleep_efficiency': sleep_metrics['efficiency'],
-        'sleep_hr': sleep_metrics['hr'],
-        'sleep_light': sleep_metrics['light'],
-        'sleep_deep': sleep_metrics['deep'],
-        'sleep_rem': sleep_metrics['rem'],
-        'sleep_awake': sleep_metrics['awake']
+        'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio))
     }
+    
+    # 🆕 MODIFICA: Aggiungi metriche sonno solo se calcolate
+    if sleep_metrics:
+        result.update({
+            'sleep_duration': sleep_metrics['duration'],
+            'sleep_efficiency': sleep_metrics['efficiency'],
+            'sleep_hr': sleep_metrics['hr'],
+            'sleep_light': sleep_metrics['light'],
+            'sleep_deep': sleep_metrics['deep'],
+            'sleep_rem': sleep_metrics['rem'],
+            'sleep_awake': sleep_metrics['awake']
+        })
+    
+    return result
 
 def filter_rr_outliers(rr_intervals):
     """Filtra gli artefatti in modo conservativo"""
@@ -2103,8 +2113,11 @@ def calculate_daily_metrics(days_data, user_age, user_gender):
     
     for day_date, day_rr_intervals in days_data.items():
         if len(day_rr_intervals) >= 10:  # Solo giorni con dati sufficienti
+            # 🆕 MODIFICA: Passa la durata stimata della registrazione
+            recording_duration_hours = len(day_rr_intervals) * np.mean(day_rr_intervals) / (1000 * 60 * 60)
+            
             daily_metrics[day_date] = calculate_realistic_hrv_metrics(
-                day_rr_intervals, user_age, user_gender
+                day_rr_intervals, user_age, user_gender, recording_duration_hours
             )
     
     return daily_metrics
