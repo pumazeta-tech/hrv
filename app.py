@@ -397,6 +397,16 @@ def init_session_state():
     if 'editing_activity_index' not in st.session_state:
         st.session_state.editing_activity_index = None
 
+def has_valid_sleep_metrics(metrics):
+    """Verifica se ci sono metriche del sonno valide (non zero)"""
+    sleep_keys = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 
+                  'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
+    
+    for key in sleep_keys:
+        if key in metrics and metrics.get(key, 0) > 0:
+            return True
+    return False
+
 # =============================================================================
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
 # =============================================================================
@@ -453,6 +463,9 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     # CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
     sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age, recording_duration_hours, start_time, end_time)
     
+    # DEBUG: Verifica cosa restituisce estimate_sleep_metrics
+    print(f"DEBUG sleep_metrics: {sleep_metrics}")
+    
     # Metriche base
     metrics = {
         'sdnn': max(25, min(180, sdnn)),
@@ -470,6 +483,9 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     # CORREZIONE: AGGIUNGI SOLO SE CI SONO METRICHE DEL SONNO (non vuoto)
     if sleep_metrics:  # Questo sarà True solo se sleep_metrics non è vuoto
         metrics.update(sleep_metrics)
+        print(f"DEBUG: Aggiunte metriche sonno: {sleep_metrics}")
+    else:
+        print("DEBUG: Nessuna metrica sonno aggiunta")
     
     return metrics
 
@@ -1680,8 +1696,8 @@ def display_analysis_history():
             for day_date, day_metrics in daily_metrics.items():
                 day_dt = datetime.fromisoformat(day_date)
                 
-                # CORREZIONE: Controlla se ci sono metriche del sonno
-                has_sleep_metrics = any(key.startswith('sleep_') for key in day_metrics.keys())
+                # CORREZIONE: Controlla se ci sono metriche del sonno VALIDE (non zero)
+                has_sleep_metrics = has_valid_sleep_metrics(day_metrics)
                 
                 row = {
                     'Data Inserimento': data_inserimento,
@@ -1697,7 +1713,7 @@ def display_analysis_history():
                     'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
                 }
                 
-                # CORREZIONE: Aggiungi metriche sonno solo se presenti
+                # CORREZIONE: Aggiungi metriche sonno solo se presenti E VALIDE
                 if has_sleep_metrics:
                     row.update({
                         'Sonno Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
@@ -1724,8 +1740,8 @@ def display_analysis_history():
         elif overall_metrics:
             recording_start = datetime.fromisoformat(analysis['recording_start'])
             
-            # CORREZIONE: Controlla se ci sono metriche del sonno
-            has_sleep_metrics = any(key.startswith('sleep_') for key in overall_metrics.keys())
+            # CORREZIONE: Controlla se ci sono metriche del sonno VALIDE (non zero)
+            has_sleep_metrics = has_valid_sleep_metrics(overall_metrics)
             
             row = {
                 'Data Inserimento': data_inserimento,
@@ -1741,7 +1757,7 @@ def display_analysis_history():
                 'VLF (ms²)': f"{overall_metrics.get('vlf', 0):.0f}"
             }
             
-            # CORREZIONE: Aggiungi metriche sonno solo se presenti
+            # CORREZIONE: Aggiungi metriche sonno solo se presenti E VALIDE
             if has_sleep_metrics:
                 row.update({
                     'Sonno Totale (h)': f"{overall_metrics.get('sleep_duration', 0):.1f}",
@@ -2113,7 +2129,7 @@ def main():
                 """, unsafe_allow_html=True)
             
             # CORREZIONE: Mostra metriche sonno solo se presenti
-            has_sleep_metrics = any(key.startswith('sleep_') for key in avg_metrics.keys())
+            has_sleep_metrics = has_valid_sleep_metrics(avg_metrics)
             
             with col4:
                 if has_sleep_metrics:
@@ -2236,7 +2252,7 @@ def main():
 
                         # CORREZIONE: Mostra metriche sonno solo se presenti in almeno un giorno
                         has_any_sleep_data = any(
-                            any(key.startswith('sleep_') for key in day_metrics.keys()) 
+                            has_valid_sleep_metrics(day_metrics) 
                             for day_metrics in daily_metrics.values()
                         )
                         
