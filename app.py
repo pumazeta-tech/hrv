@@ -389,7 +389,6 @@ def get_user_key(user_profile):
         surname = user_profile.get('surname', '').strip().lower()
         birth_date = user_profile.get('birth_date')
         
-        # Debug
         print(f"DEBUG get_user_key - Name: '{name}', Surname: '{surname}', Birth_date: {birth_date}")
         
         if not name or not surname or not birth_date:
@@ -415,10 +414,10 @@ def get_user_key(user_profile):
                     # Usa la stringa originale pulita
                     birth_str = str(birth_date).replace('-', '').replace('/', '').replace(' ', '')
         
-        # 🆕 PULIZIA CONSISTENTE
-        name_clean = re.sub(r'[^a-zA-Z0-9]', '', name)
-        surname_clean = re.sub(r'[^a-zA-Z0-9]', '', surname)
-        birth_clean = re.sub(r'[^0-9]', '', birth_str)
+        # 🆕 NON RIMUOVERE GLI SPAZI - mantieni la formattazione originale
+        name_clean = name.replace(' ', '_')
+        surname_clean = surname.replace(' ', '_')
+        birth_clean = birth_str
         
         user_key = f"{name_clean}_{surname_clean}_{birth_clean}"
         
@@ -429,6 +428,34 @@ def get_user_key(user_profile):
         print(f"DEBUG - Errore in get_user_key: {e}")
         st.error(f"❌ Errore nella generazione della chiave utente: {e}")
         return None
+
+def fix_existing_user_keys():
+    """Corregge le chiavi utente esistenti nel database"""
+    fixed_count = 0
+    user_database = st.session_state.user_database
+    
+    # Crea una copia delle chiavi per iterare
+    old_keys = list(user_database.keys())
+    
+    for old_key in old_keys:
+        user_data = user_database[old_key]
+        profile = user_data['profile']
+        
+        # Rigenera la chiave con la nuova logica
+        new_key = get_user_key(profile)
+        
+        if new_key and new_key != old_key:
+            # Sostituisci la chiave vecchia con quella nuova
+            user_database[new_key] = user_database.pop(old_key)
+            fixed_count += 1
+            print(f"🔧 Chiave corretta: {old_key} -> {new_key}")
+    
+    if fixed_count > 0:
+        save_user_database()
+        st.success(f"🔧 Corrette {fixed_count} chiavi utente!")
+    
+    return fixed_count
+
 def init_session_state():
     """Inizializza lo stato della sessione con persistenza"""
     # Carica il database all'inizio - MAI RESETTARE
@@ -2114,6 +2141,17 @@ def main():
         if st.session_state.user_profile.get('name'):
             user_key = get_user_key(st.session_state.user_profile)
             st.info(f"🔑 Chiave corrente: {user_key}")
+
+        # 🆕 PULSANTE CORREZIONE DATABASE
+        st.divider()
+        if st.button("🔧 CORREGGI CHIAVI DATABASE", use_container_width=True, type="secondary"):
+            fixed_count = fix_existing_user_keys()
+            if fixed_count > 0:
+                st.success(f"✅ Corrette {fixed_count} chiavi!")
+            else:
+                st.info("✅ Nessuna correzione necessaria")
+            st.rerun()
+
         
         # 🆕 PULSANTE FORZA AGGIORNAMENTO ANALISI
         st.divider()
