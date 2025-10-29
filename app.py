@@ -1117,6 +1117,60 @@ def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
     
     return sleep_analysis.get('sleep_metrics', {})
 
+def get_sleep_metrics_for_day(day_date, activities, day_metrics):
+    """Restituisce le metriche sonno per un giorno specifico se ci sono attività sonno"""
+    sleep_activities_for_day = []
+    
+    for activity in activities:
+        if activity['type'] == 'Sonno':
+            activity_date = activity['start_time'].date().isoformat()
+            # Se l'attività sonno è per questo giorno
+            if activity_date == day_date:
+                sleep_activities_for_day.append(activity)
+    
+    if not sleep_activities_for_day:
+        return {}  # Nessuna attività sonno per questo giorno
+    
+    # Prendi l'ultima attività sonno del giorno
+    latest_sleep = sleep_activities_for_day[-1]
+    
+    # Calcola metriche sonno (simile a analyze_sleep_impact ma semplificato)
+    sleep_duration_hours = latest_sleep['duration'] / 60.0
+    
+    if sleep_duration_hours >= 3:
+        base_sleep_duration = min(9.0, sleep_duration_hours)
+        
+        # Efficienza basata su età
+        age = st.session_state.user_profile.get('age', 30)
+        base_efficiency = 85 - (age - 20) * 0.2
+        efficiency_boost = min(10, (base_sleep_duration - 6) * 2)
+        sleep_efficiency = base_efficiency + efficiency_boost
+        sleep_efficiency = max(70, min(98, sleep_efficiency))
+        
+        # Battito durante il sonno
+        base_hr = day_metrics.get('hr_mean', 65)
+        sleep_hr = base_hr * 0.8
+        sleep_hr = max(45, min(65, sleep_hr))
+        
+        # Distribuzione fasi sonno
+        total_sleep_minutes = base_sleep_duration * 60
+        sleep_light = total_sleep_minutes * 0.50
+        sleep_deep = total_sleep_minutes * 0.25
+        sleep_rem = total_sleep_minutes * 0.20
+        sleep_awake = total_sleep_minutes * 0.05
+        
+        return {
+            'sleep_duration': round(base_sleep_duration, 1),
+            'sleep_efficiency': round(sleep_efficiency, 1),
+            'sleep_hr': round(sleep_hr, 1),
+            'sleep_light': round(sleep_light / 60, 1),
+            'sleep_deep': round(sleep_deep / 60, 1),
+            'sleep_rem': round(sleep_rem / 60, 1),
+            'sleep_awake': round(sleep_awake / 60, 1)
+        }
+    
+    return {}
+
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
     """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
     if not day_metrics:
@@ -1715,18 +1769,26 @@ def calculate_recording_timeline(rr_intervals, start_time):
     }
 
 def calculate_daily_metrics(days_data, user_age, user_gender):
-    """Calcola le metriche HRV per ogni giorno"""
+    """Calcola le metriche HRV per ogni giorno - CON SUPPORO PER METRICHE SONNO"""
     daily_metrics = {}
     
     for day_date, day_rr_intervals in days_data.items():
         if len(day_rr_intervals) >= 10:
-            # CORREZIONE: Crea datetime di inizio e fine per ogni giorno
+            # Crea datetime di inizio e fine per ogni giorno
             day_start = datetime.fromisoformat(day_date)
             day_end = day_start + timedelta(hours=24)
             
-            daily_metrics[day_date] = calculate_realistic_hrv_metrics(
-                day_rr_intervals, user_age, user_gender, day_start, day_end  # PASSAGGIO ORARI
+            # Calcola metriche HRV base
+            day_metrics = calculate_realistic_hrv_metrics(
+                day_rr_intervals, user_age, user_gender, day_start, day_end
             )
+            
+            # AGGIUNGI METRICHE SONNO SE CI SONO ATTIVITÀ SONNO PER QUEL GIORNO
+            sleep_metrics_for_day = get_sleep_metrics_for_day(day_date, st.session_state.activities, day_metrics)
+            if sleep_metrics_for_day:
+                day_metrics.update(sleep_metrics_for_day)
+            
+            daily_metrics[day_date] = day_metrics
     
     return daily_metrics
 
@@ -2523,12 +2585,14 @@ def main():
                             height=min(300, 50 + len(hrv_df) * 35)
                         )
 
+
+
                         # CORREZIONE: Mostra metriche sonno solo se presenti in almeno un giorno
                         has_any_sleep_data = any(
-                            has_valid_sleep_metrics(day_metrics) 
+                            any(key.startswith('sleep_') for key in day_metrics.keys())
                             for day_metrics in daily_metrics.values()
                         )
-                        
+
                         if has_any_sleep_data:
                             st.subheader("😴 Metriche Sonno")
 
@@ -2565,8 +2629,7 @@ def main():
                             else:
                                 st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
                         else:
-                            st.info("😴 Nessuna analisi del sonno disponibile - registrazione diurna")
-                        
+                            st.info("😴 Nessuna analisi del sonno disponibile - registrazione diurna")                       
                         st.markdown("<br>", unsafe_allow_html=True)
                         col1, col2 = st.columns(2)
                         
