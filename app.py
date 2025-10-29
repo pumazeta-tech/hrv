@@ -2393,37 +2393,68 @@ def main():
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
                     
-                    # GRAFICO DETTAGLIATO CON ZOOM INTERATTIVO
-                    st.subheader("📈 Andamento Dettagliato HRV con Attività")
+            # GRAFICO DETTAGLIATO CON ZOOM INTERATTIVO
+            st.subheader("📈 Andamento Dettagliato HRV con Attività")
+            
+            if len(rr_intervals) > 0:
+                timestamps = []
+                current_time = start_time
+                
+                for rr in rr_intervals:
+                    timestamps.append(current_time)
+                    current_time += timedelta(milliseconds=rr)
+                
+                hr_instant = [60000 / rr for rr in rr_intervals]
+                window_size = min(60, len(rr_intervals) // 20)  # Finestra più piccola ma più stabile
+                if window_size < 30:
+                    window_size = min(30, len(rr_intervals))
+                
+                # FUNZIONE SMOOTHING
+                def smooth_data(data, window_size=5):
+                    """Applica un filtro mediano per smussare i picchi"""
+                    if len(data) < window_size:
+                        return data
+                    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+                
+                sdnn_moving = []
+                rmssd_moving = []
+                moving_timestamps = []
+                
+                # Applica un filtro ai dati prima del calcolo
+                smoothed_rr = smooth_data(rr_intervals, window_size=3)
+                
+                for i in range(len(smoothed_rr) - window_size):
+                    window_rr = smoothed_rr[i:i + window_size]
                     
-                    if len(rr_intervals) > 0:
-                        timestamps = []
-                        current_time = start_time
+                    # Calcola SDNN con controllo degli outlier
+                    if len(window_rr) > 1:
+                        # Rimuovi outlier estremi dentro ogni finestra
+                        q25, q75 = np.percentile(window_rr, [25, 75])
+                        iqr = q75 - q25
+                        lower_bound = q25 - 1.5 * iqr
+                        upper_bound = q75 + 1.5 * iqr
                         
-                        for rr in rr_intervals:
-                            timestamps.append(current_time)
-                            current_time += timedelta(milliseconds=rr)
+                        filtered_window = [x for x in window_rr if lower_bound <= x <= upper_bound]
                         
-                        hr_instant = [60000 / rr for rr in rr_intervals]
-                        window_size = min(300, len(rr_intervals) // 10)
-                        if window_size < 30:
-                            window_size = min(30, len(rr_intervals))
-                        
-                        sdnn_moving = []
-                        rmssd_moving = []
-                        moving_timestamps = []
-                        
-                        for i in range(len(rr_intervals) - window_size):
-                            window_rr = rr_intervals[i:i + window_size]
-                            window_hr = hr_instant[i:i + window_size]
-                            
-                            sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
-                            differences = np.diff(window_rr)
+                        if len(filtered_window) > 10:  # Almeno 10 punti validi
+                            sdnn = np.std(filtered_window, ddof=1)
+                            differences = np.diff(filtered_window)
                             rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
-                            
-                            sdnn_moving.append(sdnn)
-                            rmssd_moving.append(rmssd)
-                            moving_timestamps.append(timestamps[i + window_size // 2])
+                        else:
+                            sdnn = 0
+                            rmssd = 0
+                    else:
+                        sdnn = 0
+                        rmssd = 0
+                    
+                    sdnn_moving.append(sdnn)
+                    rmssd_moving.append(rmssd)
+                    moving_timestamps.append(timestamps[i + window_size // 2])
+                
+                # Applica ulteriore smoothing ai risultati finali
+                if sdnn_moving:
+                    sdnn_moving = smooth_data(sdnn_moving, window_size=3)
+                    rmssd_moving = smooth_data(rmssd_moving, window_size=3)
                         
                         fig_main = go.Figure()
                         
