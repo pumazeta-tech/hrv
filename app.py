@@ -2233,6 +2233,15 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
+            with col3:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">⚖️ {avg_metrics['lf_hf_ratio']:.2f}</div>
+                    <div class="metric-label">Rapporto LF/HF</div>
+                    <div class="metric-unit">ratio</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
             # SECONDA RIGA: ANALISI SPETTRALE E SONNO
             col1, col2, col3, col4, col5 = st.columns(5)
             
@@ -2274,15 +2283,6 @@ def main():
                 """)
             else:
                 st.success("✅ Ottima registrazione! Dati molto affidabili.")
-            
-            with col3:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">⚖️ {avg_metrics['lf_hf_ratio']:.2f}</div>
-                    <div class="metric-label">Rapporto LF/HF</div>
-                    <div class="metric-unit">ratio</div>
-                </div>
-                """, unsafe_allow_html=True)
             
             # CORREZIONE: Mostra metriche sonno solo se presenti
             has_sleep_metrics = has_valid_sleep_metrics(avg_metrics)
