@@ -2400,53 +2400,85 @@ def main():
                 timestamps = []
                 current_time = start_time
                 
-                # FILTRO SUPER-AGGRESSIVO - RIMUOVI COMPLETAMENTE BATTITI IMPOSSIBILI
-                filtered_rr_intervals = []
-                valid_timestamps = []
-                
-                for i, rr in enumerate(rr_intervals):
-                    # CRITERI MOLTO STRETTI: range fisiologico realistico
-                    if 400 <= rr <= 1200:  # 50 bpm (1200ms) to 150 bpm (400ms)
-                        filtered_rr_intervals.append(rr)
-                        valid_timestamps.append(current_time)
-                    # else: SCARTA COMPLETAMENTE il battito impossibile
+                # FILTRO DI INTERPOLAZIONE PER ARTEFATTI ISOLATI
+                def interpolate_artifacts(rr_data):
+                    """Corregge artefatti isolati usando la media dei vicini"""
+                    cleaned_data = rr_data.copy()
+                    artifact_count = 0
                     
+                    for i in range(1, len(rr_data) - 1):  # Salta primo e ultimo
+                        current_rr = rr_data[i]
+                        prev_rr = rr_data[i-1]
+                        next_rr = rr_data[i+1]
+                        
+                        # Definisci range normale basato sui vicini
+                        normal_min = min(prev_rr, next_rr) * 0.7   # -30%
+                        normal_max = max(prev_rr, next_rr) * 1.3   # +30%
+                        
+                        # Se il battito corrente è anormale ma i vicini sono normali
+                        if not (normal_min <= current_rr <= normal_max) and (400 <= prev_rr <= 1200) and (400 <= next_rr <= 1200):
+                            # Interpola con la media dei vicini
+                            cleaned_data[i] = (prev_rr + next_rr) / 2
+                            artifact_count += 1
+                    
+                    if artifact_count > 0:
+                        st.success(f"🔧 Corretti {artifact_count} artefatti isolati")
+                    
+                    return cleaned_data
+                
+                # APPLICA IL FILTRO
+                filtered_rr_intervals = interpolate_artifacts(rr_intervals)
+                
+                # FILTRO SECONDARIO PER ARTEFATTI PERSISTENTI
+                final_rr_intervals = []
+                for rr in filtered_rr_intervals:
+                    if 350 <= rr <= 1300:  # Range fisiologico ampio ma realistico
+                        final_rr_intervals.append(rr)
+                    else:
+                        # Per artefatti estremi, usa un valore conservativo
+                        final_rr_intervals.append(800)  # 75 bpm default
+                
+                # CREA TIMESTAMPS
+                for rr in final_rr_intervals:
+                    timestamps.append(current_time)
                     current_time += timedelta(milliseconds=rr)
                 
-                # Se abbiamo perso troppi dati, usa una strategia di fallback
-                if len(filtered_rr_intervals) < len(rr_intervals) * 0.5:
-                    st.warning(f"⚠️ Trovati molti artefatti. Dati validi: {len(filtered_rr_intervals)}/{len(rr_intervals)}")
-                    # Fallback: usa i dati originali ma con filtro più leggero
-                    filtered_rr_intervals = [rr for rr in rr_intervals if 350 <= rr <= 1300]
-                    current_time = start_time
-                    valid_timestamps = []
-                    for rr in filtered_rr_intervals:
-                        valid_timestamps.append(current_time)
-                        current_time += timedelta(milliseconds=rr)
-                
-                timestamps = valid_timestamps
-                
-                # CALCOLO FREQUENZA CARDIACA CON LIMITI FISSI
+                # CALCOLO FREQUENZA CARDIACA CON CONTROLLO FINALE
                 hr_instant = []
-                for rr in filtered_rr_intervals:
-                    hr = 60000 / rr
-                    # LIMITE MASSIMO ASSOLUTO - TAGLIA TUTTO SOPRA 180 bpm
-                    hr = min(hr, 180)  # Nessuno supera 180 bpm in condizioni normali
+                for i in range(len(final_rr_intervals)):
+                    hr = 60000 / final_rr_intervals[i]
+                    
+                    # Controllo di coerenza con i vicini
+                    if i > 0 and i < len(final_rr_intervals) - 1:
+                        prev_hr = 60000 / final_rr_intervals[i-1]
+                        next_hr = 60000 / final_rr_intervals[i+1]
+                        avg_surrounding = (prev_hr + next_hr) / 2
+                        
+                        # Se il battito è troppo diverso dai vicini, usa la media
+                        if abs(hr - avg_surrounding) > 40:  # Differenza > 40 bpm
+                            hr = avg_surrounding
+                    
+                    # Limiti assoluti
+                    hr = max(30, min(hr, 180))  # 30-180 bpm range assoluto
                     hr_instant.append(hr)
                 
-                # APPLICA FILTRO MEDIANO PER RIMUOVERE PICCHI RESIDUI
-                if len(hr_instant) > 5:
+                # APPLICA SMOOTHING LEGGERO
+                if len(hr_instant) > 3:
                     hr_smoothed = []
                     for i in range(len(hr_instant)):
-                        start_idx = max(0, i - 2)
-                        end_idx = min(len(hr_instant), i + 3)
-                        window = hr_instant[start_idx:end_idx]
-                        hr_smoothed.append(np.median(window))
+                        if i == 0:
+                            hr_smoothed.append(hr_instant[i])
+                        elif i == len(hr_instant) - 1:
+                            hr_smoothed.append(hr_instant[i])
+                        else:
+                            # Media pesata: 25% precedente, 50% corrente, 25% successivo
+                            smoothed = (hr_instant[i-1] * 0.25 + hr_instant[i] * 0.5 + hr_instant[i+1] * 0.25)
+                            hr_smoothed.append(smoothed)
                     hr_instant = hr_smoothed
                 
-                window_size = min(100, len(filtered_rr_intervals) // 15)
+                window_size = min(100, len(final_rr_intervals) // 15)
                 if window_size < 30:
-                    window_size = min(30, len(filtered_rr_intervals))
+                    window_size = min(30, len(final_rr_intervals))
                 
                 sdnn_moving = []
                 rmssd_moving = []
@@ -2459,17 +2491,12 @@ def main():
                     smoothed = np.convolve(data, np.ones(window_size)/window_size, mode='valid')
                     return smoothed.tolist()
                 
-                for i in range(len(filtered_rr_intervals) - window_size):
-                    window_rr = filtered_rr_intervals[i:i + window_size]
+                for i in range(len(final_rr_intervals) - window_size):
+                    window_rr = final_rr_intervals[i:i + window_size]
                     
-                    # Solo finestre completamente valide
-                    if all(400 <= rr <= 1200 for rr in window_rr):
-                        sdnn = np.std(window_rr, ddof=1)
-                        differences = np.diff(window_rr)
-                        rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
-                    else:
-                        sdnn = 0
-                        rmssd = 0
+                    sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
+                    differences = np.diff(window_rr)
+                    rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
                     
                     sdnn_moving.append(sdnn)
                     rmssd_moving.append(rmssd)
@@ -2483,21 +2510,22 @@ def main():
                     if len(moving_timestamps) > 4:
                         moving_timestamps = moving_timestamps[2:-2]
                 
-                # STATISTICHE FINALI
-                hr_clean = [hr for hr in hr_instant if hr <= 180]
-                avg_hr = np.mean(hr_clean) if hr_clean else 70
-                max_hr = np.max(hr_clean) if hr_clean else 0
+                # STATISTICHE
+                hr_stats = {
+                    'medio': np.mean(hr_instant),
+                    'massimo': np.max(hr_instant),
+                    'minimo': np.min(hr_instant),
+                    'battiti_totali': len(final_rr_intervals)
+                }
                 
                 st.info(f"""
-                **📊 Informazioni Dati (FILTRATI):**
-                - **Battiti totali:** {len(filtered_rr_intervals)} (originali: {len(rr_intervals)})
-                - **Battiti scartati:** {len(rr_intervals) - len(filtered_rr_intervals)}
-                - **Battito medio:** {avg_hr:.1f} bpm
-                - **Battito massimo:** {max_hr:.1f} bpm
-                - **Range realistico:** 50-180 bpm
+                **📊 Dati Filtrati:**
+                - **Battiti:** {hr_stats['battiti_totali']}
+                - **Battito medio:** {hr_stats['medio']:.1f} bpm
+                - **Range:** {hr_stats['minimo']:.1f} - {hr_stats['massimo']:.1f} bpm
+                - **Finestra mobile:** {window_size} battiti
                 """)
                 
-                # GRAFICO CON DATI FILTRATI
                 fig_main = go.Figure()
                 
                 if st.session_state.activities:
@@ -2516,9 +2544,8 @@ def main():
                             line_width=0,
                         )
                 
-                # GRAFICO BATTITO (ORA FILTRATO)
                 fig_main.add_trace(go.Scatter(
-                    x=timestamps[:len(hr_instant)],
+                    x=timestamps,
                     y=hr_instant,
                     mode='lines',
                     name='Battito Istantaneo',
