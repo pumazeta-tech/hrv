@@ -1440,7 +1440,7 @@ def create_activity_tracker():
             duration = duration_minutes
             food_items = ""
             intensity = "Normale"
-            activity_name = f"Sonno {sleep_start.strftime('%H:%M')}-{sleep_end.strftime('%H:%M')}"
+            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
         else:  # PER TUTTI GLI ALTRI TIPI
             food_items = ""
             intensity = st.select_slider("Intensità", 
