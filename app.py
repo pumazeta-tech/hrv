@@ -1547,19 +1547,23 @@ def edit_activity_interface():
             # Mostra le date selezionate
             st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
             st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
+
         else:  # PER TUTTI GLI ALTRI TIPI
             food_items = activity.get('food_items', '')
             intensity = st.select_slider("Intensità", 
                                        options=["Leggera", "Moderata", "Intensa", "Massimale"],
                                        value=activity['intensity'], key="edit_intensity")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Data", value=activity['start_time'].date(), key="edit_date")
-            start_time = st.time_input("Ora inizio", value=activity['start_time'].time(), key="edit_time")
-            st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
-        with col2:
-            duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=activity['duration'], key="edit_duration")
+            
+            # === SPOSTA QUESTI CAMPI DENTRO L'ELSE ===
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Data", value=activity['start_time'].date(), key="edit_date")
+                start_time = st.time_input("Ora inizio", value=activity['start_time'].time(), key="edit_time")
+                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
+            with col2:
+                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=activity['duration'], key="edit_duration")
+
+            # === FINE CAMPI ===
         
         notes = st.text_area("Note", value=activity.get('notes', ''), key="edit_notes")
         
