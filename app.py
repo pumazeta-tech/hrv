@@ -2400,61 +2400,72 @@ def main():
                 timestamps = []
                 current_time = start_time
                 
-                # FILTRO ANTARTEFATTI - RIMUOVI BATTITI IMPOSSIBILI
+                # FILTRO SUPER-AGGRESSIVO - RIMUOVI COMPLETAMENTE BATTITI IMPOSSIBILI
                 filtered_rr_intervals = []
-                for rr in rr_intervals:
-                    # Intervalli RR realistici: 300ms (200 bpm) to 1500ms (40 bpm)
-                    if 300 <= rr <= 1500:
+                valid_timestamps = []
+                
+                for i, rr in enumerate(rr_intervals):
+                    # CRITERI MOLTO STRETTI: range fisiologico realistico
+                    if 400 <= rr <= 1200:  # 50 bpm (1200ms) to 150 bpm (400ms)
                         filtered_rr_intervals.append(rr)
-                    else:
-                        # Sostituisci con la media degli intervalli vicini
-                        filtered_rr_intervals.append(np.median(rr_intervals[max(0, len(filtered_rr_intervals)-5):len(filtered_rr_intervals)]))
-                
-                # Usa i dati filtrati invece degli originali
-                rr_intervals_clean = filtered_rr_intervals if len(filtered_rr_intervals) > len(rr_intervals) * 0.8 else rr_intervals
-                
-                for rr in rr_intervals_clean:
-                    timestamps.append(current_time)
+                        valid_timestamps.append(current_time)
+                    # else: SCARTA COMPLETAMENTE il battito impossibile
+                    
                     current_time += timedelta(milliseconds=rr)
                 
-                # CALCOLA FREQUENZA CARDIACA CON FILTRO
-                hr_instant = []
-                for rr in rr_intervals_clean:
-                    hr = 60000 / rr
-                    # Filtra frequenze cardiache impossibili (20-220 bpm range realistico)
-                    if 20 <= hr <= 220:
-                        hr_instant.append(hr)
-                    else:
-                        # Usa la media delle frequenze vicine
-                        if hr_instant:
-                            hr_instant.append(np.mean(hr_instant[-5:]) if len(hr_instant) >= 5 else hr_instant[-1])
-                        else:
-                            hr_instant.append(70)  # Valore di default
+                # Se abbiamo perso troppi dati, usa una strategia di fallback
+                if len(filtered_rr_intervals) < len(rr_intervals) * 0.5:
+                    st.warning(f"⚠️ Trovati molti artefatti. Dati validi: {len(filtered_rr_intervals)}/{len(rr_intervals)}")
+                    # Fallback: usa i dati originali ma con filtro più leggero
+                    filtered_rr_intervals = [rr for rr in rr_intervals if 350 <= rr <= 1300]
+                    current_time = start_time
+                    valid_timestamps = []
+                    for rr in filtered_rr_intervals:
+                        valid_timestamps.append(current_time)
+                        current_time += timedelta(milliseconds=rr)
                 
-                window_size = min(150, len(rr_intervals_clean) // 10)
-                if window_size < 50:
-                    window_size = min(50, len(rr_intervals_clean))
+                timestamps = valid_timestamps
+                
+                # CALCOLO FREQUENZA CARDIACA CON LIMITI FISSI
+                hr_instant = []
+                for rr in filtered_rr_intervals:
+                    hr = 60000 / rr
+                    # LIMITE MASSIMO ASSOLUTO - TAGLIA TUTTO SOPRA 180 bpm
+                    hr = min(hr, 180)  # Nessuno supera 180 bpm in condizioni normali
+                    hr_instant.append(hr)
+                
+                # APPLICA FILTRO MEDIANO PER RIMUOVERE PICCHI RESIDUI
+                if len(hr_instant) > 5:
+                    hr_smoothed = []
+                    for i in range(len(hr_instant)):
+                        start_idx = max(0, i - 2)
+                        end_idx = min(len(hr_instant), i + 3)
+                        window = hr_instant[start_idx:end_idx]
+                        hr_smoothed.append(np.median(window))
+                    hr_instant = hr_smoothed
+                
+                window_size = min(100, len(filtered_rr_intervals) // 15)
+                if window_size < 30:
+                    window_size = min(30, len(filtered_rr_intervals))
                 
                 sdnn_moving = []
                 rmssd_moving = []
                 moving_timestamps = []
                 
-                # FUNZIONE SMOOTHING CORRETTA
+                # FUNZIONE SMOOTHING
                 def smooth_data(data, window_size=3):
                     if len(data) < window_size:
                         return data
                     smoothed = np.convolve(data, np.ones(window_size)/window_size, mode='valid')
                     return smoothed.tolist()
                 
-                for i in range(len(rr_intervals_clean) - window_size):
-                    window_rr = rr_intervals_clean[i:i + window_size]
+                for i in range(len(filtered_rr_intervals) - window_size):
+                    window_rr = filtered_rr_intervals[i:i + window_size]
                     
-                    # Filtra ulteriormente la finestra corrente
-                    valid_rr = [rr for rr in window_rr if 300 <= rr <= 1500]
-                    
-                    if len(valid_rr) >= window_size * 0.7:  # Almeno 70% di dati validi
-                        sdnn = np.std(valid_rr, ddof=1)
-                        differences = np.diff(valid_rr)
+                    # Solo finestre completamente valide
+                    if all(400 <= rr <= 1200 for rr in window_rr):
+                        sdnn = np.std(window_rr, ddof=1)
+                        differences = np.diff(window_rr)
                         rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
                     else:
                         sdnn = 0
@@ -2462,30 +2473,31 @@ def main():
                     
                     sdnn_moving.append(sdnn)
                     rmssd_moving.append(rmssd)
-                    moving_timestamps.append(timestamps[i + window_size // 2])
+                    if i + window_size // 2 < len(timestamps):
+                        moving_timestamps.append(timestamps[i + window_size // 2])
                 
-                # APPLICA SMOOTHING AI RISULTATI
+                # APPLICA SMOOTHING
                 if len(sdnn_moving) > 5:
                     sdnn_moving = smooth_data(sdnn_moving, 5)
                     rmssd_moving = smooth_data(rmssd_moving, 5)
                     if len(moving_timestamps) > 4:
                         moving_timestamps = moving_timestamps[2:-2]
                 
-                # STATISTICHE PULITE
-                hr_clean = [hr for hr in hr_instant if 20 <= hr <= 220]
+                # STATISTICHE FINALI
+                hr_clean = [hr for hr in hr_instant if hr <= 180]
                 avg_hr = np.mean(hr_clean) if hr_clean else 70
                 max_hr = np.max(hr_clean) if hr_clean else 0
-                min_hr = np.min(hr_clean) if hr_clean else 0
                 
                 st.info(f"""
                 **📊 Informazioni Dati (FILTRATI):**
-                - **Battiti totali:** {len(rr_intervals_clean)} (originali: {len(rr_intervals)})
+                - **Battiti totali:** {len(filtered_rr_intervals)} (originali: {len(rr_intervals)})
+                - **Battiti scartati:** {len(rr_intervals) - len(filtered_rr_intervals)}
                 - **Battito medio:** {avg_hr:.1f} bpm
-                - **Range battito:** {min_hr:.1f} - {max_hr:.1f} bpm
-                - **Finestra mobile:** {window_size} battiti
-                - **Attività tracciate:** {len(st.session_state.activities)}
+                - **Battito massimo:** {max_hr:.1f} bpm
+                - **Range realistico:** 50-180 bpm
                 """)
-
+                
+                # GRAFICO CON DATI FILTRATI
                 fig_main = go.Figure()
                 
                 if st.session_state.activities:
@@ -2503,24 +2515,10 @@ def main():
                             layer="below",
                             line_width=0,
                         )
-                        
-                        activity_center = activity_start + (activity_end - activity_start) / 2
-                        fig_main.add_annotation(
-                            x=activity_center,
-                            y=1.02,
-                            yref="paper",
-                            text=activity['name'],
-                            showarrow=False,
-                            textangle=-45,
-                            font=dict(size=9, color=color),
-                            bgcolor="rgba(255,255,255,0.9)",
-                            bordercolor=color,
-                            borderwidth=1,
-                            borderpad=2
-                        )
                 
+                # GRAFICO BATTITO (ORA FILTRATO)
                 fig_main.add_trace(go.Scatter(
-                    x=timestamps[:len(hr_instant)],  # Assicura lunghezze uguali
+                    x=timestamps[:len(hr_instant)],
                     y=hr_instant,
                     mode='lines',
                     name='Battito Istantaneo',
