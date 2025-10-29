@@ -1461,10 +1461,11 @@ def create_activity_tracker():
         if st.button("💾 Salva Attività", use_container_width=True, key="save_activity"):
             if activity_type == "Sonno":
                 start_datetime = sleep_start_datetime
+                start_date = sleep_start_date  # AGGIUNGI QUESTA RIGA
             else:
                 start_datetime = datetime.combine(start_date, start_time)
                 
-            save_activity(activity_type, activity_name, intensity, food_items, start_datetime, duration, notes)
+            save_activity(activity_type, activity_name, intensity, food_items, start_date, start_datetime, duration, notes)  # CORREGGI QUESTA RIGA
             st.success("Attività salvata!")
             st.rerun()
     
@@ -1580,14 +1581,11 @@ def edit_activity_interface():
             if st.form_submit_button("💾 Salva Modifiche", use_container_width=True):
                 if activity_type == "Sonno":
                     start_datetime = sleep_start_datetime
+                    start_date = sleep_start_date  # AGGIUNGI QUESTA RIGA
                 else:
                     start_datetime = datetime.combine(start_date, start_time)
                     
-                update_activity(activity_index, activity_type, activity_name, intensity, food_items, start_datetime, duration, notes)
-                st.session_state.editing_activity_index = None
-                st.rerun()
-        with col2:
-            if st.form_submit_button("❌ Annulla", use_container_width=True):
+                update_activity(activity_index, activity_type, activity_name, intensity, food_items, start_date, start_datetime, duration, notes)  # CORREGGI QUESTA RIGA
                 st.session_state.editing_activity_index = None
                 st.rerun()
 
