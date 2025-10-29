@@ -557,7 +557,7 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
 
 # CORREZIONE: RIMOSSA LA FUNZIONE DUPLICATA calculate_hrv_coherence
 
-ddef estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
+def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
     """Stima le metriche del sonno SOLO se la registrazione include ore notturne (22:00-7:00)"""
     try:
         # DEBUG
