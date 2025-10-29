@@ -2223,6 +2223,15 @@ def main():
                     <div class="metric-unit">ms²</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+            with col2:
+                st.markdown(f"""
+                <div class="compact-metric-card">
+                    <div class="metric-value">📈 {avg_metrics['hf']:.0f}</div>
+                    <div class="metric-label">HF</div>
+                    <div class="metric-unit">ms²</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             # SECONDA RIGA: ANALISI SPETTRALE E SONNO
             col1, col2, col3, col4, col5 = st.columns(5)
@@ -2265,15 +2274,6 @@ def main():
                 """)
             else:
                 st.success("✅ Ottima registrazione! Dati molto affidabili.")
-            
-            with col2:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">📈 {avg_metrics['hf']:.0f}</div>
-                    <div class="metric-label">HF</div>
-                    <div class="metric-unit">ms²</div>
-                </div>
-                """, unsafe_allow_html=True)
             
             with col3:
                 st.markdown(f"""
