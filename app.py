@@ -2456,7 +2456,7 @@ def main():
                     sdnn_moving = smooth_data(sdnn_moving, window_size=3)
                     rmssd_moving = smooth_data(rmssd_moving, window_size=3)
                         
-                        fig_main = go.Figure()
+                    fig_main = go.Figure()
                         
                         if st.session_state.activities:
                             for activity in st.session_state.activities:
