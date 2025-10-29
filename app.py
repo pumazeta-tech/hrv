@@ -2413,11 +2413,12 @@ def main():
                 rmssd_moving = []
                 moving_timestamps = []
                 
-                # FUNZIONE SMOOTHING SEMPLICE
+                # FUNZIONE SMOOTHING CORRETTA - converte in lista
                 def smooth_data(data, window_size=3):
                     if len(data) < window_size:
                         return data
-                    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+                    smoothed = np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+                    return smoothed.tolist()  # CONVERTI IN LISTA
                 
                 for i in range(len(rr_intervals) - window_size):
                     window_rr = rr_intervals[i:i + window_size]
@@ -2434,8 +2435,9 @@ def main():
                 if len(sdnn_moving) > 5:
                     sdnn_moving = smooth_data(sdnn_moving, 5)
                     rmssd_moving = smooth_data(rmssd_moving, 5)
-                    # Accorcia anche moving_timestamps per matchare la lunghezza
-                    moving_timestamps = moving_timestamps[2:-2] if len(moving_timestamps) > 4 else moving_timestamps
+                    # Accorcia moving_timestamps per matchare la lunghezza
+                    if len(moving_timestamps) > 4:
+                        moving_timestamps = moving_timestamps[2:-2]
                 
                 fig_main = go.Figure()
                 
@@ -2479,7 +2481,7 @@ def main():
                     opacity=0.8
                 ))
                 
-                if sdnn_moving:
+                if sdnn_moving and len(sdnn_moving) > 0:  # CONTROLLO CORRETTO
                     fig_main.add_trace(go.Scatter(
                         x=moving_timestamps,
                         y=sdnn_moving,
@@ -2489,7 +2491,7 @@ def main():
                         yaxis='y2'
                     ))
                 
-                if rmssd_moving:
+                if rmssd_moving and len(rmssd_moving) > 0:  # CONTROLLO CORRETTO
                     fig_main.add_trace(go.Scatter(
                         x=moving_timestamps,
                         y=rmssd_moving,
