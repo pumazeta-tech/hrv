@@ -1492,7 +1492,7 @@ def create_activity_tracker():
             duration = duration_minutes
             food_items = ""
             intensity = "Normale"
-            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
+            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}-{sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}"
             
             st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
             st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
@@ -1530,7 +1530,14 @@ def create_activity_tracker():
         st.sidebar.subheader("📋 Gestione Attività")
         
         for i, activity in enumerate(st.session_state.activities[-10:]):
-            with st.sidebar.expander(f"{activity['name']} - {activity['start_time'].strftime('%d/%m/%Y %H:%M')}", False):
+            if activity['type'] == 'Sonno':
+                # Per il sonno, mostra solo il nome (che già contiene le date)
+                display_text = f"{activity['name']}"
+            else:
+                # Per altre attività, mostra nome + data/ora
+                display_text = f"{activity['name']} - {activity['start_time'].strftime('%d/%m/%Y %H:%M')}"
+            
+            with st.sidebar.expander(display_text, False):
                 st.write(f"**Tipo:** {activity['type']}")
                 st.write(f"**Intensità:** {activity['intensity']}")
                 if activity['food_items']:
@@ -1612,7 +1619,7 @@ def edit_activity_interface():
             duration = duration_minutes
             food_items = ""
             intensity = "Normale"
-            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
+            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}-{sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}"
             
             st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
             st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
