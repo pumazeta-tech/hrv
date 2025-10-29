@@ -408,6 +408,64 @@ def has_valid_sleep_metrics(metrics):
     return False
 
 # =============================================================================
+# FUNZIONI PROFESSIONALI PER PULIRE I DATI
+# =============================================================================
+
+def professional_hrv_preprocessing(rr_intervals):
+    """Pulisce i dati HRV come fanno i dottori"""
+    print("🧹 Sto pulendo i dati...")
+    
+    # Trova i battiti strani
+    battiti_strani = []
+    for i, battito in enumerate(rr_intervals):
+        if battito < 300 or battito > 2000:  # Battiti impossibili
+            battiti_strani.append(i)
+        elif i > 0 and i < len(rr_intervals)-1:
+            battito_prima = rr_intervals[i-1]
+            battito_dopo = rr_intervals[i+1]
+            media_vicini = (battito_prima + battito_dopo) / 2
+            # Se è troppo diverso dai vicini
+            if abs(battito - media_vicini) / media_vicini > 0.2:
+                battiti_strani.append(i)
+    
+    # Correggi i battiti strani
+    dati_puliti = rr_intervals.copy()
+    for idx in battiti_strani:
+        if 0 < idx < len(dati_puliti)-1:
+            # Sostituisci con la media dei vicini
+            dati_puliti[idx] = (dati_puliti[idx-1] + dati_puliti[idx+1]) / 2
+    
+    # Controlla se la pulizia è andata bene
+    percentuale_pulita = (len(rr_intervals) - len(battiti_strani)) / len(rr_intervals) * 100
+    
+    qualita = "Ottima" if percentuale_pulita > 95 else \
+             "Buona" if percentuale_pulita > 90 else \
+             "Accettabile" if percentuale_pulita > 80 else "Scadente"
+    
+    print(f"✅ Puliti {len(battiti_strani)} battiti strani - Qualità: {qualita}")
+    
+    return dati_puliti, qualita, len(battiti_strani)
+
+def calculate_professional_hrv_metrics(rr_intervals, user_age, user_gender, start_time, end_time):
+    """Versione PRO dei calcoli HRV"""
+    
+    # PRIMA PULISCI I DATI
+    dati_puliti, qualita, battiti_corretti = professional_hrv_preprocessing(rr_intervals)
+    
+    # POI CALCOLA CON DATI PULITI
+    if qualita in ["Ottima", "Buona", "Accettabile"]:
+        metrics = calculate_realistic_hrv_metrics(dati_puliti, user_age, user_gender, start_time, end_time)
+        metrics['qualita_segnale'] = qualita
+        metrics['battiti_corretti'] = battiti_corretti
+    else:
+        st.warning("⚠️ Qualità registrazione bassa - Uso dati di base")
+        metrics = get_default_metrics(user_age, user_gender)
+        metrics['qualita_segnale'] = qualita
+        metrics['battiti_corretti'] = battiti_corretti
+    
+    return metrics
+
+# =============================================================================
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
 # =============================================================================
 
@@ -2100,7 +2158,7 @@ def main():
             avg_metrics = {}
             
             try:
-                calculated_metrics = calculate_realistic_hrv_metrics(
+                calculated_metrics = calculate_professional_hrv_metrics(
                     rr_intervals, user_profile['age'], user_profile['gender'], start_time, timeline['end_time']
                 )
                 if calculated_metrics:
@@ -2177,6 +2235,36 @@ def main():
                     <div class="metric-unit">ms²</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+            # 🔬 REPORT QUALITÀ REGISTRAZIONE
+            st.subheader("🔬 Qualità della Registrazione")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                qualita = calculated_metrics.get('qualita_segnale', 'Sconosciuta')
+                colore = "🟢" if qualita == "Ottima" else "🔵" if qualita == "Buona" else "🟠" if qualita == "Accettabile" else "🔴"
+                st.metric("Livello Qualità", f"{colore} {qualita}")
+            
+            with col2:
+                battiti_corretti = calculated_metrics.get('battiti_corretti', 0)
+                st.metric("Battiti Corretti", f"{battiti_corretti}")
+            
+            if qualita == "Scadente":
+                st.error("""
+                **🎯 Consigli per migliorare:**
+                - Controlla che il sensore sia ben posizionato
+                - Stai fermo durante la misurazione  
+                - Prova in un ambiente tranquillo
+                - Ripeti la registrazione
+                """)
+            elif qualita == "Accettabile":
+                st.warning("""
+                **💡 Suggerimenti:**
+                - La registrazione è utilizzabile ma puoi fare di meglio
+                - Cerca di muoverti meno durante la misurazione
+                """)
+            else:
+                st.success("✅ Ottima registrazione! Dati molto affidabili.")
             
             with col2:
                 st.markdown(f"""
