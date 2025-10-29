@@ -1393,7 +1393,6 @@ def create_activity_tracker():
         return
     
     with st.sidebar.expander("➕ Aggiungi Attività/Pasto", expanded=False):
-        # MODIFICA: Aggiungi "Sonno" alla lista
         activity_type = st.selectbox("Tipo Attività", 
                                    ["Allenamento", "Alimentazione", "Stress", "Riposo", "Sonno", "Altro"])
         
@@ -1403,7 +1402,16 @@ def create_activity_tracker():
             food_items = st.text_area("Cosa hai mangiato? (separato da virgola)", placeholder="Es: pasta, insalata, frutta")
             intensity = st.select_slider("Pesantezza pasto", 
                                        options=["Leggero", "Normale", "Pesante", "Molto pesante"])
-        elif activity_type == "Sonno":  # NUOVO BLOCCO PER SONNO
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Data", value=datetime.now().date(), key="activity_date")
+                start_time = st.time_input("Ora inizio", value=datetime.now().time(), key="activity_time")
+                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
+            with col2:
+                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=30, key="activity_duration")
+                
+        elif activity_type == "Sonno":
             st.info("💤 Registra il tuo periodo di sonno")
             
             col1, col2 = st.columns(2)
@@ -1418,11 +1426,9 @@ def create_activity_tracker():
             with col2:
                 sleep_end_time = st.time_input("Ora fine sonno", value=datetime(2020,1,1,7,0).time(), key="sleep_end_time")
             
-            # Calcola durata automatica
             sleep_start_datetime = datetime.combine(sleep_start_date, sleep_start_time)
             sleep_end_datetime = datetime.combine(sleep_end_date, sleep_end_time)
             
-            # Se la fine è prima dell'inizio, assume che sia il giorno dopo
             if sleep_end_datetime < sleep_start_datetime:
                 sleep_end_datetime += timedelta(days=1)
             
@@ -1434,30 +1440,31 @@ def create_activity_tracker():
             intensity = "Normale"
             activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
             
-            # Mostra le date selezionate
             st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
             st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
-            duration = duration_minutes
-            food_items = ""
-            intensity = "Normale"
-            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
-        else:  # PER TUTTI GLI ALTRI TIPI
+            
+        else:
             food_items = ""
             intensity = st.select_slider("Intensità", 
                                        options=["Leggera", "Moderata", "Intensa", "Massimale"])
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            start_date = st.date_input("Data", value=datetime.now().date(), key="activity_date")
-            start_time = st.time_input("Ora inizio", value=datetime.now().time(), key="activity_time")
-            st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
-        with col2:
-            duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=30, key="activity_duration")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Data", value=datetime.now().date(), key="activity_date")
+                start_time = st.time_input("Ora inizio", value=datetime.now().time(), key="activity_time")
+                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
+            with col2:
+                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=30, key="activity_duration")
         
         notes = st.text_area("Note (opzionale)", placeholder="Note aggiuntive...", key="activity_notes")
         
         if st.button("💾 Salva Attività", use_container_width=True, key="save_activity"):
-            save_activity(activity_type, activity_name, intensity, food_items, start_date, start_time, duration, notes)
+            if activity_type == "Sonno":
+                start_datetime = sleep_start_datetime
+            else:
+                start_datetime = datetime.combine(start_date, start_time)
+                
+            save_activity(activity_type, activity_name, intensity, food_items, start_datetime, duration, notes)
             st.success("Attività salvata!")
             st.rerun()
     
@@ -1507,10 +1514,18 @@ def edit_activity_interface():
             intensity = st.select_slider("Pesantezza pasto", 
                                        options=["Leggero", "Normale", "Pesante", "Molto pesante"],
                                        value=activity['intensity'], key="edit_intensity_food")
-        elif activity_type == "Sonno":  # NUOVO BLOCCO PER MODIFICA SONNO
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Data", value=activity['start_time'].date(), key="edit_date")
+                start_time = st.time_input("Ora inizio", value=activity['start_time'].time(), key="edit_time")
+                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
+            with col2:
+                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=activity['duration'], key="edit_duration")
+                
+        elif activity_type == "Sonno":
             st.info("💤 Modifica periodo di sonno")
             
-            # Estrai data/ora dall'attività esistente
             existing_start = activity['start_time']
             
             col1, col2 = st.columns(2)
@@ -1519,7 +1534,6 @@ def edit_activity_interface():
             with col2:
                 sleep_start_time = st.time_input("Ora inizio sonno", value=existing_start.time(), key="edit_sleep_start_time")
             
-            # Calcola la data/ora fine basandosi sulla durata esistente
             existing_end = existing_start + timedelta(minutes=activity['duration'])
             
             col1, col2 = st.columns(2)
@@ -1528,11 +1542,9 @@ def edit_activity_interface():
             with col2:
                 sleep_end_time = st.time_input("Ora fine sonno", value=existing_end.time(), key="edit_sleep_end_time")
             
-            # Calcola durata automatica
             sleep_start_datetime = datetime.combine(sleep_start_date, sleep_start_time)
             sleep_end_datetime = datetime.combine(sleep_end_date, sleep_end_time)
             
-            # Se la fine è prima dell'inizio, assume che sia il giorno dopo
             if sleep_end_datetime < sleep_start_datetime:
                 sleep_end_datetime += timedelta(days=1)
             
@@ -1544,17 +1556,15 @@ def edit_activity_interface():
             intensity = "Normale"
             activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
             
-            # Mostra le date selezionate
             st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
             st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
-
-        else:  # PER TUTTI GLI ALTRI TIPI
+            
+        else:
             food_items = activity.get('food_items', '')
             intensity = st.select_slider("Intensità", 
                                        options=["Leggera", "Moderata", "Intensa", "Massimale"],
                                        value=activity['intensity'], key="edit_intensity")
             
-            # === SPOSTA QUESTI CAMPI DENTRO L'ELSE ===
             col1, col2 = st.columns(2)
             with col1:
                 start_date = st.date_input("Data", value=activity['start_time'].date(), key="edit_date")
@@ -1562,15 +1572,18 @@ def edit_activity_interface():
                 st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
             with col2:
                 duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=activity['duration'], key="edit_duration")
-
-            # === FINE CAMPI ===
         
         notes = st.text_area("Note", value=activity.get('notes', ''), key="edit_notes")
         
         col1, col2 = st.columns(2)
         with col1:
             if st.form_submit_button("💾 Salva Modifiche", use_container_width=True):
-                update_activity(activity_index, activity_type, activity_name, intensity, food_items, start_date, start_time, duration, notes)
+                if activity_type == "Sonno":
+                    start_datetime = sleep_start_datetime
+                else:
+                    start_datetime = datetime.combine(start_date, start_time)
+                    
+                update_activity(activity_index, activity_type, activity_name, intensity, food_items, start_datetime, duration, notes)
                 st.session_state.editing_activity_index = None
                 st.rerun()
         with col2:
