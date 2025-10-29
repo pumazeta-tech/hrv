@@ -616,59 +616,65 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
 # CORREZIONE: RIMOSSA LA FUNZIONE DUPLICATA calculate_hrv_coherence
 
 def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
-    """Stima le metriche del sonno SOLO se la registrazione include ore notturne (22:00-7:00)"""
+    """Stima le metriche del sonno SOLO se la registrazione include ore notturne (22:00-7:00) in modo più restrittivo"""
     try:
         # DEBUG
         print(f"   🛌 DEBUG estimate_sleep_metrics:")
         print(f"      Start: {start_time} (hour: {start_time.hour}), End: {end_time} (hour: {end_time.hour})")
         print(f"      Duration: {recording_duration_hours:.2f}h")
         
-        # Determina se la registrazione comprende ore notturne (22:00 - 7:00)
+        # DEFINIZIONE PIÙ RESTRITTIVA: SONNO SOLO SE COPRE ALMENO 4 ORE NOTTURNE
         includes_night_hours = False
+        night_coverage = 0.0
         
-        # Caso 1: Registrazione lunga che copre sicuramente la notte
-        if recording_duration_hours >= 10:
-            includes_night_hours = True
-            print("      Caso 1 - Registrazione lunga >=10h")
+        # Calcola la copertura effettiva delle ore notturne (22:00-7:00)
+        night_start_hour = 22  # 22:00
+        night_end_hour = 7     # 7:00 (del giorno successivo)
         
-        # Caso 2: Inizia di sera (dopo le 20:00) e finisce di notte/mattina
-        elif start_time.hour >= 20 and end_time.hour <= 12:
-            includes_night_hours = True
-            print("      Caso 2 - Inizia sera, finisce mattina")
+        # Se la registrazione finisce il giorno dopo, aggiungi 24 ore all'end_hour per calcoli
+        end_hour_calc = end_time.hour
+        if end_time.date() > start_time.date():
+            end_hour_calc += 24
         
-        # Caso 3: Inizia di notte (prima delle 7:00)
-        elif start_time.hour < 7:
-            includes_night_hours = True
-            print("      Caso 3 - Inizia di notte")
-            
-        # Caso 4: Finisce di notte (dopo le 22:00)
-        elif end_time.hour >= 22:
-            includes_night_hours = True
-            print("      Caso 4 - Finisce di notte")
+        start_hour_calc = start_time.hour
         
-        # Caso 5: Attraversa completamente la notte (inizia prima delle 22 e finisce dopo le 7)
-        elif start_time.hour < 22 and end_time.hour > 7 and recording_duration_hours > 8:
-            includes_night_hours = True
-            print("      Caso 5 - Attraversa la notte")
+        # Calcola ore notturne coperte
+        night_hours_covered = 0
         
-        print(f"      includes_night_hours = {includes_night_hours}")
+        # Caso 1: Registrazione che inizia prima delle 22 e finisce dopo le 7 del giorno dopo
+        if start_hour_calc < night_start_hour and end_hour_calc > night_end_hour + 24:
+            night_hours_covered = 9  # Copre tutta la notte (9 ore)
         
-        # CORREZIONE: Se NON include ore notturne, NON restituire le metriche del sonno
+        # Caso 2: Inizia di sera e finisce di mattina (stesso ciclo notte)
+        elif start_hour_calc >= night_start_hour and end_hour_calc <= night_end_hour + 24:
+            night_hours_covered = min(end_hour_calc, night_end_hour + 24) - start_hour_calc
+        
+        # Caso 3: Inizia di notte (prima delle 7) e finisce di giorno
+        elif start_hour_calc < night_end_hour:
+            night_hours_covered = min(end_hour_calc, night_end_hour) - start_hour_calc
+        
+        # Caso 4: Inizia di giorno e finisce di notte (dopo le 22)
+        elif end_hour_calc > night_start_hour:
+            night_hours_covered = end_hour_calc - max(start_hour_calc, night_start_hour)
+        
+        # Calcola la percentuale di copertura notturna
+        night_coverage = night_hours_covered / 9.0  # 9 ore totali di notte
+        
+        print(f"      Night hours covered: {night_hours_covered}h")
+        print(f"      Night coverage: {night_coverage:.2f}")
+        
+        # CONDIZIONE PIÙ RESTRITTIVA: solo se copre ALMENO 4 ore notturne (44% della notte)
+        includes_night_hours = night_hours_covered >= 4
+        
+        print(f"      includes_night_hours = {includes_night_hours} (threshold: >=4h night coverage)")
+        
+        # CORREZIONE: Se NON include ore notturne sufficienti, NON restituire le metriche del sonno
         if not includes_night_hours:
-            print("      ❌ NESSUN SONNO - Registrazione diurna")
+            print("      ❌ NESSUN SONNO - Copertura notturna insufficiente o registrazione diurna")
             return {}  # RESTITUISCI DIZIONARIO VUOTO
         
-        # Se arriva qui, significa che include ore notturne
+        # Se arriva qui, significa che include ore notturne sufficienti
         if len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
-            night_coverage = calculate_night_coverage(start_time, end_time, recording_duration_hours)
-            
-            print(f"      Night coverage: {night_coverage:.2f}")
-            
-            # Se la copertura notturna è troppo bassa, non calcolare il sonno
-            if night_coverage < 0.3:  # Meno del 30% della notte coperta
-                print(f"      ❌ Copertura notturna insufficiente: {night_coverage:.2f}")
-                return {}
-            
             # Calcolo durata sonno realistico basato sulla copertura notturna
             base_sleep_duration = 7.0  # Ore base di sonno
             sleep_duration = base_sleep_duration * night_coverage
