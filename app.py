@@ -1460,12 +1460,15 @@ def create_activity_tracker():
         
         if st.button("💾 Salva Attività", use_container_width=True, key="save_activity"):
             if activity_type == "Sonno":
-                start_datetime = sleep_start_datetime
-                start_date = sleep_start_date  # AGGIUNGI QUESTA RIGA
+                # Per Sonno, usa sleep_start_datetime e estrai date/time
+                start_date = sleep_start_date
+                start_time = sleep_start_time
             else:
-                start_datetime = datetime.combine(start_date, start_time)
+                # Per altri tipi, usa i valori normali
+                start_date = start_date
+                start_time = start_time
                 
-            save_activity(activity_type, activity_name, intensity, food_items, start_date, start_datetime, duration, notes)  # CORREGGI QUESTA RIGA
+            save_activity(activity_type, activity_name, intensity, food_items, start_date, start_time, duration, notes)
             st.success("Attività salvata!")
             st.rerun()
     
@@ -1580,17 +1583,21 @@ def edit_activity_interface():
         with col1:
             if st.form_submit_button("💾 Salva Modifiche", use_container_width=True):
                 if activity_type == "Sonno":
-                    start_datetime = sleep_start_datetime
-                    start_date = sleep_start_date  # AGGIUNGI QUESTA RIGA
+                    # Per Sonno, usa sleep_start_datetime e estrai date/time
+                    start_date = sleep_start_date
+                    start_time = sleep_start_time
                 else:
-                    start_datetime = datetime.combine(start_date, start_time)
+                    # Per altri tipi, usa i valori normali
+                    start_date = start_date
+                    start_time = start_time
                     
-                update_activity(activity_index, activity_type, activity_name, intensity, food_items, start_date, start_datetime, duration, notes)  # CORREGGI QUESTA RIGA
+                update_activity(activity_index, activity_type, activity_name, intensity, food_items, start_date, start_time, duration, notes)
                 st.session_state.editing_activity_index = None
                 st.rerun()
 
 def save_activity(activity_type, name, intensity, food_items, start_date, start_time, duration, notes):
     """Salva una nuova attività"""
+    # Combina data e ora
     start_datetime = datetime.combine(start_date, start_time)
     
     activity = {
