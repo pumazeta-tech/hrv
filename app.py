@@ -2405,13 +2405,19 @@ def main():
                     current_time += timedelta(milliseconds=rr)
                 
                 hr_instant = [60000 / rr for rr in rr_intervals]
-                window_size = min(100, len(rr_intervals) // 15)  # Finestra più grande = meno picchi
-                if window_size < 40:
-                    window_size = min(40, len(rr_intervals))
+                window_size = min(150, len(rr_intervals) // 10)  # Finestra più grande = meno picchi
+                if window_size < 50:
+                    window_size = min(50, len(rr_intervals))
                 
                 sdnn_moving = []
                 rmssd_moving = []
                 moving_timestamps = []
+                
+                # FUNZIONE SMOOTHING SEMPLICE
+                def smooth_data(data, window_size=3):
+                    if len(data) < window_size:
+                        return data
+                    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
                 
                 for i in range(len(rr_intervals) - window_size):
                     window_rr = rr_intervals[i:i + window_size]
@@ -2424,9 +2430,12 @@ def main():
                     rmssd_moving.append(rmssd)
                     moving_timestamps.append(timestamps[i + window_size // 2])
                 
-                fig_main = go.Figure()
-                
-                # ... il resto del tuo codice originale ...
+                # APPLICA SMOOTHING AI RISULTATI PER RIDURRE I PICCHI
+                if len(sdnn_moving) > 5:
+                    sdnn_moving = smooth_data(sdnn_moving, 5)
+                    rmssd_moving = smooth_data(rmssd_moving, 5)
+                    # Accorcia anche moving_timestamps per matchare la lunghezza
+                    moving_timestamps = moving_timestamps[2:-2] if len(moving_timestamps) > 4 else moving_timestamps
                 
                 fig_main = go.Figure()
                 
@@ -2469,108 +2478,108 @@ def main():
                     line=dict(color='#e74c3c', width=1),
                     opacity=0.8
                 ))
-                        
-                        if sdnn_moving:
-                            fig_main.add_trace(go.Scatter(
-                                x=moving_timestamps,
-                                y=sdnn_moving,
-                                mode='lines',
-                                name='SDNN Mobile',
-                                line=dict(color='#3498db', width=2),
-                                yaxis='y2'
-                            ))
-                        
-                        if rmssd_moving:
-                            fig_main.add_trace(go.Scatter(
-                                x=moving_timestamps,
-                                y=rmssd_moving,
-                                mode='lines',
-                                name='RMSSD Mobile',
-                                line=dict(color='#2ecc71', width=2),
-                                yaxis='y3'
-                            ))
-                        
-                        fig_main.update_layout(
-                            title='Andamento Dettagliato HRV - Zoomma con mouse/touch (Aree colorate = Attività)',
-                            xaxis=dict(
-                                title='Tempo',
-                                rangeslider=dict(visible=False)
-                            ),
-                            yaxis=dict(
-                                title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
-                                tickfont=dict(color='#e74c3c')
-                            ),
-                            yaxis2=dict(
-                                title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
-                                tickfont=dict(color='#3498db'),
-                                overlaying='y',
-                                side='right',
-                                position=0.85
-                            ),
-                            yaxis3=dict(
-                                title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
-                                tickfont=dict(color='#2ecc71'),
-                                overlaying='y',
-                                side='right',
-                                position=0.15
-                            ),
-                            height=600,
-                            showlegend=True,
-                            hovermode='x unified',
-                            plot_bgcolor='rgba(240,240,240,0.1)'
-                        )
-                        
-                        fig_main.update_layout(
-                            xaxis=dict(
-                                rangeselector=dict(
-                                    buttons=list([
-                                        dict(count=1, label="1h", step="hour", stepmode="backward"),
-                                        dict(count=6, label="6h", step="hour", stepmode="backward"),
-                                        dict(count=1, label="1gg", step="day", stepmode="backward"),
-                                        dict(step="all", label="Tutto")
-                                    ])
-                                ),
-                                rangeslider=dict(visible=False),
-                                type="date"
-                            )
-                        )
-                        
-                        st.plotly_chart(fig_main, use_container_width=True)
-                        
-                        st.caption("""
-                        **🔍 Come zoommare:**
-                        - **Mouse:** Trascina per selezionare un'area da zoommare
-                        - **Doppio click:** Reset dello zoom
-                        - **Pulsanti sopra:** Zoom predefiniti (1h, 6h, 1 giorno, Tutto)
-                        - **Aree colorate:** Periodi di attività (Allenamento=🔴, Alimentazione=🟠, Stress=🟣, Riposo=🔵)
-                        """)
-                        
-                        st.info(f"""
-                        **📊 Informazioni Dati:**
-                        - **Battiti totali:** {len(rr_intervals)}
-                        - **Durata registrazione:** {timeline['total_duration_hours']:.1f} ore
-                        - **Finestra mobile:** {window_size} battiti
-                        - **Battito medio:** {np.mean(hr_instant):.1f} bpm
-                        - **SDNN medio:** {np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms
-                        - **RMSSD medio:** {np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms
-                        - **Attività tracciate:** {len(st.session_state.activities)}
-                        """)
-                    
-                    else:
-                        st.warning("Dati insufficienti per l'analisi dettagliata")
-                    
-                    st.subheader("📊 Statistiche Generali")
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        st.metric("Battito Medio", f"{np.mean(hr_instant):.1f} bpm")
-                    with col2:
-                        st.metric("SDNN Medio", f"{np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms")
-                    with col3:
-                        st.metric("RMSSD Medio", f"{np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms")
-                    with col4:
-                        st.metric("Battiti Totali", len(rr_intervals))
+                
+                if sdnn_moving:
+                    fig_main.add_trace(go.Scatter(
+                        x=moving_timestamps,
+                        y=sdnn_moving,
+                        mode='lines',
+                        name='SDNN Mobile',
+                        line=dict(color='#3498db', width=2),
+                        yaxis='y2'
+                    ))
+                
+                if rmssd_moving:
+                    fig_main.add_trace(go.Scatter(
+                        x=moving_timestamps,
+                        y=rmssd_moving,
+                        mode='lines',
+                        name='RMSSD Mobile',
+                        line=dict(color='#2ecc71', width=2),
+                        yaxis='y3'
+                    ))
+                
+                fig_main.update_layout(
+                    title='Andamento Dettagliato HRV - Zoomma con mouse/touch (Aree colorate = Attività)',
+                    xaxis=dict(
+                        title='Tempo',
+                        rangeslider=dict(visible=False)
+                    ),
+                    yaxis=dict(
+                        title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
+                        tickfont=dict(color='#e74c3c')
+                    ),
+                    yaxis2=dict(
+                        title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
+                        tickfont=dict(color='#3498db'),
+                        overlaying='y',
+                        side='right',
+                        position=0.85
+                    ),
+                    yaxis3=dict(
+                        title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
+                        tickfont=dict(color='#2ecc71'),
+                        overlaying='y',
+                        side='right',
+                        position=0.15
+                    ),
+                    height=600,
+                    showlegend=True,
+                    hovermode='x unified',
+                    plot_bgcolor='rgba(240,240,240,0.1)'
+                )
+                
+                fig_main.update_layout(
+                    xaxis=dict(
+                        rangeselector=dict(
+                            buttons=list([
+                                dict(count=1, label="1h", step="hour", stepmode="backward"),
+                                dict(count=6, label="6h", step="hour", stepmode="backward"),
+                                dict(count=1, label="1gg", step="day", stepmode="backward"),
+                                dict(step="all", label="Tutto")
+                            ])
+                        ),
+                        rangeslider=dict(visible=False),
+                        type="date"
+                    )
+                )
+                
+                st.plotly_chart(fig_main, use_container_width=True)
+                
+                st.caption("""
+                **🔍 Come zoommare:**
+                - **Mouse:** Trascina per selezionare un'area da zoommare
+                - **Doppio click:** Reset dello zoom
+                - **Pulsanti sopra:** Zoom predefiniti (1h, 6h, 1 giorno, Tutto)
+                - **Aree colorate:** Periodi di attività (Allenamento=🔴, Alimentazione=🟠, Stress=🟣, Riposo=🔵)
+                """)
+                
+                st.info(f"""
+                **📊 Informazioni Dati:**
+                - **Battiti totali:** {len(rr_intervals)}
+                - **Durata registrazione:** {timeline['total_duration_hours']:.1f} ore
+                - **Finestra mobile:** {window_size} battiti
+                - **Battito medio:** {np.mean(hr_instant):.1f} bpm
+                - **SDNN medio:** {np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms
+                - **RMSSD medio:** {np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms
+                - **Attività tracciate:** {len(st.session_state.activities)}
+                """)
+            
+            else:
+                st.warning("Dati insufficienti per l'analisi dettagliata")
+            
+            st.subheader("📊 Statistiche Generali")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Battito Medio", f"{np.mean(hr_instant):.1f} bpm")
+            with col2:
+                st.metric("SDNN Medio", f"{np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms")
+            with col3:
+                st.metric("RMSSD Medio", f"{np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms")
+            with col4:
+                st.metric("Battiti Totali", len(rr_intervals))
             
             # SALVATAGGIO ANALISI - VERSIONE CORRETTA
             if st.button("💾 Salva Analisi nel Database", type="primary"):
