@@ -1405,19 +1405,38 @@ def create_activity_tracker():
                                        options=["Leggero", "Normale", "Pesante", "Molto pesante"])
         elif activity_type == "Sonno":  # NUOVO BLOCCO PER SONNO
             st.info("💤 Registra il tuo periodo di sonno")
+            
             col1, col2 = st.columns(2)
             with col1:
-                sleep_start = st.time_input("Ora inizio sonno", value=datetime(2020,1,1,23,0).time())
+                sleep_start_date = st.date_input("Data inizio sonno", value=datetime.now().date(), key="sleep_start_date")
             with col2:
-                sleep_end = st.time_input("Ora fine sonno", value=datetime(2020,1,1,7,0).time())
+                sleep_start_time = st.time_input("Ora inizio sonno", value=datetime(2020,1,1,23,0).time(), key="sleep_start_time")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                sleep_end_date = st.date_input("Data fine sonno", value=datetime.now().date(), key="sleep_end_date")
+            with col2:
+                sleep_end_time = st.time_input("Ora fine sonno", value=datetime(2020,1,1,7,0).time(), key="sleep_end_time")
             
             # Calcola durata automatica
-            duration_minutes = ((sleep_end.hour - sleep_start.hour) * 60 + 
-                               (sleep_end.minute - sleep_start.minute))
-            if duration_minutes < 0:
-                duration_minutes += 24 * 60  # Correggi per sonno che passa la mezzanotte
+            sleep_start_datetime = datetime.combine(sleep_start_date, sleep_start_time)
+            sleep_end_datetime = datetime.combine(sleep_end_date, sleep_end_time)
+            
+            # Se la fine è prima dell'inizio, assume che sia il giorno dopo
+            if sleep_end_datetime < sleep_start_datetime:
+                sleep_end_datetime += timedelta(days=1)
+            
+            duration_minutes = int((sleep_end_datetime - sleep_start_datetime).total_seconds() / 60)
             
             st.write(f"**Durata sonno:** {duration_minutes // 60}h {duration_minutes % 60}min")
+            duration = duration_minutes
+            food_items = ""
+            intensity = "Normale"
+            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
+            
+            # Mostra le date selezionate
+            st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
+            st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
             duration = duration_minutes
             food_items = ""
             intensity = "Normale"
@@ -1488,7 +1507,47 @@ def edit_activity_interface():
             intensity = st.select_slider("Pesantezza pasto", 
                                        options=["Leggero", "Normale", "Pesante", "Molto pesante"],
                                        value=activity['intensity'], key="edit_intensity_food")
-        else:
+        elif activity_type == "Sonno":  # NUOVO BLOCCO PER MODIFICA SONNO
+            st.info("💤 Modifica periodo di sonno")
+            
+            # Estrai data/ora dall'attività esistente
+            existing_start = activity['start_time']
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                sleep_start_date = st.date_input("Data inizio sonno", value=existing_start.date(), key="edit_sleep_start_date")
+            with col2:
+                sleep_start_time = st.time_input("Ora inizio sonno", value=existing_start.time(), key="edit_sleep_start_time")
+            
+            # Calcola la data/ora fine basandosi sulla durata esistente
+            existing_end = existing_start + timedelta(minutes=activity['duration'])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                sleep_end_date = st.date_input("Data fine sonno", value=existing_end.date(), key="edit_sleep_end_date")
+            with col2:
+                sleep_end_time = st.time_input("Ora fine sonno", value=existing_end.time(), key="edit_sleep_end_time")
+            
+            # Calcola durata automatica
+            sleep_start_datetime = datetime.combine(sleep_start_date, sleep_start_time)
+            sleep_end_datetime = datetime.combine(sleep_end_date, sleep_end_time)
+            
+            # Se la fine è prima dell'inizio, assume che sia il giorno dopo
+            if sleep_end_datetime < sleep_start_datetime:
+                sleep_end_datetime += timedelta(days=1)
+            
+            duration_minutes = int((sleep_end_datetime - sleep_start_datetime).total_seconds() / 60)
+            
+            st.write(f"**Durata sonno:** {duration_minutes // 60}h {duration_minutes % 60}min")
+            duration = duration_minutes
+            food_items = ""
+            intensity = "Normale"
+            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m %H:%M')}-{sleep_end_datetime.strftime('%d/%m %H:%M')}"
+            
+            # Mostra le date selezionate
+            st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
+            st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
+        else:  # PER TUTTI GLI ALTRI TIPI
             food_items = activity.get('food_items', '')
             intensity = st.select_slider("Intensità", 
                                        options=["Leggera", "Moderata", "Intensa", "Massimale"],
