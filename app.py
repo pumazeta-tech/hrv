@@ -616,105 +616,9 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
 # CORREZIONE: RIMOSSA LA FUNZIONE DUPLICATA calculate_hrv_coherence
 
 def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
-    """Stima le metriche del sonno SOLO se la registrazione include ore notturne (22:00-7:00) in modo più restrittivo"""
-    try:
-        # DEBUG
-        print(f"   🛌 DEBUG estimate_sleep_metrics:")
-        print(f"      Start: {start_time} (hour: {start_time.hour}), End: {end_time} (hour: {end_time.hour})")
-        print(f"      Duration: {recording_duration_hours:.2f}h")
-        
-        # DEFINIZIONE PIÙ RESTRITTIVA: SONNO SOLO SE COPRE ALMENO 4 ORE NOTTURNE
-        includes_night_hours = False
-        night_coverage = 0.0
-        
-        # Calcola la copertura effettiva delle ore notturne (22:00-7:00)
-        night_start_hour = 22  # 22:00
-        night_end_hour = 7     # 7:00 (del giorno successivo)
-        
-        # Se la registrazione finisce il giorno dopo, aggiungi 24 ore all'end_hour per calcoli
-        end_hour_calc = end_time.hour
-        if end_time.date() > start_time.date():
-            end_hour_calc += 24
-        
-        start_hour_calc = start_time.hour
-        
-        # Calcola ore notturne coperte
-        night_hours_covered = 0
-        
-        # Caso 1: Registrazione che inizia prima delle 22 e finisce dopo le 7 del giorno dopo
-        if start_hour_calc < night_start_hour and end_hour_calc > night_end_hour + 24:
-            night_hours_covered = 9  # Copre tutta la notte (9 ore)
-        
-        # Caso 2: Inizia di sera e finisce di mattina (stesso ciclo notte)
-        elif start_hour_calc >= night_start_hour and end_hour_calc <= night_end_hour + 24:
-            night_hours_covered = min(end_hour_calc, night_end_hour + 24) - start_hour_calc
-        
-        # Caso 3: Inizia di notte (prima delle 7) e finisce di giorno
-        elif start_hour_calc < night_end_hour:
-            night_hours_covered = min(end_hour_calc, night_end_hour) - start_hour_calc
-        
-        # Caso 4: Inizia di giorno e finisce di notte (dopo le 22)
-        elif end_hour_calc > night_start_hour:
-            night_hours_covered = end_hour_calc - max(start_hour_calc, night_start_hour)
-        
-        # Calcola la percentuale di copertura notturna
-        night_coverage = night_hours_covered / 9.0  # 9 ore totali di notte
-        
-        print(f"      Night hours covered: {night_hours_covered}h")
-        print(f"      Night coverage: {night_coverage:.2f}")
-        
-        # CONDIZIONE PIÙ RESTRITTIVA: solo se copre ALMENO 4 ore notturne (44% della notte)
-        includes_night_hours = night_hours_covered >= 4
-        
-        print(f"      includes_night_hours = {includes_night_hours} (threshold: >=4h night coverage)")
-        
-        # CORREZIONE: Se NON include ore notturne sufficienti, NON restituire le metriche del sonno
-        if not includes_night_hours:
-            print("      ❌ NESSUN SONNO - Copertura notturna insufficiente o registrazione diurna")
-            return {}  # RESTITUISCI DIZIONARIO VUOTO
-        
-        # Se arriva qui, significa che include ore notturne sufficienti
-        if len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
-            # Calcolo durata sonno realistico basato sulla copertura notturna
-            base_sleep_duration = 7.0  # Ore base di sonno
-            sleep_duration = base_sleep_duration * night_coverage
-            sleep_duration = max(3.0, min(9.0, sleep_duration))  # Limiti realistici
-            
-            # Battito durante il sonno (più basso)
-            sleep_hr = hr_mean * (0.75 + np.random.normal(0, 0.03))
-            sleep_hr = max(45, min(65, sleep_hr))
-            
-            # Efficienza del sonno basata su HRV e età
-            base_efficiency = 85 - (age - 20) * 0.2
-            sleep_efficiency = base_efficiency + np.random.normal(0, 5)
-            sleep_efficiency = max(70, min(95, sleep_efficiency))
-            
-            # Distribuzione realistico delle fasi del sonno
-            total_sleep_minutes = sleep_duration * 60
-            sleep_light = total_sleep_minutes * 0.55  # 55% sonno leggero
-            sleep_deep = total_sleep_minutes * 0.20   # 20% sonno profondo  
-            sleep_rem = total_sleep_minutes * 0.25    # 25% sonno REM
-            sleep_awake = total_sleep_minutes * 0.05  # 5% risvegli
-            
-            result = {
-                'sleep_duration': round(sleep_duration, 1),
-                'sleep_efficiency': round(sleep_efficiency, 1),
-                'sleep_hr': round(sleep_hr, 1),
-                'sleep_light': round(sleep_light / 60, 1),
-                'sleep_deep': round(sleep_deep / 60, 1),
-                'sleep_rem': round(sleep_rem / 60, 1),
-                'sleep_awake': round(sleep_awake / 60, 1)
-            }
-            
-            print(f"      ✅ SONNO CALCOLATO: {result}")
-            return result
-        else:
-            print("      ❌ Troppo pochi battiti per analisi sonno")
-            return {}
-            
-    except Exception as e:
-        print(f"      ❌ Errore: {e}")
-        return {}
+    """NON calcolare mai automaticamente il sonno - solo tramite attività esplicita"""
+    print(f"   🛌 estimate_sleep_metrics: SONNO DISABILITATO - Usa attività 'Sonno' per registrarlo")
+    return {}  # Sempre vuoto
 
 def calculate_night_coverage(start_time, end_time, duration_hours):
     """Calcola quanta parte della notte (22:00-7:00) è coperta dalla registrazione"""
@@ -1030,6 +934,9 @@ def analyze_activities_impact(activities, daily_metrics, timeline):
         elif activity['type'] == "Riposo":
             analysis = analyze_recovery_impact(activity, daily_metrics)
             activity_analysis.append(analysis)
+        elif activity['type'] == "Sonno":  # NUOVO - analisi sonno
+            analysis = analyze_sleep_impact(activity, daily_metrics, timeline)
+            activity_analysis.append(analysis)
         elif activity['type'] == "Stress":
             analysis = analyze_stress_impact(activity, daily_metrics)
             activity_analysis.append(analysis)
@@ -1097,6 +1004,84 @@ def analyze_recovery_impact(activity, daily_metrics):
         'recommendations': ["Ottima scelta per il recupero!"]
     }
 
+def analyze_sleep_impact(activity, daily_metrics, timeline):
+    """Analisi specifica per periodi di sonno"""
+    sleep_start = activity['start_time']
+    sleep_duration_hours = activity['duration'] / 60.0
+    
+    # Calcola metriche sonno realistiche basate sulla durata specificata
+    if sleep_duration_hours >= 3:  # Almeno 3 ore di sonno
+        base_sleep_duration = min(9.0, sleep_duration_hours)  # Max 9 ore
+        
+        # Efficienza basata su età e durata
+        age = st.session_state.user_profile.get('age', 30)
+        base_efficiency = 85 - (age - 20) * 0.2
+        # Migliora efficienza se sonno più lungo
+        efficiency_boost = min(10, (base_sleep_duration - 6) * 2)  # +2% per ora oltre 6h
+        sleep_efficiency = base_efficiency + efficiency_boost
+        sleep_efficiency = max(70, min(98, sleep_efficiency))
+        
+        # Battito durante il sonno (più basso del normale)
+        base_hr = 65  # Default
+        if daily_metrics:
+            # Trova metriche del giorno corrispondente
+            sleep_date = sleep_start.date().isoformat()
+            day_metrics = daily_metrics.get(sleep_date, {})
+            base_hr = day_metrics.get('hr_mean', 65)
+        
+        sleep_hr = base_hr * 0.8  # -20% durante il sonno
+        sleep_hr = max(45, min(65, sleep_hr))
+        
+        # Distribuzione fasi sonno (più realistico)
+        total_sleep_minutes = base_sleep_duration * 60
+        sleep_light = total_sleep_minutes * 0.50  # 50% sonno leggero
+        sleep_deep = total_sleep_minutes * 0.25   # 25% sonno profondo  
+        sleep_rem = total_sleep_minutes * 0.20    # 20% sonno REM
+        sleep_awake = total_sleep_minutes * 0.05  # 5% risvegli
+        
+        sleep_metrics = {
+            'sleep_duration': round(base_sleep_duration, 1),
+            'sleep_efficiency': round(sleep_efficiency, 1),
+            'sleep_hr': round(sleep_hr, 1),
+            'sleep_light': round(sleep_light / 60, 1),
+            'sleep_deep': round(sleep_deep / 60, 1),
+            'sleep_rem': round(sleep_rem / 60, 1),
+            'sleep_awake': round(sleep_awake / 60, 1)
+        }
+        
+        # Raccomandazioni basate sulla qualità
+        recommendations = [
+            f"💤 Sonno registrato: {base_sleep_duration:.1f}h",
+            f"📊 Efficienza: {sleep_efficiency:.0f}%"
+        ]
+        
+        if base_sleep_duration >= 7:
+            recommendations.append("🎯 Ottima durata del sonno!")
+        elif base_sleep_duration < 6:
+            recommendations.append("⚠️ Cerca di dormire almeno 7 ore")
+            
+        if sleep_efficiency >= 90:
+            recommendations.append("💪 Eccellente qualità del sonno!")
+        
+        return {
+            'activity': activity,
+            'sleep_metrics': sleep_metrics,
+            'type': 'sleep',
+            'recovery_status': 'optimal' if base_sleep_duration >= 7 else 'good',
+            'recommendations': recommendations
+        }
+    else:
+        return {
+            'activity': activity,
+            'sleep_metrics': None,
+            'type': 'sleep',
+            'recovery_status': 'poor',
+            'recommendations': [
+                "⚠️ Durata sonno insufficiente",
+                "💡 Cerca di dormire almeno 6-8 ore per notte"
+            ]
+        }
+
 def analyze_stress_impact(activity, daily_metrics):
     """Analisi impatto attività stressanti"""
     return {
@@ -1118,6 +1103,19 @@ def analyze_other_impact(activity, daily_metrics):
         'recovery_status': 'unknown',
         'recommendations': ["📝 Attività registrata"]
     }
+
+def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
+    """Raccoglie le metriche del sonno dalle attività di sonno registrate"""
+    sleep_activities = [a for a in activities if a['type'] == 'Sonno']
+    
+    if not sleep_activities:
+        return {}  # Nessuna attività sonno → nessuna metrica sonno
+    
+    # Prendi l'ultima attività sonno (più recente)
+    latest_sleep = sleep_activities[-1]
+    sleep_analysis = analyze_sleep_impact(latest_sleep, daily_metrics, timeline)
+    
+    return sleep_analysis.get('sleep_metrics', {})
 
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
     """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
@@ -1382,6 +1380,7 @@ ACTIVITY_COLORS = {
     "Alimentazione": "#f39c12", 
     "Stress": "#9b59b6",
     "Riposo": "#3498db",
+    "Sonno": "#2c3e50",
     "Altro": "#95a5a6"
 }
 
@@ -1394,8 +1393,9 @@ def create_activity_tracker():
         return
     
     with st.sidebar.expander("➕ Aggiungi Attività/Pasto", expanded=False):
+        # MODIFICA: Aggiungi "Sonno" alla lista
         activity_type = st.selectbox("Tipo Attività", 
-                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Altro"])
+                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Sonno", "Altro"])
         
         activity_name = st.text_input("Nome Attività/Pasto", placeholder="Es: Corsa mattutina, Pranzo, etc.")
         
@@ -1403,7 +1403,26 @@ def create_activity_tracker():
             food_items = st.text_area("Cosa hai mangiato? (separato da virgola)", placeholder="Es: pasta, insalata, frutta")
             intensity = st.select_slider("Pesantezza pasto", 
                                        options=["Leggero", "Normale", "Pesante", "Molto pesante"])
-        else:
+        elif activity_type == "Sonno":  # NUOVO BLOCCO PER SONNO
+            st.info("💤 Registra il tuo periodo di sonno")
+            col1, col2 = st.columns(2)
+            with col1:
+                sleep_start = st.time_input("Ora inizio sonno", value=datetime(2020,1,1,23,0).time())
+            with col2:
+                sleep_end = st.time_input("Ora fine sonno", value=datetime(2020,1,1,7,0).time())
+            
+            # Calcola durata automatica
+            duration_minutes = ((sleep_end.hour - sleep_start.hour) * 60 + 
+                               (sleep_end.minute - sleep_start.minute))
+            if duration_minutes < 0:
+                duration_minutes += 24 * 60  # Correggi per sonno che passa la mezzanotte
+            
+            st.write(f"**Durata sonno:** {duration_minutes // 60}h {duration_minutes % 60}min")
+            duration = duration_minutes
+            food_items = ""
+            intensity = "Normale"
+            activity_name = f"Sonno {sleep_start.strftime('%H:%M')}-{sleep_end.strftime('%H:%M')}"
+        else:  # PER TUTTI GLI ALTRI TIPI
             food_items = ""
             intensity = st.select_slider("Intensità", 
                                        options=["Leggera", "Moderata", "Intensa", "Massimale"])
@@ -1458,8 +1477,8 @@ def edit_activity_interface():
     
     with st.sidebar.form("edit_activity_form"):
         activity_type = st.selectbox("Tipo Attività", 
-                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Altro"],
-                                   index=["Allenamento", "Alimentazione", "Stress", "Riposo", "Altro"].index(activity['type']),
+                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Sonno", "Altro"],
+                                   index=["Allenamento", "Alimentazione", "Stress", "Riposo", "Sonno", "Altro"].index(activity['type']),
                                    key="edit_type")
         
         activity_name = st.text_input("Nome Attività/Pasto", value=activity['name'], key="edit_name")
@@ -2179,6 +2198,17 @@ def main():
                     'lf': 1000.0, 'hf': 1100.0, 'lf_hf_ratio': 0.9
                     # CORREZIONE: NESSUNA METRICA SONNO nei default
                 }
+
+            # AGGIUNGI METRICHE SONNO SOLO SE CI SONO ATTIVITÀ SONNO ESPLICITE
+            sleep_metrics = get_sleep_metrics_from_activities(
+                st.session_state.activities, daily_metrics, timeline
+            )
+
+            if sleep_metrics:
+                avg_metrics.update(sleep_metrics)
+                st.success(f"😴 Metriche sonno aggiunte: {sleep_metrics.get('sleep_duration', 0):.1f}h di sonno")
+            else:
+                st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel pannello laterale")
 
             st.subheader("📈 Medie Complessive")
             
