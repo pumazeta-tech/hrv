@@ -2396,6 +2396,13 @@ def main():
             # GRAFICO DETTAGLIATO CON ZOOM INTERATTIVO
             st.subheader("📈 Andamento Dettagliato HRV con Attività")
             
+            # FUNZIONE SMOOTHING - SPOSTATA FUORI DAL BLOCCO IF
+            def smooth_data(data, window_size=5):
+                """Applica un filtro mediano per smussare i picchi"""
+                if len(data) < window_size:
+                    return data
+                return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
+            
             if len(rr_intervals) > 0:
                 timestamps = []
                 current_time = start_time
@@ -2408,13 +2415,6 @@ def main():
                 window_size = min(60, len(rr_intervals) // 20)  # Finestra più piccola ma più stabile
                 if window_size < 30:
                     window_size = min(30, len(rr_intervals))
-                
-                # FUNZIONE SMOOTHING
-                def smooth_data(data, window_size=5):
-                    """Applica un filtro mediano per smussare i picchi"""
-                    if len(data) < window_size:
-                        return data
-                    return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
                 
                 sdnn_moving = []
                 rmssd_moving = []
