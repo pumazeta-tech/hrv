@@ -2455,48 +2455,48 @@ def main():
                 if sdnn_moving:
                     sdnn_moving = smooth_data(sdnn_moving, window_size=3)
                     rmssd_moving = smooth_data(rmssd_moving, window_size=3)
+                
+                fig_main = go.Figure()
+                
+                if st.session_state.activities:
+                    for activity in st.session_state.activities:
+                        activity_start = activity['start_time']
+                        activity_end = activity_start + timedelta(minutes=activity['duration'])
                         
-                    fig_main = go.Figure()
+                        color = activity.get('color', '#95a5a6')
                         
-                        if st.session_state.activities:
-                            for activity in st.session_state.activities:
-                                activity_start = activity['start_time']
-                                activity_end = activity_start + timedelta(minutes=activity['duration'])
-                                
-                                color = activity.get('color', '#95a5a6')
-                                
-                                fig_main.add_vrect(
-                                    x0=activity_start,
-                                    x1=activity_end,
-                                    fillcolor=color,
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                )
-                                
-                                activity_center = activity_start + (activity_end - activity_start) / 2
-                                fig_main.add_annotation(
-                                    x=activity_center,
-                                    y=1.02,
-                                    yref="paper",
-                                    text=activity['name'],
-                                    showarrow=False,
-                                    textangle=-45,
-                                    font=dict(size=9, color=color),
-                                    bgcolor="rgba(255,255,255,0.9)",
-                                    bordercolor=color,
-                                    borderwidth=1,
-                                    borderpad=2
-                                )
+                        fig_main.add_vrect(
+                            x0=activity_start,
+                            x1=activity_end,
+                            fillcolor=color,
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        )
                         
-                        fig_main.add_trace(go.Scatter(
-                            x=timestamps,
-                            y=hr_instant,
-                            mode='lines',
-                            name='Battito Istantaneo',
-                            line=dict(color='#e74c3c', width=1),
-                            opacity=0.8
-                        ))
+                        activity_center = activity_start + (activity_end - activity_start) / 2
+                        fig_main.add_annotation(
+                            x=activity_center,
+                            y=1.02,
+                            yref="paper",
+                            text=activity['name'],
+                            showarrow=False,
+                            textangle=-45,
+                            font=dict(size=9, color=color),
+                            bgcolor="rgba(255,255,255,0.9)",
+                            bordercolor=color,
+                            borderwidth=1,
+                            borderpad=2
+                        )
+                
+                fig_main.add_trace(go.Scatter(
+                    x=timestamps,
+                    y=hr_instant,
+                    mode='lines',
+                    name='Battito Istantaneo',
+                    line=dict(color='#e74c3c', width=1),
+                    opacity=0.8
+                ))
                         
                         if sdnn_moving:
                             fig_main.add_trace(go.Scatter(
