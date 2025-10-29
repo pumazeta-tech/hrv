@@ -611,6 +611,11 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
                 print(f"      ❌ Copertura notturna insufficiente: {night_coverage:.2f}")
                 return {}
             
+            # Calcolo durata sonno realistico basato sulla copertura notturna
+            base_sleep_duration = 7.0  # Ore base di sonno
+            sleep_duration = base_sleep_duration * night_coverage
+            sleep_duration = max(3.0, min(9.0, sleep_duration))  # Limiti realistici
+            
             # Battito durante il sonno (più basso)
             sleep_hr = hr_mean * (0.75 + np.random.normal(0, 0.03))
             sleep_hr = max(45, min(65, sleep_hr))
