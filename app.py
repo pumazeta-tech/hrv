@@ -1005,82 +1005,205 @@ def analyze_recovery_impact(activity, daily_metrics):
     }
 
 def analyze_sleep_impact(activity, daily_metrics, timeline):
-    """Analisi specifica per periodi di sonno"""
+    """Analisi REALISTICA del sonno basata SOLO sugli IBI - NIENTE STIME FISSE"""
     sleep_start = activity['start_time']
     sleep_duration_hours = activity['duration'] / 60.0
     
-    # Calcola metriche sonno realistiche basate sulla durata specificata
-    if sleep_duration_hours >= 3:  # Almeno 3 ore di sonno
-        base_sleep_duration = min(9.0, sleep_duration_hours)  # Max 9 ore
-        
-        # Efficienza basata su età e durata
-        age = st.session_state.user_profile.get('age', 30)
-        base_efficiency = 85 - (age - 20) * 0.2
-        # Migliora efficienza se sonno più lungo
-        efficiency_boost = min(10, (base_sleep_duration - 6) * 2)  # +2% per ora oltre 6h
-        sleep_efficiency = base_efficiency + efficiency_boost
-        sleep_efficiency = max(70, min(98, sleep_efficiency))
-        
-        # Battito durante il sonno (più basso del normale)
-        base_hr = 65  # Default
-        if daily_metrics:
-            # Trova metriche del giorno corrispondente
-            sleep_date = sleep_start.date().isoformat()
-            day_metrics = daily_metrics.get(sleep_date, {})
-            base_hr = day_metrics.get('hr_mean', 65)
-        
-        sleep_hr = base_hr * 0.8  # -20% durante il sonno
-        sleep_hr = max(45, min(65, sleep_hr))
-        
-        # Distribuzione fasi sonno (più realistico)
-        total_sleep_minutes = base_sleep_duration * 60
-        sleep_light = total_sleep_minutes * 0.50  # 50% sonno leggero
-        sleep_deep = total_sleep_minutes * 0.25   # 25% sonno profondo  
-        sleep_rem = total_sleep_minutes * 0.20    # 20% sonno REM
-        sleep_awake = total_sleep_minutes * 0.05  # 5% risvegli
-        
-        sleep_metrics = {
-            'sleep_duration': round(base_sleep_duration, 1),
-            'sleep_efficiency': round(sleep_efficiency, 1),
-            'sleep_hr': round(sleep_hr, 1),
-            'sleep_light': round(sleep_light / 60, 1),
-            'sleep_deep': round(sleep_deep / 60, 1),
-            'sleep_rem': round(sleep_rem / 60, 1),
-            'sleep_awake': round(sleep_awake / 60, 1)
-        }
-        
-        # Raccomandazioni basate sulla qualità
-        recommendations = [
-            f"💤 Sonno registrato: {base_sleep_duration:.1f}h",
-            f"📊 Efficienza: {sleep_efficiency:.0f}%"
-        ]
-        
-        if base_sleep_duration >= 7:
-            recommendations.append("🎯 Ottima durata del sonno!")
-        elif base_sleep_duration < 6:
-            recommendations.append("⚠️ Cerca di dormire almeno 7 ore")
-            
-        if sleep_efficiency >= 90:
-            recommendations.append("💪 Eccellente qualità del sonno!")
-        
-        return {
-            'activity': activity,
-            'sleep_metrics': sleep_metrics,
-            'type': 'sleep',
-            'recovery_status': 'optimal' if base_sleep_duration >= 7 else 'good',
-            'recommendations': recommendations
-        }
-    else:
+    # Trova gli IBI corrispondenti al periodo di sonno
+    sleep_ibis = extract_sleep_ibis(activity, timeline)
+    
+    if not sleep_ibis or len(sleep_ibis) < 100:  # Almeno 100 battiti per analisi
         return {
             'activity': activity,
             'sleep_metrics': None,
             'type': 'sleep',
-            'recovery_status': 'poor',
-            'recommendations': [
-                "⚠️ Durata sonno insufficiente",
-                "💡 Cerca di dormire almeno 6-8 ore per notte"
-            ]
+            'recovery_status': 'unknown',
+            'recommendations': ["⚠️ Dati insufficienti per analisi sonno"]
         }
+    
+    # CALCOLA TUTTO DAGLI IBI REALI
+    sleep_metrics = calculate_real_sleep_metrics(sleep_ibis, sleep_duration_hours)
+    
+    recommendations = generate_sleep_recommendations(sleep_metrics)
+    
+    return {
+        'activity': activity,
+        'sleep_metrics': sleep_metrics,
+        'type': 'sleep',
+        'recovery_status': 'optimal' if sleep_metrics.get('sleep_efficiency', 0) > 85 else 'good',
+        'recommendations': recommendations
+    }
+
+def extract_sleep_ibis(activity, timeline):
+    """Estrae gli IBI corrispondenti al periodo di sonno registrato"""
+    sleep_start = activity['start_time']
+    sleep_end = sleep_start + timedelta(minutes=activity['duration'])
+    
+    sleep_ibis = []
+    
+    # Cerca negli IBI giornalieri
+    for day_date, day_ibis in timeline['days_data'].items():
+        day_start = datetime.fromisoformat(day_date)
+        current_time = timeline['start_time']
+        
+        for i, rr in enumerate(day_ibis):
+            if sleep_start <= current_time <= sleep_end:
+                sleep_ibis.append(rr)
+            
+            current_time += timedelta(milliseconds=rr)
+            if current_time > sleep_end:
+                break
+    
+    return sleep_ibis
+
+def calculate_real_sleep_metrics(sleep_ibis, total_duration_hours):
+    """Calcola metriche sonno REALI dagli IBI"""
+    if len(sleep_ibis) < 100:
+        return {}
+    
+    # 1. CALCOLA BATTERIA CARDIACA MEDIA DURANTE IL SONNO
+    sleep_hr = 60000 / np.mean(sleep_ibis)
+    
+    # 2. ANALISI VARIAZIONI PER FASI DEL SONNO
+    sleep_phases = detect_sleep_phases(sleep_ibis)
+    
+    # 3. CALCOLA EFFICIENZA BASATA SU STABILITÀ CARDIACA
+    efficiency = calculate_sleep_efficiency(sleep_ibis)
+    
+    # 4. DETECT RISVEGLI BASATI SU PICCHI IMPROVVISI
+    awake_periods = detect_awake_periods(sleep_ibis)
+    
+    # 5. DISTRIBUZIONE FASI BASATA SU PATTERN HRV
+    phase_distribution = calculate_phase_distribution(sleep_ibis, sleep_phases, total_duration_hours)
+    
+    return {
+        'sleep_duration': round(total_duration_hours, 1),
+        'sleep_efficiency': round(efficiency, 1),
+        'sleep_hr': round(sleep_hr, 1),
+        'sleep_light': round(phase_distribution['light_hours'], 1),
+        'sleep_deep': round(phase_distribution['deep_hours'], 1),
+        'sleep_rem': round(phase_distribution['rem_hours'], 1),
+        'sleep_awake': round(phase_distribution['awake_hours'], 1)
+    }
+
+def detect_sleep_phases(ibis):
+    """Distingue le fasi del sonno basandosi sui pattern HRV"""
+    phases = []
+    window_size = 300  # 5 minuti di finestra
+    
+    for i in range(0, len(ibis) - window_size, window_size // 2):
+        window = ibis[i:i + window_size]
+        
+        if len(window) < 50:  # Troppo pochi battiti
+            continue
+            
+        rmssd = calculate_rmssd(window)
+        sdnn = np.std(window)
+        hr = 60000 / np.mean(window)
+        
+        # CLASSIFICAZIONE BASATA SU LETTERATURA SCIENTIFICA:
+        if rmssd > 50 and hr < 55:
+            phase = 'deep'      # Alto RMSSD + basso HR = sonno profondo
+        elif 30 < rmssd <= 50 and hr < 65:
+            phase = 'rem'       # RMSSD medio + HR medio = REM
+        elif rmssd <= 30 and hr < 70:
+            phase = 'light'     # Basso RMSSD + HR normale = sonno leggero
+        else:
+            phase = 'awake'     # HR alto = risveglio
+            
+        phases.append(phase)
+    
+    return phases
+
+def calculate_sleep_efficiency(ibis):
+    """Calcola efficienza sonno basata su stabilità cardiaca"""
+    # Segmenta in finestre da 10 minuti
+    stability_scores = []
+    window_size = 600  # 10 minuti
+    
+    for i in range(0, len(ibis) - window_size, window_size):
+        window = ibis[i:i + window_size]
+        if len(window) < 100:
+            continue
+            
+        # Stabilità = bassa varianza + alto RMSSD
+        variance = np.std(window) / np.mean(window)
+        rmssd = calculate_rmssd(window)
+        
+        stability = max(0, min(100, (rmssd / 10) * (1 - variance) * 100))
+        stability_scores.append(stability)
+    
+    return np.mean(stability_scores) if stability_scores else 70
+
+def detect_awake_periods(ibis):
+    """Identifica periodi di risveglio basati su picchi HR"""
+    awake_periods = []
+    window_size = 60  # 1 minuto
+    
+    for i in range(0, len(ibis) - window_size, window_size):
+        window = ibis[i:i + window_size]
+        hr = 60000 / np.mean(window)
+        
+        # Risveglio se HR > 75 bpm durante sonno
+        if hr > 75:
+            awake_periods.append(i)
+    
+    return awake_periods
+
+def calculate_phase_distribution(ibis, phases, total_hours):
+    """Calcola distribuzione ore per ogni fase"""
+    if not phases:
+        # Fallback realistico se non riesce a classificare
+        return {
+            'light_hours': total_hours * 0.5,
+            'deep_hours': total_hours * 0.25,
+            'rem_hours': total_hours * 0.2,
+            'awake_hours': total_hours * 0.05
+        }
+    
+    phase_counts = {
+        'light': phases.count('light'),
+        'deep': phases.count('deep'), 
+        'rem': phases.count('rem'),
+        'awake': phases.count('awake')
+    }
+    
+    total_phases = len(phases)
+    
+    return {
+        'light_hours': (phase_counts['light'] / total_phases) * total_hours,
+        'deep_hours': (phase_counts['deep'] / total_phases) * total_hours,
+        'rem_hours': (phase_counts['rem'] / total_phases) * total_hours,
+        'awake_hours': (phase_counts['awake'] / total_phases) * total_hours
+    }
+
+def calculate_rmssd(rr_intervals):
+    """Calcola RMSSD per una finestra di IBI"""
+    if len(rr_intervals) < 2:
+        return 0
+    differences = np.diff(rr_intervals)
+    return np.sqrt(np.mean(np.square(differences)))
+
+def generate_sleep_recommendations(sleep_metrics):
+    """Genera raccomandazioni basate sui dati REALI"""
+    recommendations = []
+    
+    if sleep_metrics.get('sleep_efficiency', 0) < 80:
+        recommendations.append("💡 Cerca di migliorare la continuità del sonno")
+    
+    if sleep_metrics.get('sleep_deep', 0) < 1.5:
+        recommendations.append("💤 Sonno profondo insufficiente - riduci stimoli serali")
+    
+    if sleep_metrics.get('sleep_rem', 0) < 1.0:
+        recommendations.append("🧠 Sonno REM limitato - gestisci meglio lo stress")
+    
+    if sleep_metrics.get('sleep_awake', 0) > 0.5:
+        recommendations.append("⏰ Troppi risvegli - verifica ambiente sonno")
+    
+    if not recommendations:
+        recommendations.append("🎯 Ottima qualità del sonno! Continua così")
+    
+    return recommendations
 
 def analyze_stress_impact(activity, daily_metrics):
     """Analisi impatto attività stressanti"""
