@@ -1034,14 +1034,14 @@ def analyze_other_impact(activity, daily_metrics):
     }
 
 def analyze_sleep_impact_simple(activity, daily_metrics, timeline=None):
-    """Analisi sonno BASATA SU IBI REALI - VERSIONE CORRETTA"""
+    """Analisi sonno BASATA SU METRICHE REALI del giorno"""
     sleep_duration_hours = activity['duration'] / 60.0
     
-    # Se abbiamo la timeline, analizza gli IBI REALI
-    if timeline and 'days_data' in timeline:
-        sleep_metrics = calculate_sleep_from_real_ibis(activity, timeline, sleep_duration_hours)
+    # Se abbiamo timeline E daily_metrics, analizza con dati REALI
+    if timeline and daily_metrics:
+        sleep_metrics = calculate_sleep_from_daily_metrics(activity, timeline, daily_metrics, sleep_duration_hours)
     else:
-        # Fallback a valori realistici
+        # Fallback
         sleep_metrics = calculate_sleep_fallback(sleep_duration_hours)
     
     recommendations = generate_sleep_recommendations(sleep_metrics)
