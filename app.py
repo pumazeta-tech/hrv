@@ -508,6 +508,10 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
 
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_time, end_time):
     """Calcola metriche HRV realistiche e fisiologicamente corrette CON ANALISI SONNO"""
+    # DEBUG: Verifica che la funzione esista
+    if 'estimate_sleep_metrics' not in globals():
+        st.error("❌ estimate_sleep_metrics NON TROVATA!")
+        return get_default_metrics(user_age, user_gender)
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
     
