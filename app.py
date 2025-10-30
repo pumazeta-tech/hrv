@@ -22,6 +22,11 @@ from email.mime.text import MIMEText
 import secrets
 import time
 
+
+def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
+    """Funzione placeholder - le metriche sonno vengono dalle attività registrate"""
+    return {}
+
 # =============================================================================
 # SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
 # =============================================================================
@@ -653,9 +658,6 @@ def calculate_night_coverage(start_time, end_time, duration_hours):
     
     return max(0.1, min(1.0, coverage))
 
-def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
-    """Funzione placeholder - le metriche sonno vengono dalle attività registrate"""
-    return {}
 
 def get_default_metrics(age, gender):
     """Metriche di default realistiche basate su età e genere"""
