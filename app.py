@@ -1048,12 +1048,10 @@ def analyze_sleep_impact(activity, daily_metrics, timeline):
     }
 
 def extract_sleep_ibis(activity, timeline):
-    """Estrae SOLO gli IBI del periodo di sonno - VERSIONE SICURA"""
+    """Estrae SOLO gli IBI del periodo di sonno - VERSIONE ALLINEATA DATE"""
     
-    # CONTROLLO DI SICUREZZA: timeline ha days_data?
     if 'days_data' not in timeline or not timeline['days_data']:
-        print(f"❌ ERRORE CRITICO: timeline['days_data'] non esiste o è vuoto!")
-        print(f"   Keys disponibili in timeline: {list(timeline.keys())}")
+        print(f"❌ ERRORE: timeline['days_data'] non disponibile")
         return []
     
     sleep_start = activity['start_time']
@@ -1063,38 +1061,56 @@ def extract_sleep_ibis(activity, timeline):
     
     print(f"🔍 Cercando IBI sonno:")
     print(f"   Sonno: {sleep_start} -> {sleep_end}")
-    print(f"   Timeline giorni disponibili: {list(timeline['days_data'].keys())}")
+    print(f"   Durata: {activity['duration']} minuti")
+    print(f"   Timeline start: {timeline['start_time']}")
+    print(f"   Timeline giorni: {list(timeline['days_data'].keys())}")
     
-    # Cerca negli IBI giornalieri
+    # CONVERTI LE DATE PER CONFRONTO CORRETTO
+    sleep_start_date = sleep_start.date().isoformat()
+    sleep_end_date = sleep_end.date().isoformat()
+    
+    print(f"   Date sonno: {sleep_start_date} -> {sleep_end_date}")
+    
+    # Cerca negli IBI dei giorni rilevanti
     for day_date, day_ibis in timeline['days_data'].items():
-        current_time = timeline['start_time']
-        
-        print(f"   Scannerizzo giorno {day_date} ({len(day_ibis)} IBI)")
-        
-        for rr in day_ibis:
-            # Controlla se questo IBI è nel periodo di sonno
-            if sleep_start <= current_time <= sleep_end:
-                sleep_ibis.append(rr)
+        # Controlla se questo giorno è rilevante per il sonno
+        if sleep_start_date <= day_date <= sleep_end_date:
+            print(f"   Scannerizzo giorno rilevante: {day_date}")
             
-            current_time += timedelta(milliseconds=rr)
+            # Ricostruisci la timeline per questo giorno
+            current_time = timeline['start_time']
+            day_found_ibis = 0
             
-            # Se siamo oltre la fine del sonno, esci
+            for rr in day_ibis:
+                # Controlla se questo IBI è nel periodo di sonno
+                if sleep_start <= current_time <= sleep_end:
+                    sleep_ibis.append(rr)
+                    day_found_ibis += 1
+                
+                current_time += timedelta(milliseconds=rr)
+                
+                # Se siamo oltre la fine del sonno, esci
+                if current_time > sleep_end:
+                    break
+            
+            print(f"     Trovati {day_found_ibis} IBI in questo giorno")
+            
+            # Se siamo oltre la fine del sonno, esci dal loop giorni
             if current_time > sleep_end:
                 break
-        
-        # Se siamo oltre la fine del sonno, esci dal loop giorni
-        if current_time > sleep_end:
-            break
+        else:
+            print(f"   Salto giorno {day_date} (non rilevante per sonno)")
     
-    print(f"✅ Trovati {len(sleep_ibis)} IBI durante il sonno")
+    print(f"✅ TOTALE: {len(sleep_ibis)} IBI trovati durante il sonno")
     
     if len(sleep_ibis) == 0:
-        print(f"❌ Nessun IBI trovato durante il sonno!")
-        print(f"   Timeline start: {timeline['start_time']}")
-        print(f"   Sonno start: {sleep_start}")
+        print(f"❌ CRITICO: Nessun IBI trovato!")
+        print(f"   Possibili cause:")
+        print(f"   - Date non corrispondenti")
+        print(f"   - Orari non allineati") 
+        print(f"   - Timeline troppo corta")
     
     return sleep_ibis
-
 def calculate_real_sleep_metrics(sleep_ibis, total_duration_hours):
     """Calcola metriche sonno REALI - CON CONTROLLI DI SICUREZZA"""
     
@@ -2488,14 +2504,31 @@ def main():
             
             start_time = parse_starttime_from_file(content)
             timeline = calculate_recording_timeline(rr_intervals, start_time)
+            
+            # 2. DEBUG ESPLOSIVO - controlla ALLINEAMENTO DATE
+            print(f"🎯 DEBUG ALLINEAMENTO DATE:")
+            print(f"   File start: {start_time}")
+            print(f"   Timeline start: {timeline['start_time']}")
+            print(f"   Timeline end: {timeline['end_time']}")
+            print(f"   Timeline giorni: {list(timeline['days_data'].keys())}")
 
-            # AGGIUNGI QUESTO CONTROLLO:
-            print(f"🔍 DEBUG TIMELINE:")
-            print(f"   Timeline keys: {list(timeline.keys())}")
-            print(f"   Ha days_data?: {'days_data' in timeline}")
-            if 'days_data' in timeline:
-                print(f"   Giorni in days_data: {list(timeline['days_data'].keys())}")
-                print(f"   IBI per giorno: { {k: len(v) for k, v in timeline['days_data'].items()} }")
+            # 3. CONTROLLA SE CI SONO ATTIVITÀ SONNO
+            if st.session_state.activities:
+                sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
+                print(f"   Attività sonno trovate: {len(sleep_activities)}")
+                
+                for i, sleep_act in enumerate(sleep_activities):
+                    sleep_start = sleep_act['start_time']
+                    sleep_end = sleep_start + timedelta(minutes=sleep_act['duration'])
+                    print(f"   Sonno {i+1}: {sleep_start} -> {sleep_end}")
+                    print(f"     Date: {sleep_start.date().isoformat()} -> {sleep_end.date().isoformat()}")
+                    
+                    # Verifica se le date coincidono
+                    timeline_dates = list(timeline['days_data'].keys())
+                    sleep_dates = [sleep_start.date().isoformat(), sleep_end.date().isoformat()]
+                    
+                    date_match = any(date in timeline_dates for date in sleep_dates)
+                    print(f"     Date corrispondono con timeline: {date_match}")
             
             col1, col2 = st.columns(2)
             with col1:
@@ -2540,9 +2573,16 @@ def main():
 
             if sleep_metrics:
                 avg_metrics.update(sleep_metrics)
-                st.success(f"😴 Metriche sonno aggiunte: {sleep_metrics.get('sleep_duration', 0):.1f}h di sonno")
+                st.success(f"😴 SONNO ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f}h di sonno")
+                
+                # DEBUG: mostra cosa abbiamo trovato
+                print(f"✅ METRICHE SONNO TROVATE:")
+                for key, value in sleep_metrics.items():
+                    print(f"   {key}: {value}")
             else:
                 st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel pannello laterale")
+                print(f"❌ NESSUNA METRICA SONNO TROVATA")
+                print(f"   Attività sonno: {[a for a in st.session_state.activities if a['type'] == 'Sonno']}")
 
             st.subheader("📈 Medie Complessive")
             
