@@ -1374,6 +1374,42 @@ def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
     
     return sleep_analysis.get('sleep_metrics', {})
 
+def get_sleep_metrics_for_day(day_date, activities, day_metrics):
+    """Restituisce le metriche sonno REALI per un giorno specifico basate sugli IBI"""
+    
+    print(f"🔍 DEBUG get_sleep_metrics_for_day:")
+    print(f"   Giorno: {day_date}")
+    print(f"   Attività totali: {len(activities)}")
+    
+    sleep_activities_for_day = []
+    
+    for activity in activities:
+        if activity['type'] == 'Sonno':
+            activity_date = activity['start_time'].date().isoformat()
+            print(f"   Attività sonno: {activity['name']} - {activity_date}")
+            # Se l'attività sonno è per questo giorno
+            if activity_date == day_date:
+                sleep_activities_for_day.append(activity)
+                print(f"   ✅ Sonno corrisponde al giorno!")
+    
+    print(f"   Attività sonno per questo giorno: {len(sleep_activities_for_day)}")
+    
+    if not sleep_activities_for_day:
+        print(f"   ❌ Nessuna attività sonno per questo giorno")
+        return {}  # Nessuna attività sonno per questo giorno
+    
+    # Prendi l'ultima attività sonno del giorno
+    latest_sleep = sleep_activities_for_day[-1]
+    
+    # CALCOLA METRICHE REALI dagli IBI (non stime fisse!)
+    # Usa un timeline vuoto perché non abbiamo il timeline completo qui
+    # Le metriche verranno calcolate dagli IBI disponibili
+    sleep_analysis = analyze_sleep_impact(latest_sleep, {}, {})  
+    
+    print(f"   Risultato analisi: {sleep_analysis.get('sleep_metrics', 'NONE')}")
+    
+    return sleep_analysis.get('sleep_metrics', {})
+
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
     """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
     if not day_metrics:
