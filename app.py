@@ -22,11 +22,6 @@ from email.mime.text import MIMEText
 import secrets
 import time
 
-
-def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
-    """Funzione placeholder - le metriche sonno vengono dalle attività registrate"""
-    return {}
-
 # =============================================================================
 # SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
 # =============================================================================
@@ -535,11 +530,12 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     print(f"   End: {end_time} (hour: {end_time.hour})")
     print(f"   Duration: {recording_duration_hours:.2f}h")
     
-    # CORREZIONE: Le metriche sonno vengono dalle attività, non da questa funzione
-    sleep_metrics = {}
+    # CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
+    sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age, recording_duration_hours, start_time, end_time)
     
-    # DEBUG: Informa che le metriche sonno vengono dalle attività
-    print(f"   sleep_metrics: vuoto - le metriche sonno vengono dalle attività registrate")
+    # DEBUG: Verifica cosa restituisce estimate_sleep_metrics
+    print(f"   sleep_metrics returned: {sleep_metrics}")
+    print(f"   sleep_metrics is empty: {not sleep_metrics}")
     
     # Metriche base
     metrics = {
@@ -617,11 +613,12 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
     
     return max(25, min(90, coherence))
 
-def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
-    """Funzione placeholder - le metriche sonno vengono dalle attività registrate"""
-    return {}
-
 # CORREZIONE: RIMOSSA LA FUNZIONE DUPLICATA calculate_hrv_coherence
+
+def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
+    """NON calcolare mai automaticamente il sonno - solo tramite attività esplicita"""
+    print(f"   🛌 estimate_sleep_metrics: SONNO DISABILITATO - Usa attività 'Sonno' per registrarlo")
+    return {}  # Sempre vuoto
 
 def calculate_night_coverage(start_time, end_time, duration_hours):
     """Calcola quanta parte della notte (22:00-7:00) è coperta dalla registrazione"""
@@ -658,7 +655,6 @@ def calculate_night_coverage(start_time, end_time, duration_hours):
     
     return max(0.1, min(1.0, coverage))
 
-
 def get_default_metrics(age, gender):
     """Metriche di default realistiche basate su età e genere"""
     age_norm = max(20, min(80, age))
@@ -688,275 +684,6 @@ def get_default_metrics(age, gender):
     }
     
     return metrics
-
-# =============================================================================
-# NUOVO SISTEMA AVANZATO DI RILEVAZIONE SONNO CON IBI REALI
-# =============================================================================
-
-def extract_sleep_ibis_advanced(activity, timeline):
-    """Estrae gli IBI reali del periodo di sonno con matching preciso - VERSIONE CORRETTA"""
-    
-    sleep_start = activity['start_time']
-    sleep_end = sleep_start + timedelta(minutes=activity['duration'])
-    
-    print(f"🎯 DEBUG extract_sleep_ibis_advanced INIZIO:")
-    print(f"   SONNO: {sleep_start} -> {sleep_end}")
-    print(f"   DURATA: {activity['duration']} minuti ({activity['duration']/60:.1f} ore)")
-    print(f"   TIMELINE: {timeline['start_time']} -> {timeline['end_time']}")
-    
-    sleep_ibis = []
-    total_ibis_scanned = 0
-    ibis_found = 0
-    
-    # DEBUG: Mostra tutti i giorni disponibili nella timeline
-    print(f"   GIORNI TIMELINE: {list(timeline['days_data'].keys())}")
-    
-    # Scansiona tutti i giorni nella timeline
-    for day_date, day_ibis in timeline['days_data'].items():
-        current_time = timeline['start_time']
-        day_ibis_found = 0
-        
-        print(f"   🔍 Scansionando giorno {day_date} ({len(day_ibis)} IBI)")
-        
-        # Scansiona tutti gli IBI del giorno
-        for rr in day_ibis:
-            total_ibis_scanned += 1
-            
-            # DEBUG: Mostra i primi 3 IBI per capire l'allineamento
-            if total_ibis_scanned <= 3:
-                print(f"      IBI {total_ibis_scanned}: time={current_time}, rr={rr}")
-            
-            # Controlla se questo IBI cade nel periodo di sonno
-            if sleep_start <= current_time <= sleep_end:
-                sleep_ibis.append(rr)
-                day_ibis_found += 1
-                ibis_found += 1
-                if day_ibis_found <= 2:  # Mostra solo i primi 2 trovati
-                    print(f"      ✅ TROVATO IBI nel sonno: {current_time}")
-            
-            # Avanza nel tempo
-            current_time += timedelta(milliseconds=rr)
-            
-            # Se abbiamo superato la fine del sonno, interrompi
-            if current_time > sleep_end:
-                break
-        
-        print(f"     📊 Giorno {day_date}: trovati {day_ibis_found} IBI")
-        
-        # Se abbiamo superato la fine del sonno, interrompi il ciclo
-        if current_time > sleep_end:
-            break
-    
-    print(f"   🎯 RISULTATO FINALE:")
-    print(f"      IBI totali scansionati: {total_ibis_scanned}")
-    print(f"      IBI trovati nel sonno: {ibis_found}")
-    print(f"      Percentuale: {ibis_found/max(1,total_ibis_scanned)*100:.1f}%")
-    
-    if ibis_found == 0:
-        print(f"   ❌ CRITICO: Nessun IBI trovato!")
-        print(f"   ANALISI PROBLEMA:")
-        print(f"     - Sleep start: {sleep_start}")
-        print(f"     - Sleep end: {sleep_end}")
-        print(f"     - Timeline start: {timeline['start_time']}")
-        print(f"     - Timeline end: {timeline['end_time']}")
-        print(f"     - Sonno incluso nella timeline: {timeline['start_time'] <= sleep_start <= timeline['end_time']}")
-        
-    return sleep_ibis
-
-def calculate_sleep_metrics_from_real_ibis(sleep_ibis, sleep_duration_hours):
-    """Calcola metriche del sonno basate sugli IBI reali - VERSIONE MIGLIORATA"""
-    
-    if len(sleep_ibis) < 50:
-        print(f"   ⚠️  IBI insufficienti per analisi sonno: {len(sleep_ibis)}")
-        if len(sleep_ibis) > 10:
-            print(f"   🎯 Userò comunque i {len(sleep_ibis)} IBI disponibili")
-        else:
-            return calculate_sleep_fallback(sleep_duration_hours)
-    
-    print(f"   ✅ Analizzando {len(sleep_ibis)} IBI reali del sonno")
-    
-    # CALCOLI REALI dagli IBI
-    sleep_hr = 60000 / np.mean(sleep_ibis)
-    
-    # Analisi della variabilità per distinguere le fasi del sonno
-    rmssd_values = calculate_moving_rmssd(sleep_ibis, window_size=min(300, len(sleep_ibis)//3))
-    
-    if rmssd_values:
-        avg_rmssd = np.mean(rmssd_values)
-        std_rmssd = np.std(rmssd_values)
-        
-        print(f"   📊 RMSSD analysis: avg={avg_rmssd:.1f}, std={std_rmssd:.1f}")
-        
-        # ANALISI AVANZATA DELLE FASI DEL SONNO BASATA SU VARIABILITÀ
-        if avg_rmssd > 50:
-            # Alto RMSSD = predominanza sonno profondo/REM
-            light_pct = 0.40
-            deep_pct = 0.35
-            rem_pct = 0.20
-            print("   🎯 Pattern: Sonno profondo predominante")
-        elif avg_rmssd > 35:
-            # RMSSD medio = distribuzione bilanciata
-            light_pct = 0.50
-            deep_pct = 0.25
-            rem_pct = 0.20
-            print("   🎯 Pattern: Sonno bilanciato")
-        else:
-            # Basso RMSSD = predominanza sonno leggero
-            light_pct = 0.60
-            deep_pct = 0.20
-            rem_pct = 0.15
-            print("   🎯 Pattern: Sonno leggero predominante")
-        
-        # Aggiusta in base alla stabilità (deviazione standard)
-        stability_factor = min(1.0, 30 / (std_rmssd + 1))
-        deep_pct *= stability_factor
-        rem_pct *= stability_factor
-        
-    else:
-        # Fallback a distribuzione standard
-        light_pct, deep_pct, rem_pct = 0.50, 0.25, 0.20
-        print("   ⚠️  Usando distribuzione standard")
-    
-    # Calcola i risvegli basati su anomalie negli IBI
-    awake_pct = calculate_awake_percentage(sleep_ibis)
-    
-    # Normalizza le percentuali
-    total_sleep_pct = light_pct + deep_pct + rem_pct
-    if total_sleep_pct > 0:
-        light_pct = light_pct / total_sleep_pct * (1 - awake_pct)
-        deep_pct = deep_pct / total_sleep_pct * (1 - awake_pct)
-        rem_pct = rem_pct / total_sleep_pct * (1 - awake_pct)
-    
-    # Calcola l'efficienza basata sulla stabilità della frequenza cardiaca
-    hr_values = [60000/rr for rr in sleep_ibis]
-    hr_std = np.std(hr_values)
-    efficiency = max(70, min(95, 90 - hr_std * 0.5))
-    
-    metrics = {
-        'sleep_duration': round(sleep_duration_hours, 1),
-        'sleep_efficiency': round(efficiency, 1),
-        'sleep_hr': round(sleep_hr, 1),
-        'sleep_light': round(sleep_duration_hours * light_pct, 1),
-        'sleep_deep': round(sleep_duration_hours * deep_pct, 1),
-        'sleep_rem': round(sleep_duration_hours * rem_pct, 1),
-        'sleep_awake': round(sleep_duration_hours * awake_pct, 1),
-        'sleep_ibis_analyzed': len(sleep_ibis),
-        'sleep_rmssd_avg': round(avg_rmssd, 1) if 'avg_rmssd' in locals() else 0
-    }
-    
-    print(f"   📊 Metriche sonno calcolate:")
-    print(f"      - Durata: {sleep_duration_hours:.1f}h")
-    print(f"      - Efficienza: {efficiency:.1f}%")
-    print(f"      - Fasi: Leggero {light_pct*100:.1f}%, Profondo {deep_pct*100:.1f}%, REM {rem_pct*100:.1f}%")
-    print(f"      - Risvegli: {awake_pct*100:.1f}%")
-    print(f"      - Battiti analizzati: {len(sleep_ibis)}")
-    
-    return metrics
-
-def calculate_awake_percentage(sleep_ibis):
-    """Calcola la percentuale di risvegli basata su anomalie negli IBI"""
-    if len(sleep_ibis) < 10:
-        return 0.05
-    
-    awake_threshold = 1.5  # Soglia per considerare un risveglio
-    awake_count = 0
-    
-    for i in range(1, len(sleep_ibis) - 1):
-        current_hr = 60000 / sleep_ibis[i]
-        prev_hr = 60000 / sleep_ibis[i-1]
-        next_hr = 60000 / sleep_ibis[i+1]
-        
-        # Se c'è un picco improvviso della frequenza cardiaca
-        if current_hr > prev_hr * awake_threshold and current_hr > next_hr * awake_threshold:
-            awake_count += 1
-    
-    awake_percentage = min(0.15, awake_count / len(sleep_ibis))
-    return awake_percentage
-
-def calculate_moving_rmssd(ibis, window_size=300):
-    """Calcola RMSSD mobile per finestre di IBI"""
-    if len(ibis) < window_size:
-        return []
-    
-    rmssd_values = []
-    for i in range(len(ibis) - window_size):
-        window = ibis[i:i + window_size]
-        differences = np.diff(window)
-        rmssd = np.sqrt(np.mean(np.square(differences)))
-        rmssd_values.append(rmssd)
-    
-    return rmssd_values
-
-def calculate_sleep_fallback(sleep_duration_hours):
-    """Fallback per quando non ci sono IBI sufficienti"""
-    return {
-        'sleep_duration': round(sleep_duration_hours, 1),
-        'sleep_efficiency': min(95, 80 + (sleep_duration_hours - 6) * 3),
-        'sleep_hr': 58,
-        'sleep_light': round(sleep_duration_hours * 0.5, 1),
-        'sleep_deep': round(sleep_duration_hours * 0.25, 1),
-        'sleep_rem': round(sleep_duration_hours * 0.2, 1),
-        'sleep_awake': round(sleep_duration_hours * 0.05, 1),
-        'sleep_ibis_analyzed': 0,
-        'sleep_rmssd_avg': 0
-    }
-
-def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
-    """Raccoglie le metriche del sonno REALI - VERSIONE CORRETTA CON DEBUG"""
-    
-    print(f"🎯 DEBUG get_sleep_metrics_from_activities INIZIO:")
-    print(f"   Numero totale attività: {len(activities)}")
-    
-    # Cerca TUTTE le attività sonno
-    sleep_activities = [a for a in activities if a['type'] == 'Sonno']
-    print(f"   Attività sonno trovate: {len(sleep_activities)}")
-    
-    # DEBUG: mostra TUTTE le attività per vedere cosa c'è
-    for i, activity in enumerate(activities):
-        print(f"   Attività {i}: {activity['type']} - '{activity['name']}'")
-        if activity['type'] == 'Sonno':
-            print(f"      🕒 Sonno: {activity['start_time']} -> {activity['start_time'] + timedelta(minutes=activity['duration'])}")
-    
-    if not sleep_activities:
-        print(f"   ❌ Nessuna attività 'Sonno' trovata!")
-        return {}
-    
-    # Prendi l'ULTIMA attività sonno (la più recente)
-    latest_sleep = sleep_activities[-1]
-    print(f"   🔍 Analizzando sonno più recente: '{latest_sleep['name']}'")
-    print(f"      Orario: {latest_sleep['start_time']} -> {latest_sleep['start_time'] + timedelta(minutes=latest_sleep['duration'])}")
-    print(f"      Durata: {latest_sleep['duration']} minuti")
-    
-    # Verifica che il sonno sia nella timeline
-    sleep_in_timeline = (
-        timeline['start_time'] <= latest_sleep['start_time'] <= timeline['end_time'] or
-        timeline['start_time'] <= (latest_sleep['start_time'] + timedelta(minutes=latest_sleep['duration'])) <= timeline['end_time']
-    )
-    
-    print(f"   📅 Sonno incluso nella timeline: {sleep_in_timeline}")
-    
-    if not sleep_in_timeline:
-        print(f"   ⚠️  ATTENZIONE: Il sonno registrato NON è incluso nella timeline della registrazione!")
-        print(f"      Timeline: {timeline['start_time']} -> {timeline['end_time']}")
-        print(f"      Sonno: {latest_sleep['start_time']} -> {latest_sleep['start_time'] + timedelta(minutes=latest_sleep['duration'])}")
-        return {}
-    
-    # Estrai IBI reali del periodo di sonno
-    sleep_ibis = extract_sleep_ibis_advanced(latest_sleep, timeline)
-    
-    if not sleep_ibis or len(sleep_ibis) < 10:
-        print(f"   ⚠️  IBI insufficienti per analisi sonno dettagliata")
-        print(f"   🎯 Provo con analisi di fallback...")
-        # Usa comunque una stima basata sulla durata
-        sleep_duration_hours = latest_sleep['duration'] / 60.0
-        return calculate_sleep_fallback(sleep_duration_hours)
-    
-    # Calcola metriche del sonno dagli IBI reali
-    sleep_duration_hours = latest_sleep['duration'] / 60.0
-    sleep_metrics = calculate_sleep_metrics_from_real_ibis(sleep_ibis, sleep_duration_hours)
-    
-    print(f"   ✅ Metriche sonno calcolate con successo!")
-    return sleep_metrics
 
 # =============================================================================
 # DATABASE NUTRIZIONALE SUPER DETTAGLIATO
@@ -1443,37 +1170,15 @@ def calculate_moving_rmssd(ibis, window_size=300):
     return rmssd_values
 
 def calculate_sleep_fallback(sleep_duration_hours):
-    """Fallback per quando non ci sono IBI sufficienti - VERSIONE VARIABILE"""
-    
-    # Aggiungi una piccola variazione random per evitare valori identici
-    import random
-    variation = random.uniform(0.9, 1.1)  # ±10% di variazione
-    
-    base_efficiency = min(95, 80 + (sleep_duration_hours - 6) * 3)
-    efficiency = base_efficiency * variation
-    
-    # Varia leggermente le fasi del sonno
-    light_variation = random.uniform(0.45, 0.55)
-    deep_variation = random.uniform(0.20, 0.30)
-    rem_variation = random.uniform(0.15, 0.25)
-    
-    # Normalizza per somma 100%
-    total = light_variation + deep_variation + rem_variation
-    light_pct = light_variation / total * 0.95  # 95% per il sonno, 5% per risvegli
-    deep_pct = deep_variation / total * 0.95
-    rem_pct = rem_variation / total * 0.95
-    
+    """Fallback per quando non ci sono IBI sufficienti"""
     return {
         'sleep_duration': round(sleep_duration_hours, 1),
-        'sleep_efficiency': round(efficiency, 1),
-        'sleep_hr': round(58 * variation, 1),  # Varia il battito
-        'sleep_light': round(sleep_duration_hours * light_pct, 1),
-        'sleep_deep': round(sleep_duration_hours * deep_pct, 1),
-        'sleep_rem': round(sleep_duration_hours * rem_pct, 1),
-        'sleep_awake': round(sleep_duration_hours * 0.05, 1),
-        'sleep_ibis_analyzed': 0,
-        'sleep_rmssd_avg': 0,
-        'calculated_from': 'random_fallback'
+        'sleep_efficiency': min(95, 80 + (sleep_duration_hours - 6) * 3),
+        'sleep_hr': 58,
+        'sleep_light': round(sleep_duration_hours * 0.5, 1),
+        'sleep_deep': round(sleep_duration_hours * 0.25, 1),
+        'sleep_rem': round(sleep_duration_hours * 0.2, 1),
+        'sleep_awake': round(sleep_duration_hours * 0.05, 1)
     }
 
 def generate_sleep_recommendations(sleep_metrics):
@@ -1556,58 +1261,14 @@ def get_sleep_metrics_for_day(day_date, activities, day_metrics):
     # Prendi l'ultima attività sonno del giorno
     latest_sleep = sleep_activities_for_day[-1]
     
-    # CALCOLA METRICHE REALI basate sulla durata e variabilità
-    sleep_duration_hours = latest_sleep['duration'] / 60.0
+    # CALCOLA METRICHE REALI dagli IBI (non stime fisse!)
+    # Usa un timeline vuoto perché non abbiamo il timeline completo qui
+    # Le metriche verranno calcolate dagli IBI disponibili
+    sleep_analysis = analyze_sleep_impact_simple(latest_sleep, {}, {})  
     
-    # Usa le metriche HRV del giorno per calcolare metriche sonno realistiche
-    if day_metrics:
-        # Calcola metriche variabili basate sulle metriche HRV del giorno
-        rmssd = day_metrics.get('rmssd', 35)
-        hr_mean = day_metrics.get('hr_mean', 65)
-        
-        # Efficienza basata su RMSSD (maggiore variabilità = migliore sonno)
-        efficiency = min(95, 75 + (rmssd - 20) * 0.5)
-        
-        # Battito durante il sonno basato sul battito medio
-        sleep_hr = max(45, hr_mean - 10)
-        
-        # Distribuzione fasi basata su RMSSD
-        if rmssd > 45:
-            # Alta variabilità = più sonno profondo
-            light_pct = 0.45
-            deep_pct = 0.30
-            rem_pct = 0.20
-        elif rmssd > 30:
-            # Variabilità media = distribuzione bilanciata
-            light_pct = 0.50
-            deep_pct = 0.25
-            rem_pct = 0.20
-        else:
-            # Bassa variabilità = più sonno leggero
-            light_pct = 0.60
-            deep_pct = 0.20
-            rem_pct = 0.15
-        
-        awake_pct = 0.05
-        
-        sleep_metrics = {
-            'sleep_duration': round(sleep_duration_hours, 1),
-            'sleep_efficiency': round(efficiency, 1),
-            'sleep_hr': round(sleep_hr, 1),
-            'sleep_light': round(sleep_duration_hours * light_pct, 1),
-            'sleep_deep': round(sleep_duration_hours * deep_pct, 1),
-            'sleep_rem': round(sleep_duration_hours * rem_pct, 1),
-            'sleep_awake': round(sleep_duration_hours * awake_pct, 1),
-            'calculated_from': 'hrv_metrics'
-        }
-    else:
-        # Fallback se non ci sono metriche HRV
-        sleep_metrics = calculate_sleep_fallback(sleep_duration_hours)
-        sleep_metrics['calculated_from'] = 'fallback'
+    print(f"   Risultato analisi: {sleep_analysis.get('sleep_metrics', 'NONE')}")
     
-    print(f"   📊 Metriche sonno calcolate: {sleep_metrics}")
-    
-    return sleep_metrics
+    return sleep_analysis.get('sleep_metrics', {})
 
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
     """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
@@ -2223,7 +1884,7 @@ def calculate_recording_timeline(rr_intervals, start_time):
     }
 
 def calculate_daily_metrics(days_data, user_age, user_gender):
-    """Calcola le metriche HRV per ogni giorno - CON METRICHE SONNO REALI"""
+    """Calcola le metriche HRV per ogni giorno - CON SUPPORO PER METRICHE SONNO"""
     daily_metrics = {}
     
     for day_date, day_rr_intervals in days_data.items():
@@ -2237,11 +1898,10 @@ def calculate_daily_metrics(days_data, user_age, user_gender):
                 day_rr_intervals, user_age, user_gender, day_start, day_end
             )
             
-            # AGGIUNGI METRICHE SONNO REALI per questo giorno
+            # AGGIUNGI METRICHE SONNO SE CI SONO ATTIVITÀ SONNO PER QUEL GIORNO
             sleep_metrics_for_day = get_sleep_metrics_for_day(day_date, st.session_state.activities, day_metrics)
             if sleep_metrics_for_day:
                 day_metrics.update(sleep_metrics_for_day)
-                print(f"✅ Aggiunte metriche sonno per {day_date}: {sleep_metrics_for_day.get('sleep_duration', 0)}h")
             
             daily_metrics[day_date] = day_metrics
     
@@ -2822,68 +2482,26 @@ def main():
                     # CORREZIONE: NESSUNA METRICA SONNO nei default
                 }
 
-            # DEBUG ESPLOSIVO - CONTROLLO ALLINEAMENTO DATE
-            print(f"🎯 DEBUG ALLINEAMENTO DATE ULTIMATIVO:")
-            print(f"   Timeline start: {timeline['start_time']}")
-            print(f"   Timeline end: {timeline['end_time']}")
-            print(f"   Timeline giorni: {list(timeline['days_data'].keys())}")
-
-            # Controlla TUTTE le attività sonno
-            sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
-            print(f"   Attività sonno trovate: {len(sleep_activities)}")
-
-            # DEBUG: mostra TUTTE le attività
-            print(f"   TUTTE LE ATTIVITÀ:")
+            # DEBUG ULTIMATIVO: verifica ESATTAMENTE cosa c'è nelle attività
+            print(f"🎯 DEBUG ULTIMATIVO ACTIVITIES:")
             for i, activity in enumerate(st.session_state.activities):
-                print(f"      {i}: {activity['type']} - '{activity['name']}'")
-                if activity['type'] == 'Sonno':
-                    sleep_end = activity['start_time'] + timedelta(minutes=activity['duration'])
-                    print(f"         🕒 Sonno: {activity['start_time']} -> {sleep_end}")
+                print(f"   {i}: type='{activity['type']}', name='{activity['name']}'")
+                print(f"      start_time={activity['start_time']}, duration={activity['duration']}min")
+            
+            sleep_count = sum(1 for a in st.session_state.activities if a['type'] == 'Sonno')
+            print(f"   Totale attività 'Sonno': {sleep_count}")
+            # AGGIUNGI METRICHE SONNO SOLO SE CI SONO ATTIVITÀ SONNO ESPLICITE
+            sleep_metrics = get_sleep_metrics_from_activities(
+                st.session_state.activities, daily_metrics, timeline
+            )
 
-            for i, sleep_act in enumerate(sleep_activities):
-                sleep_start = sleep_act['start_time']
-                sleep_end = sleep_start + timedelta(minutes=sleep_act['duration'])
-                
-                print(f"   🔍 Analisi Sonno {i+1}:")
-                print(f"      Nome: {sleep_act['name']}")
-                print(f"      Inizio: {sleep_start}")
-                print(f"      Fine: {sleep_end}")
-                print(f"      Durata: {sleep_act['duration']} minuti")
-                
-                # Verifica inclusione nella timeline
-                included_in_timeline = (
-                    timeline['start_time'] <= sleep_start <= timeline['end_time'] or
-                    timeline['start_time'] <= sleep_end <= timeline['end_time'] or
-                    (sleep_start <= timeline['start_time'] and sleep_end >= timeline['end_time'])
-                )
-                
-                print(f"      ❓ Incluso in timeline: {included_in_timeline}")
-                
-                if not included_in_timeline:
-                    print(f"      ⚠️  PROBLEMA: Sonno fuori dalla timeline!")
-                    print(f"         Timeline range: {timeline['start_time']} -> {timeline['end_time']}")
-                    print(f"         Sonno range: {sleep_start} -> {sleep_end}")
-
-            # Prova a forzare l'analisi del sonno se ce n'è uno
-            if sleep_activities:
-                latest_sleep = sleep_activities[-1]
-                print(f"   🎯 Forzando analisi sonno: {latest_sleep['name']}")
-                
-                sleep_metrics = get_sleep_metrics_from_activities(
-                    st.session_state.activities, daily_metrics, timeline
-                )
-                
-                if sleep_metrics:
-                    avg_metrics.update(sleep_metrics)
-                    st.success(f"😴 SONNO RILEVATO E ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
-                    st.info(f"📊 Analisi basata su {sleep_metrics.get('sleep_ibis_analyzed', 0)} battiti cardiaci reali")
-                    print(f"✅ SONNO AGGIUNTO ALLE METRICHE")
-                else:
-                    st.error("❌ IMPOSSIBILE ANALIZZARE IL SONNO: date non allineate con la registrazione")
-                    st.info("💡 Assicurati che il periodo di sonno registrato corrisponda alla data della registrazione IBI")
+            if sleep_metrics:
+                avg_metrics.update(sleep_metrics)
+                st.success(f"😴 SONNO RILEVATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
+                print(f"✅ SONNO AGGIUNTO ALLE METRICHE")
             else:
-                st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel tracker laterale")
-                print(f"❌ NESSUNA ATTIVITÀ SONNO TROVATA")
+                st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno'")
+                print(f"❌ NESSUNA METRICA SONNO TROVATA")
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
