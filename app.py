@@ -1112,25 +1112,47 @@ def calculate_sleep_from_real_ibis(activity, timeline, sleep_duration_hours):
     }
 
 def extract_sleep_ibis_simple(activity, timeline):
-    """Estrae IBI del sonno - VERSIONE SEMPLIFICATA MA FUNZIONANTE"""
+    """Estrae IBI del sonno - CON DEBUG ESPLOSIVO"""
     sleep_start = activity['start_time']
     sleep_end = sleep_start + timedelta(minutes=activity['duration'])
     
     sleep_ibis = []
     
+    print(f"🎯 DEBUG extract_sleep_ibis_simple:")
+    print(f"   Cercando sonno: {sleep_start} -> {sleep_end}")
+    print(f"   Timeline start: {timeline['start_time']}")
+    print(f"   Timeline giorni disponibili: {list(timeline['days_data'].keys())}")
+    
+    found_count = 0
+    
     for day_date, day_ibis in timeline['days_data'].items():
         current_time = timeline['start_time']
+        day_found = 0
+        
+        print(f"   Scannerizzo giorno {day_date} ({len(day_ibis)} IBI)")
         
         for rr in day_ibis:
             if sleep_start <= current_time <= sleep_end:
                 sleep_ibis.append(rr)
+                day_found += 1
+                found_count += 1
             
             current_time += timedelta(milliseconds=rr)
             if current_time > sleep_end:
                 break
         
+        print(f"     Trovati {day_found} IBI in questo giorno")
+        
         if current_time > sleep_end:
             break
+    
+    print(f"   TOTALE IBI trovati: {found_count}")
+    
+    if found_count == 0:
+        print(f"   ❌ CRITICO: Nessun IBI trovato per questa notte!")
+        print(f"   Possibile problema: date non corrispondenti")
+        print(f"   Sonno date: {sleep_start.date()} -> {sleep_end.date()}")
+        print(f"   Timeline dates: {list(timeline['days_data'].keys())}")
     
     return sleep_ibis
 
