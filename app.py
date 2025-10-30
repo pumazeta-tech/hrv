@@ -1033,8 +1033,8 @@ def analyze_other_impact(activity, daily_metrics):
         'recommendations': ["📝 Attività registrata"]
     }
 
-def analyze_sleep_impact_simple(activity, daily_metrics):
-    """Analisi sonno SEMPLIFICATA che FUNZIONA"""
+def analyze_sleep_impact_simple(activity, daily_metrics, timeline=None):
+    """Analisi sonno SEMPLIFICATA che FUNZIONA - ACCETTA 3 ARGOMENTI"""
     sleep_duration_hours = activity['duration'] / 60.0
     
     # Metriche realistiche basate sulla durata
