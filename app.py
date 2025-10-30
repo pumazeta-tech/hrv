@@ -1005,30 +1005,38 @@ def analyze_recovery_impact(activity, daily_metrics):
     }
 
 def analyze_sleep_impact(activity, daily_metrics, timeline):
-    """Analisi sonno BASATA SOLO SU IBI REALI"""
+    """Analisi sonno BASATA SOLO SU IBI REALI - CON DEBUG MIGLIORATO"""
     sleep_start = activity['start_time']
     sleep_duration_hours = activity['duration'] / 60.0
     
-    print(f"🔍 ANALISI SONNO: {sleep_start} per {sleep_duration_hours} ore")
+    print(f"🔍 ANALISI SONNO INIZIATA:")
+    print(f"   Sonno: {sleep_start} per {sleep_duration_hours} ore")
     
     # Trova gli IBI corrispondenti al periodo di sonno
     sleep_ibis = extract_sleep_ibis(activity, timeline)
     
+    # DEBUG DETTAGLIATO
+    print(f"   IBI trovati: {len(sleep_ibis)}")
+    
     # Se non ci sono IBI, restituisci errore
     if not sleep_ibis or len(sleep_ibis) < 50:
+        print(f"   ❌ ABORT: IBI insufficienti ({len(sleep_ibis)})")
         return {
             'activity': activity,
             'sleep_metrics': None,
             'type': 'sleep', 
             'recovery_status': 'unknown',
-            'recommendations': [f"⚠️ Nessun dato IBI trovato durante il sonno ({len(sleep_ibis) if sleep_ibis else 0} battiti)"]
+            'recommendations': [f"⚠️ Dati IBI insufficienti durante il sonno ({len(sleep_ibis)} battiti)"]
         }
+    
+    print(f"   ✅ IBI sufficienti, procedo con calcolo metriche...")
     
     # CALCOLA METRICHE REALI
     sleep_metrics = calculate_real_sleep_metrics(sleep_ibis, sleep_duration_hours)
     
     # Se il calcolo fallisce
     if not sleep_metrics:
+        print(f"   ❌ ABORT: calculate_real_sleep_metrics ha restituito vuoto")
         return {
             'activity': activity,
             'sleep_metrics': None,
@@ -1036,6 +1044,18 @@ def analyze_sleep_impact(activity, daily_metrics, timeline):
             'recovery_status': 'unknown', 
             'recommendations': ["⚠️ Impossibile calcolare metriche sonno dai dati"]
         }
+    
+    print(f"   ✅ Metriche calcolate: {sleep_metrics}")
+    
+    recommendations = generate_sleep_recommendations(sleep_metrics)
+    
+    return {
+        'activity': activity,
+        'sleep_metrics': sleep_metrics,
+        'type': 'sleep',
+        'recovery_status': 'optimal' if sleep_metrics.get('sleep_efficiency', 0) > 85 else 'good',
+        'recommendations': recommendations
+    }
     
     recommendations = generate_sleep_recommendations(sleep_metrics)
     
@@ -1321,18 +1341,25 @@ def analyze_other_impact(activity, daily_metrics):
     }
 
 def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
-    """Raccoglie le metriche del sonno REALI dalle attività di sonno registrate"""
+    """Raccoglie le metriche del sonno REALI dalle attività di sonno registrate - CON DEBUG"""
     sleep_activities = [a for a in activities if a['type'] == 'Sonno']
     
+    print(f"🔍 DEBUG get_sleep_metrics_from_activities:")
+    print(f"   Attività sonno trovate: {len(sleep_activities)}")
+    
     if not sleep_activities:
+        print(f"   ❌ Nessuna attività sonno trovata!")
         return {}  # Nessuna attività sonno → nessuna metrica sonno
     
     # Prendi l'ultima attività sonno (più recente)
     latest_sleep = sleep_activities[-1]
+    print(f"   Analizzando sonno: {latest_sleep['start_time']} -> {latest_sleep['start_time'] + timedelta(minutes=latest_sleep['duration'])}")
+    
     sleep_analysis = analyze_sleep_impact(latest_sleep, daily_metrics, timeline)
     
+    print(f"   Sleep analysis result: {sleep_analysis.get('sleep_metrics', 'NONE')}")
+    
     return sleep_analysis.get('sleep_metrics', {})
-
 def get_sleep_metrics_for_day(day_date, activities, day_metrics):
     """Restituisce le metriche sonno REALI per un giorno specifico basate sugli IBI"""
     sleep_activities_for_day = []
