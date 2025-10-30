@@ -408,64 +408,6 @@ def has_valid_sleep_metrics(metrics):
     return False
 
 # =============================================================================
-# FUNZIONI PROFESSIONALI PER PULIRE I DATI
-# =============================================================================
-
-def professional_hrv_preprocessing(rr_intervals):
-    """Pulisce i dati HRV come fanno i dottori"""
-    print("🧹 Sto pulendo i dati...")
-    
-    # Trova i battiti strani
-    battiti_strani = []
-    for i, battito in enumerate(rr_intervals):
-        if battito < 300 or battito > 2000:  # Battiti impossibili
-            battiti_strani.append(i)
-        elif i > 0 and i < len(rr_intervals)-1:
-            battito_prima = rr_intervals[i-1]
-            battito_dopo = rr_intervals[i+1]
-            media_vicini = (battito_prima + battito_dopo) / 2
-            # Se è troppo diverso dai vicini
-            if abs(battito - media_vicini) / media_vicini > 0.2:
-                battiti_strani.append(i)
-    
-    # Correggi i battiti strani
-    dati_puliti = rr_intervals.copy()
-    for idx in battiti_strani:
-        if 0 < idx < len(dati_puliti)-1:
-            # Sostituisci con la media dei vicini
-            dati_puliti[idx] = (dati_puliti[idx-1] + dati_puliti[idx+1]) / 2
-    
-    # Controlla se la pulizia è andata bene
-    percentuale_pulita = (len(rr_intervals) - len(battiti_strani)) / len(rr_intervals) * 100
-    
-    qualita = "Ottima" if percentuale_pulita > 95 else \
-             "Buona" if percentuale_pulita > 90 else \
-             "Accettabile" if percentuale_pulita > 80 else "Scadente"
-    
-    print(f"✅ Puliti {len(battiti_strani)} battiti strani - Qualità: {qualita}")
-    
-    return dati_puliti, qualita, len(battiti_strani)
-
-def calculate_professional_hrv_metrics(rr_intervals, user_age, user_gender, start_time, end_time):
-    """Versione PRO dei calcoli HRV"""
-    
-    # PRIMA PULISCI I DATI
-    dati_puliti, qualita, battiti_corretti = professional_hrv_preprocessing(rr_intervals)
-    
-    # POI CALCOLA CON DATI PULITI
-    if qualita in ["Ottima", "Buona", "Accettabile"]:
-        metrics = calculate_realistic_hrv_metrics(dati_puliti, user_age, user_gender, start_time, end_time)
-        metrics['qualita_segnale'] = qualita
-        metrics['battiti_corretti'] = battiti_corretti
-    else:
-        st.warning("⚠️ Qualità registrazione bassa - Uso dati di base")
-        metrics = get_default_metrics(user_age, user_gender)
-        metrics['qualita_segnale'] = qualita
-        metrics['battiti_corretti'] = battiti_corretti
-    
-    return metrics
-
-# =============================================================================
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
 # =============================================================================
 
@@ -616,9 +558,99 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
 # CORREZIONE: RIMOSSA LA FUNZIONE DUPLICATA calculate_hrv_coherence
 
 def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
-    """NON calcolare mai automaticamente il sonno - solo tramite attività esplicita"""
-    print(f"   🛌 estimate_sleep_metrics: SONNO DISABILITATO - Usa attività 'Sonno' per registrarlo")
-    return {}  # Sempre vuoto
+    """Stima le metriche del sonno SOLO se la registrazione include ore notturne (22:00-7:00)"""
+    try:
+        # DEBUG
+        print(f"   🛌 DEBUG estimate_sleep_metrics:")
+        print(f"      Start: {start_time} (hour: {start_time.hour}), End: {end_time} (hour: {end_time.hour})")
+        print(f"      Duration: {recording_duration_hours:.2f}h")
+        
+        # Determina se la registrazione comprende ore notturne (22:00 - 7:00)
+        includes_night_hours = False
+        
+        # Caso 1: Registrazione lunga che copre sicuramente la notte
+        if recording_duration_hours >= 10:
+            includes_night_hours = True
+            print("      Caso 1 - Registrazione lunga >=10h")
+        
+        # Caso 2: Inizia di sera (dopo le 20:00) e finisce di notte/mattina
+        elif start_time.hour >= 20 and end_time.hour <= 12:
+            includes_night_hours = True
+            print("      Caso 2 - Inizia sera, finisce mattina")
+        
+        # Caso 3: Inizia di notte (prima delle 7:00)
+        elif start_time.hour < 7:
+            includes_night_hours = True
+            print("      Caso 3 - Inizia di notte")
+            
+        # Caso 4: Finisce di notte (dopo le 22:00)
+        elif end_time.hour >= 22:
+            includes_night_hours = True
+            print("      Caso 4 - Finisce di notte")
+        
+        # Caso 5: Attraversa completamente la notte (inizia prima delle 22 e finisce dopo le 7)
+        elif start_time.hour < 22 and end_time.hour > 7 and recording_duration_hours > 8:
+            includes_night_hours = True
+            print("      Caso 5 - Attraversa la notte")
+        
+        print(f"      includes_night_hours = {includes_night_hours}")
+        
+        # CORREZIONE: Se NON include ore notturne, NON restituire le metriche del sonno
+        if not includes_night_hours:
+            print("      ❌ NESSUN SONNO - Registrazione diurna")
+            return {}  # RESTITUISCI DIZIONARIO VUOTO
+        
+        # Se arriva qui, significa che include ore notturne
+        if len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
+            night_coverage = calculate_night_coverage(start_time, end_time, recording_duration_hours)
+            
+            print(f"      Night coverage: {night_coverage:.2f}")
+            
+            # Se la copertura notturna è troppo bassa, non calcolare il sonno
+            if night_coverage < 0.3:  # Meno del 30% della notte coperta
+                print(f"      ❌ Copertura notturna insufficiente: {night_coverage:.2f}")
+                return {}
+            
+            # Calcolo durata sonno realistico basato sulla copertura notturna
+            base_sleep_duration = 7.0  # Ore base di sonno
+            sleep_duration = base_sleep_duration * night_coverage
+            sleep_duration = max(3.0, min(9.0, sleep_duration))  # Limiti realistici
+            
+            # Battito durante il sonno (più basso)
+            sleep_hr = hr_mean * (0.75 + np.random.normal(0, 0.03))
+            sleep_hr = max(45, min(65, sleep_hr))
+            
+            # Efficienza del sonno basata su HRV e età
+            base_efficiency = 85 - (age - 20) * 0.2
+            sleep_efficiency = base_efficiency + np.random.normal(0, 5)
+            sleep_efficiency = max(70, min(95, sleep_efficiency))
+            
+            # Distribuzione realistico delle fasi del sonno
+            total_sleep_minutes = sleep_duration * 60
+            sleep_light = total_sleep_minutes * 0.55  # 55% sonno leggero
+            sleep_deep = total_sleep_minutes * 0.20   # 20% sonno profondo  
+            sleep_rem = total_sleep_minutes * 0.25    # 25% sonno REM
+            sleep_awake = total_sleep_minutes * 0.05  # 5% risvegli
+            
+            result = {
+                'sleep_duration': round(sleep_duration, 1),
+                'sleep_efficiency': round(sleep_efficiency, 1),
+                'sleep_hr': round(sleep_hr, 1),
+                'sleep_light': round(sleep_light / 60, 1),
+                'sleep_deep': round(sleep_deep / 60, 1),
+                'sleep_rem': round(sleep_rem / 60, 1),
+                'sleep_awake': round(sleep_awake / 60, 1)
+            }
+            
+            print(f"      ✅ SONNO CALCOLATO: {result}")
+            return result
+        else:
+            print("      ❌ Troppo pochi battiti per analisi sonno")
+            return {}
+            
+    except Exception as e:
+        print(f"      ❌ Errore: {e}")
+        return {}
 
 def calculate_night_coverage(start_time, end_time, duration_hours):
     """Calcola quanta parte della notte (22:00-7:00) è coperta dalla registrazione"""
@@ -934,9 +966,6 @@ def analyze_activities_impact(activities, daily_metrics, timeline):
         elif activity['type'] == "Riposo":
             analysis = analyze_recovery_impact(activity, daily_metrics)
             activity_analysis.append(analysis)
-        elif activity['type'] == "Sonno":  # NUOVO - analisi sonno SEMPLIFICATA
-            analysis = analyze_sleep_impact_simple(activity, daily_metrics)
-            activity_analysis.append(analysis)
         elif activity['type'] == "Stress":
             analysis = analyze_stress_impact(activity, daily_metrics)
             activity_analysis.append(analysis)
@@ -1004,13 +1033,6 @@ def analyze_recovery_impact(activity, daily_metrics):
         'recommendations': ["Ottima scelta per il recupero!"]
     }
 
-def calculate_rmssd(rr_intervals):
-    """Calcola RMSSD per una finestra di IBI"""
-    if len(rr_intervals) < 2:
-        return 0
-    differences = np.diff(rr_intervals)
-    return np.sqrt(np.mean(np.square(differences)))
-
 def analyze_stress_impact(activity, daily_metrics):
     """Analisi impatto attività stressanti"""
     return {
@@ -1032,243 +1054,6 @@ def analyze_other_impact(activity, daily_metrics):
         'recovery_status': 'unknown',
         'recommendations': ["📝 Attività registrata"]
     }
-
-def analyze_sleep_impact_simple(activity, daily_metrics, timeline=None):
-    """Analisi sonno BASATA SU METRICHE REALI del giorno"""
-    sleep_duration_hours = activity['duration'] / 60.0
-    
-    # Se abbiamo timeline, analizza con dati REALI
-    if timeline:
-        sleep_metrics = calculate_sleep_from_real_ibis(activity, timeline, sleep_duration_hours)
-    else:
-        # Fallback
-        sleep_metrics = calculate_sleep_fallback(sleep_duration_hours)
-    
-    recommendations = generate_sleep_recommendations(sleep_metrics)
-    
-    return {
-        'activity': activity,
-        'sleep_metrics': sleep_metrics,
-        'type': 'sleep',
-        'recovery_status': 'optimal' if sleep_metrics.get('sleep_efficiency', 0) > 85 else 'good',
-        'recommendations': recommendations
-    }
-def calculate_sleep_from_real_ibis(activity, timeline, sleep_duration_hours):
-    """Calcola metriche sonno REALI dagli IBI"""
-    sleep_ibis = extract_sleep_ibis_simple(activity, timeline)
-    
-    if not sleep_ibis or len(sleep_ibis) < 100:
-        print(f"❌ IBI insufficienti: {len(sleep_ibis) if sleep_ibis else 0}")
-        return calculate_sleep_fallback(sleep_duration_hours)
-    
-    print(f"✅ Analizzando {len(sleep_ibis)} IBI reali del sonno")
-    
-    # CALCOLI REALI dagli IBI
-    sleep_hr = 60000 / np.mean(sleep_ibis)
-    
-    # Analizza variabilità per distinguere le fasi
-    rmssd_values = calculate_moving_rmssd(sleep_ibis, window_size=300)  # 5 minuti
-    
-    # Distribuzione basata sulla variabilità
-    if rmssd_values:
-        avg_rmssd = np.mean(rmssd_values)
-        std_rmssd = np.std(rmssd_values)
-        
-        # Fasi basate su RMSSD (alta variabilità = sonno profondo/REM)
-        if avg_rmssd > 45:
-            # Alto RMSSD = più sonno profondo
-            light_pct = 0.45
-            deep_pct = 0.30
-            rem_pct = 0.20
-        elif avg_rmssd > 30:
-            # RMSSD medio = bilanciato
-            light_pct = 0.50
-            deep_pct = 0.25
-            rem_pct = 0.20
-        else:
-            # Basso RMSSD = più sonno leggero
-            light_pct = 0.60
-            deep_pct = 0.20
-            rem_pct = 0.15
-    else:
-        # Fallback
-        light_pct, deep_pct, rem_pct = 0.50, 0.25, 0.20
-    
-    awake_pct = 0.05  # Fisso per i risvegli
-    
-    # Efficienza basata su stabilità HR
-    hr_std = np.std([60000/rr for rr in sleep_ibis])
-    efficiency = max(70, min(95, 90 - hr_std))
-    
-    return {
-        'sleep_duration': round(sleep_duration_hours, 1),
-        'sleep_efficiency': round(efficiency, 1),
-        'sleep_hr': round(sleep_hr, 1),
-        'sleep_light': round(sleep_duration_hours * light_pct, 1),
-        'sleep_deep': round(sleep_duration_hours * deep_pct, 1),
-        'sleep_rem': round(sleep_duration_hours * rem_pct, 1),
-        'sleep_awake': round(sleep_duration_hours * awake_pct, 1)
-    }
-
-def extract_sleep_ibis_simple(activity, timeline):
-    """Estrae IBI del sonno - CON DEBUG ESPLOSIVO"""
-    sleep_start = activity['start_time']
-    sleep_end = sleep_start + timedelta(minutes=activity['duration'])
-    
-    sleep_ibis = []
-    
-    print(f"🎯 DEBUG extract_sleep_ibis_simple:")
-    print(f"   Cercando sonno: {sleep_start} -> {sleep_end}")
-    print(f"   Timeline start: {timeline['start_time']}")
-    print(f"   Timeline giorni disponibili: {list(timeline['days_data'].keys())}")
-    
-    found_count = 0
-    
-    for day_date, day_ibis in timeline['days_data'].items():
-        current_time = timeline['start_time']
-        day_found = 0
-        
-        print(f"   Scannerizzo giorno {day_date} ({len(day_ibis)} IBI)")
-        
-        for rr in day_ibis:
-            if sleep_start <= current_time <= sleep_end:
-                sleep_ibis.append(rr)
-                day_found += 1
-                found_count += 1
-            
-            current_time += timedelta(milliseconds=rr)
-            if current_time > sleep_end:
-                break
-        
-        print(f"     Trovati {day_found} IBI in questo giorno")
-        
-        if current_time > sleep_end:
-            break
-    
-    print(f"   TOTALE IBI trovati: {found_count}")
-    
-    if found_count == 0:
-        print(f"   ❌ CRITICO: Nessun IBI trovato per questa notte!")
-        print(f"   Possibile problema: date non corrispondenti")
-        print(f"   Sonno date: {sleep_start.date()} -> {sleep_end.date()}")
-        print(f"   Timeline dates: {list(timeline['days_data'].keys())}")
-    
-    return sleep_ibis
-
-def calculate_moving_rmssd(ibis, window_size=300):
-    """Calcola RMSSD mobile per finestre di IBI"""
-    if len(ibis) < window_size:
-        return []
-    
-    rmssd_values = []
-    for i in range(len(ibis) - window_size):
-        window = ibis[i:i + window_size]
-        differences = np.diff(window)
-        rmssd = np.sqrt(np.mean(np.square(differences)))
-        rmssd_values.append(rmssd)
-    
-    return rmssd_values
-
-def calculate_sleep_fallback(sleep_duration_hours):
-    """Fallback per quando non ci sono IBI sufficienti"""
-    return {
-        'sleep_duration': round(sleep_duration_hours, 1),
-        'sleep_efficiency': min(95, 80 + (sleep_duration_hours - 6) * 3),
-        'sleep_hr': 58,
-        'sleep_light': round(sleep_duration_hours * 0.5, 1),
-        'sleep_deep': round(sleep_duration_hours * 0.25, 1),
-        'sleep_rem': round(sleep_duration_hours * 0.2, 1),
-        'sleep_awake': round(sleep_duration_hours * 0.05, 1)
-    }
-
-def generate_sleep_recommendations(sleep_metrics):
-    """Genera raccomandazioni basate sulle metriche reali"""
-    recommendations = []
-    
-    duration = sleep_metrics.get('sleep_duration', 0)
-    efficiency = sleep_metrics.get('sleep_efficiency', 0)
-    
-    recommendations.append(f"💤 Sonno: {duration:.1f}h - Efficienza: {efficiency:.0f}%")
-    
-    if duration >= 7:
-        recommendations.append("🎯 Ottima durata!")
-    elif duration < 6:
-        recommendations.append("⚠️ Cerca di dormire almeno 7 ore")
-    
-    if efficiency >= 90:
-        recommendations.append("💪 Eccellente qualità del sonno!")
-    
-    return recommendations
-
-def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
-    """Raccoglie le metriche del sonno REALI dalle attività di sonno registrate - VERSIONE CORRETTA"""
-    
-    print(f"🎯 DEBUG get_sleep_metrics_from_activities:")
-    print(f"   Numero totale attività: {len(activities)}")
-    
-    sleep_activities = [a for a in activities if a['type'] == 'Sonno']
-    print(f"   Attività sonno trovate: {len(sleep_activities)}")
-    
-    # DEBUG: mostra TUTTE le attività per vedere cosa c'è
-    for i, activity in enumerate(activities):
-        print(f"   Attività {i}: {activity['type']} - {activity['name']} - {activity['start_time']}")
-    
-    if not sleep_activities:
-        print(f"   ❌ Nessuna attività 'Sonno' trovata!")
-        return {}
-    
-    # Prendi l'ultima attività sonno
-    latest_sleep = sleep_activities[-1]
-    print(f"   🔍 Analizzando sonno: {latest_sleep['name']}")
-    print(f"      Orario: {latest_sleep['start_time']} -> {latest_sleep['start_time'] + timedelta(minutes=latest_sleep['duration'])}")
-    
-    # FORZA il calcolo delle metriche sonno
-    sleep_analysis = analyze_sleep_impact_simple(latest_sleep, daily_metrics, timeline)
-    
-    print(f"   📊 Risultato analisi sonno:")
-    print(f"      Ha sleep_metrics: {'sleep_metrics' in sleep_analysis}")
-    if 'sleep_metrics' in sleep_analysis and sleep_analysis['sleep_metrics']:
-        print(f"      Metriche: {sleep_analysis['sleep_metrics']}")
-    else:
-        print(f"      ❌ sleep_metrics è None o vuoto!")
-    
-    return sleep_analysis.get('sleep_metrics', {})
-
-def get_sleep_metrics_for_day(day_date, activities, day_metrics):
-    """Restituisce le metriche sonno REALI per un giorno specifico basate sugli IBI"""
-    
-    print(f"🔍 DEBUG get_sleep_metrics_for_day:")
-    print(f"   Giorno: {day_date}")
-    print(f"   Attività totali: {len(activities)}")
-    
-    sleep_activities_for_day = []
-    
-    for activity in activities:
-        if activity['type'] == 'Sonno':
-            activity_date = activity['start_time'].date().isoformat()
-            print(f"   Attività sonno: {activity['name']} - {activity_date}")
-            # Se l'attività sonno è per questo giorno
-            if activity_date == day_date:
-                sleep_activities_for_day.append(activity)
-                print(f"   ✅ Sonno corrisponde al giorno!")
-    
-    print(f"   Attività sonno per questo giorno: {len(sleep_activities_for_day)}")
-    
-    if not sleep_activities_for_day:
-        print(f"   ❌ Nessuna attività sonno per questo giorno")
-        return {}  # Nessuna attività sonno per questo giorno
-    
-    # Prendi l'ultima attività sonno del giorno
-    latest_sleep = sleep_activities_for_day[-1]
-    
-    # CALCOLA METRICHE REALI dagli IBI (non stime fisse!)
-    # Usa un timeline vuoto perché non abbiamo il timeline completo qui
-    # Le metriche verranno calcolate dagli IBI disponibili
-    sleep_analysis = analyze_sleep_impact_simple(latest_sleep, {}, {})  
-    
-    print(f"   Risultato analisi: {sleep_analysis.get('sleep_metrics', 'NONE')}")
-    
-    return sleep_analysis.get('sleep_metrics', {})
 
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
     """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
@@ -1533,7 +1318,6 @@ ACTIVITY_COLORS = {
     "Alimentazione": "#f39c12", 
     "Stress": "#9b59b6",
     "Riposo": "#3498db",
-    "Sonno": "#2c3e50",
     "Altro": "#95a5a6"
 }
 
@@ -1547,7 +1331,7 @@ def create_activity_tracker():
     
     with st.sidebar.expander("➕ Aggiungi Attività/Pasto", expanded=False):
         activity_type = st.selectbox("Tipo Attività", 
-                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Sonno", "Altro"])
+                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Altro"])
         
         activity_name = st.text_input("Nome Attività/Pasto", placeholder="Es: Corsa mattutina, Pranzo, etc.")
         
@@ -1555,72 +1339,22 @@ def create_activity_tracker():
             food_items = st.text_area("Cosa hai mangiato? (separato da virgola)", placeholder="Es: pasta, insalata, frutta")
             intensity = st.select_slider("Pesantezza pasto", 
                                        options=["Leggero", "Normale", "Pesante", "Molto pesante"])
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input("Data", value=datetime.now().date(), key="activity_date")
-                start_time = st.time_input("Ora inizio", value=datetime.now().time(), key="activity_time")
-                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
-            with col2:
-                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=30, key="activity_duration")
-                
-        elif activity_type == "Sonno":
-            st.info("💤 Registra il tuo periodo di sonno")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                sleep_start_date = st.date_input("Data inizio sonno", value=datetime.now().date(), key="sleep_start_date")
-            with col2:
-                sleep_start_time = st.time_input("Ora inizio sonno", value=datetime(2020,1,1,23,0).time(), key="sleep_start_time")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                sleep_end_date = st.date_input("Data fine sonno", value=datetime.now().date(), key="sleep_end_date")
-            with col2:
-                sleep_end_time = st.time_input("Ora fine sonno", value=datetime(2020,1,1,7,0).time(), key="sleep_end_time")
-            
-            sleep_start_datetime = datetime.combine(sleep_start_date, sleep_start_time)
-            sleep_end_datetime = datetime.combine(sleep_end_date, sleep_end_time)
-            
-            if sleep_end_datetime < sleep_start_datetime:
-                sleep_end_datetime += timedelta(days=1)
-            
-            duration_minutes = int((sleep_end_datetime - sleep_start_datetime).total_seconds() / 60)
-            
-            st.write(f"**Durata sonno:** {duration_minutes // 60}h {duration_minutes % 60}min")
-            duration = duration_minutes
-            food_items = ""
-            intensity = "Normale"
-            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}-{sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}"
-            
-            st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
-            st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
-            
         else:
             food_items = ""
             intensity = st.select_slider("Intensità", 
                                        options=["Leggera", "Moderata", "Intensa", "Massimale"])
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input("Data", value=datetime.now().date(), key="activity_date")
-                start_time = st.time_input("Ora inizio", value=datetime.now().time(), key="activity_time")
-                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
-            with col2:
-                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=30, key="activity_duration")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Data", value=datetime.now().date(), key="activity_date")
+            start_time = st.time_input("Ora inizio", value=datetime.now().time(), key="activity_time")
+            st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
+        with col2:
+            duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=30, key="activity_duration")
         
         notes = st.text_area("Note (opzionale)", placeholder="Note aggiuntive...", key="activity_notes")
         
         if st.button("💾 Salva Attività", use_container_width=True, key="save_activity"):
-            if activity_type == "Sonno":
-                # Per Sonno, usa sleep_start_datetime e estrai date/time
-                start_date = sleep_start_date
-                start_time = sleep_start_time
-            else:
-                # Per altri tipi, usa i valori normali
-                start_date = start_date
-                start_time = start_time
-                
             save_activity(activity_type, activity_name, intensity, food_items, start_date, start_time, duration, notes)
             st.success("Attività salvata!")
             st.rerun()
@@ -1629,14 +1363,7 @@ def create_activity_tracker():
         st.sidebar.subheader("📋 Gestione Attività")
         
         for i, activity in enumerate(st.session_state.activities[-10:]):
-            if activity['type'] == 'Sonno':
-                # Per il sonno, mostra solo il nome (che già contiene le date)
-                display_text = f"{activity['name']}"
-            else:
-                # Per altre attività, mostra nome + data/ora
-                display_text = f"{activity['name']} - {activity['start_time'].strftime('%d/%m/%Y %H:%M')}"
-            
-            with st.sidebar.expander(display_text, False):
+            with st.sidebar.expander(f"{activity['name']} - {activity['start_time'].strftime('%d/%m/%Y %H:%M')}", False):
                 st.write(f"**Tipo:** {activity['type']}")
                 st.write(f"**Intensità:** {activity['intensity']}")
                 if activity['food_items']:
@@ -1667,8 +1394,8 @@ def edit_activity_interface():
     
     with st.sidebar.form("edit_activity_form"):
         activity_type = st.selectbox("Tipo Attività", 
-                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Sonno", "Altro"],
-                                   index=["Allenamento", "Alimentazione", "Stress", "Riposo", "Sonno", "Altro"].index(activity['type']),
+                                   ["Allenamento", "Alimentazione", "Stress", "Riposo", "Altro"],
+                                   index=["Allenamento", "Alimentazione", "Stress", "Riposo", "Altro"].index(activity['type']),
                                    key="edit_type")
         
         activity_name = st.text_input("Nome Attività/Pasto", value=activity['name'], key="edit_name")
@@ -1678,86 +1405,35 @@ def edit_activity_interface():
             intensity = st.select_slider("Pesantezza pasto", 
                                        options=["Leggero", "Normale", "Pesante", "Molto pesante"],
                                        value=activity['intensity'], key="edit_intensity_food")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input("Data", value=activity['start_time'].date(), key="edit_date")
-                start_time = st.time_input("Ora inizio", value=activity['start_time'].time(), key="edit_time")
-                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
-            with col2:
-                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=activity['duration'], key="edit_duration")
-                
-        elif activity_type == "Sonno":
-            st.info("💤 Modifica periodo di sonno")
-            
-            existing_start = activity['start_time']
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                sleep_start_date = st.date_input("Data inizio sonno", value=existing_start.date(), key="edit_sleep_start_date")
-            with col2:
-                sleep_start_time = st.time_input("Ora inizio sonno", value=existing_start.time(), key="edit_sleep_start_time")
-            
-            existing_end = existing_start + timedelta(minutes=activity['duration'])
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                sleep_end_date = st.date_input("Data fine sonno", value=existing_end.date(), key="edit_sleep_end_date")
-            with col2:
-                sleep_end_time = st.time_input("Ora fine sonno", value=existing_end.time(), key="edit_sleep_end_time")
-            
-            sleep_start_datetime = datetime.combine(sleep_start_date, sleep_start_time)
-            sleep_end_datetime = datetime.combine(sleep_end_date, sleep_end_time)
-            
-            if sleep_end_datetime < sleep_start_datetime:
-                sleep_end_datetime += timedelta(days=1)
-            
-            duration_minutes = int((sleep_end_datetime - sleep_start_datetime).total_seconds() / 60)
-            
-            st.write(f"**Durata sonno:** {duration_minutes // 60}h {duration_minutes % 60}min")
-            duration = duration_minutes
-            food_items = ""
-            intensity = "Normale"
-            activity_name = f"Sonno {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}-{sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}"
-            
-            st.write(f"**Inizio:** {sleep_start_datetime.strftime('%d/%m/%Y %H:%M')}")
-            st.write(f"**Fine:** {sleep_end_datetime.strftime('%d/%m/%Y %H:%M')}")
-            
         else:
             food_items = activity.get('food_items', '')
             intensity = st.select_slider("Intensità", 
                                        options=["Leggera", "Moderata", "Intensa", "Massimale"],
                                        value=activity['intensity'], key="edit_intensity")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input("Data", value=activity['start_time'].date(), key="edit_date")
-                start_time = st.time_input("Ora inizio", value=activity['start_time'].time(), key="edit_time")
-                st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
-            with col2:
-                duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=activity['duration'], key="edit_duration")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Data", value=activity['start_time'].date(), key="edit_date")
+            start_time = st.time_input("Ora inizio", value=activity['start_time'].time(), key="edit_time")
+            st.write(f"Data selezionata: {start_date.strftime('%d/%m/%Y')}")
+        with col2:
+            duration = st.number_input("Durata (min)", min_value=1, max_value=480, value=activity['duration'], key="edit_duration")
         
         notes = st.text_area("Note", value=activity.get('notes', ''), key="edit_notes")
         
         col1, col2 = st.columns(2)
         with col1:
             if st.form_submit_button("💾 Salva Modifiche", use_container_width=True):
-                if activity_type == "Sonno":
-                    # Per Sonno, usa sleep_start_datetime e estrai date/time
-                    start_date = sleep_start_date
-                    start_time = sleep_start_time
-                else:
-                    # Per altri tipi, usa i valori normali
-                    start_date = start_date
-                    start_time = start_time
-                    
                 update_activity(activity_index, activity_type, activity_name, intensity, food_items, start_date, start_time, duration, notes)
+                st.session_state.editing_activity_index = None
+                st.rerun()
+        with col2:
+            if st.form_submit_button("❌ Annulla", use_container_width=True):
                 st.session_state.editing_activity_index = None
                 st.rerun()
 
 def save_activity(activity_type, name, intensity, food_items, start_date, start_time, duration, notes):
     """Salva una nuova attività"""
-    # Combina data e ora
     start_datetime = datetime.combine(start_date, start_time)
     
     activity = {
@@ -1845,7 +1521,7 @@ def parse_starttime_from_file(content):
     return starttime
 
 def calculate_recording_timeline(rr_intervals, start_time):
-    """Calcola la timeline della registrazione - VERSIONE CORRETTA"""
+    """Calcola la timeline della registrazione"""
     total_duration_ms = sum(rr_intervals)
     end_time = start_time + timedelta(milliseconds=total_duration_ms)
     
@@ -1858,52 +1534,35 @@ def calculate_recording_timeline(rr_intervals, start_time):
         day_rr_intervals.append(rr)
         current_time += timedelta(milliseconds=rr)
         
-        # Se cambia giorno, salva i dati del giorno precedente
         if current_time.date() != current_day_start:
             if day_rr_intervals:
                 days_data[current_day_start.isoformat()] = day_rr_intervals.copy()
             day_rr_intervals = []
             current_day_start = current_time.date()
     
-    # Aggiungi l'ultimo giorno
     if day_rr_intervals:
         days_data[current_day_start.isoformat()] = day_rr_intervals
-    
-    print(f"📅 Timeline creata:")
-    print(f"   Start: {start_time}")
-    print(f"   End: {end_time}") 
-    print(f"   Durata: {total_duration_ms / (1000 * 60 * 60):.1f} ore")
-    print(f"   Giorni: {list(days_data.keys())}")
-    print(f"   IBI per giorno: { {k: len(v) for k, v in days_data.items()} }")
     
     return {
         'start_time': start_time,
         'end_time': end_time,
         'total_duration_hours': total_duration_ms / (1000 * 60 * 60),
-        'days_data': days_data  # QUESTA È LA CHIAVE CHE MANCAVA!
+        'days_data': days_data
     }
 
 def calculate_daily_metrics(days_data, user_age, user_gender):
-    """Calcola le metriche HRV per ogni giorno - CON SUPPORO PER METRICHE SONNO"""
+    """Calcola le metriche HRV per ogni giorno"""
     daily_metrics = {}
     
     for day_date, day_rr_intervals in days_data.items():
         if len(day_rr_intervals) >= 10:
-            # Crea datetime di inizio e fine per ogni giorno
+            # CORREZIONE: Crea datetime di inizio e fine per ogni giorno
             day_start = datetime.fromisoformat(day_date)
             day_end = day_start + timedelta(hours=24)
             
-            # Calcola metriche HRV base
-            day_metrics = calculate_realistic_hrv_metrics(
-                day_rr_intervals, user_age, user_gender, day_start, day_end
+            daily_metrics[day_date] = calculate_realistic_hrv_metrics(
+                day_rr_intervals, user_age, user_gender, day_start, day_end  # PASSAGGIO ORARI
             )
-            
-            # AGGIUNGI METRICHE SONNO SE CI SONO ATTIVITÀ SONNO PER QUEL GIORNO
-            sleep_metrics_for_day = get_sleep_metrics_for_day(day_date, st.session_state.activities, day_metrics)
-            if sleep_metrics_for_day:
-                day_metrics.update(sleep_metrics_for_day)
-            
-            daily_metrics[day_date] = day_metrics
     
     return daily_metrics
 
@@ -2421,31 +2080,6 @@ def main():
             start_time = parse_starttime_from_file(content)
             timeline = calculate_recording_timeline(rr_intervals, start_time)
             
-            # 2. DEBUG ESPLOSIVO - controlla ALLINEAMENTO DATE
-            print(f"🎯 DEBUG ALLINEAMENTO DATE:")
-            print(f"   File start: {start_time}")
-            print(f"   Timeline start: {timeline['start_time']}")
-            print(f"   Timeline end: {timeline['end_time']}")
-            print(f"   Timeline giorni: {list(timeline['days_data'].keys())}")
-
-            # 3. CONTROLLA SE CI SONO ATTIVITÀ SONNO
-            if st.session_state.activities:
-                sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
-                print(f"   Attività sonno trovate: {len(sleep_activities)}")
-                
-                for i, sleep_act in enumerate(sleep_activities):
-                    sleep_start = sleep_act['start_time']
-                    sleep_end = sleep_start + timedelta(minutes=sleep_act['duration'])
-                    print(f"   Sonno {i+1}: {sleep_start} -> {sleep_end}")
-                    print(f"     Date: {sleep_start.date().isoformat()} -> {sleep_end.date().isoformat()}")
-                    
-                    # Verifica se le date coincidono
-                    timeline_dates = list(timeline['days_data'].keys())
-                    sleep_dates = [sleep_start.date().isoformat(), sleep_end.date().isoformat()]
-                    
-                    date_match = any(date in timeline_dates for date in sleep_dates)
-                    print(f"     Date corrispondono con timeline: {date_match}")
-            
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("📅 Inizio Registrazione", 
@@ -2466,7 +2100,7 @@ def main():
             avg_metrics = {}
             
             try:
-                calculated_metrics = calculate_professional_hrv_metrics(
+                calculated_metrics = calculate_realistic_hrv_metrics(
                     rr_intervals, user_profile['age'], user_profile['gender'], start_time, timeline['end_time']
                 )
                 if calculated_metrics:
@@ -2482,26 +2116,7 @@ def main():
                     # CORREZIONE: NESSUNA METRICA SONNO nei default
                 }
 
-            # DEBUG ULTIMATIVO: verifica ESATTAMENTE cosa c'è nelle attività
-            print(f"🎯 DEBUG ULTIMATIVO ACTIVITIES:")
-            for i, activity in enumerate(st.session_state.activities):
-                print(f"   {i}: type='{activity['type']}', name='{activity['name']}'")
-                print(f"      start_time={activity['start_time']}, duration={activity['duration']}min")
-            
-            sleep_count = sum(1 for a in st.session_state.activities if a['type'] == 'Sonno')
-            print(f"   Totale attività 'Sonno': {sleep_count}")
-            # AGGIUNGI METRICHE SONNO SOLO SE CI SONO ATTIVITÀ SONNO ESPLICITE
-            sleep_metrics = get_sleep_metrics_from_activities(
-                st.session_state.activities, daily_metrics, timeline
-            )
-
-            if sleep_metrics:
-                avg_metrics.update(sleep_metrics)
-                st.success(f"😴 SONNO RILEVATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
-                print(f"✅ SONNO AGGIUNTO ALLE METRICHE")
-            else:
-                st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno'")
-                print(f"❌ NESSUNA METRICA SONNO TROVATA")
+            st.subheader("📈 Medie Complessive")
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
@@ -2562,7 +2177,7 @@ def main():
                     <div class="metric-unit">ms²</div>
                 </div>
                 """, unsafe_allow_html=True)
-
+            
             with col2:
                 st.markdown(f"""
                 <div class="compact-metric-card">
@@ -2580,36 +2195,6 @@ def main():
                     <div class="metric-unit">ratio</div>
                 </div>
                 """, unsafe_allow_html=True)
-
-            # 🔬 REPORT QUALITÀ REGISTRAZIONE
-            st.subheader("🔬 Qualità della Registrazione")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                qualita = calculated_metrics.get('qualita_segnale', 'Sconosciuta')
-                colore = "🟢" if qualita == "Ottima" else "🔵" if qualita == "Buona" else "🟠" if qualita == "Accettabile" else "🔴"
-                st.metric("Livello Qualità", f"{colore} {qualita}")
-            
-            with col2:
-                battiti_corretti = calculated_metrics.get('battiti_corretti', 0)
-                st.metric("Battiti Corretti", f"{battiti_corretti}")
-            
-            if qualita == "Scadente":
-                st.error("""
-                **🎯 Consigli per migliorare:**
-                - Controlla che il sensore sia ben posizionato
-                - Stai fermo durante la misurazione  
-                - Prova in un ambiente tranquillo
-                - Ripeti la registrazione
-                """)
-            elif qualita == "Accettabile":
-                st.warning("""
-                **💡 Suggerimenti:**
-                - La registrazione è utilizzabile ma puoi fare di meglio
-                - Cerca di muoverti meno durante la misurazione
-                """)
-            else:
-                st.success("✅ Ottima registrazione! Dati molto affidabili.")
             
             # CORREZIONE: Mostra metriche sonno solo se presenti
             has_sleep_metrics = has_valid_sleep_metrics(avg_metrics)
@@ -2733,14 +2318,12 @@ def main():
                             height=min(300, 50 + len(hrv_df) * 35)
                         )
 
-
-
                         # CORREZIONE: Mostra metriche sonno solo se presenti in almeno un giorno
                         has_any_sleep_data = any(
-                            any(key.startswith('sleep_') for key in day_metrics.keys())
+                            has_valid_sleep_metrics(day_metrics) 
                             for day_metrics in daily_metrics.values()
                         )
-
+                        
                         if has_any_sleep_data:
                             st.subheader("😴 Metriche Sonno")
 
@@ -2777,7 +2360,8 @@ def main():
                             else:
                                 st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
                         else:
-                            st.info("😴 Nessuna analisi del sonno disponibile - registrazione diurna")                       
+                            st.info("😴 Nessuna analisi del sonno disponibile - registrazione diurna")
+                        
                         st.markdown("<br>", unsafe_allow_html=True)
                         col1, col2 = st.columns(2)
                         
@@ -2809,267 +2393,181 @@ def main():
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
                     
-            # GRAFICO DETTAGLIATO CON ZOOM INTERATTIVO
-            st.subheader("📈 Andamento Dettagliato HRV con Attività")
-            
-            if len(rr_intervals) > 0:
-                timestamps = []
-                current_time = start_time
-                
-                # FILTRO DI INTERPOLAZIONE PER ARTEFATTI ISOLATI
-                def interpolate_artifacts(rr_data):
-                    """Corregge artefatti isolati usando la media dei vicini"""
-                    cleaned_data = rr_data.copy()
-                    artifact_count = 0
+                    # GRAFICO DETTAGLIATO CON ZOOM INTERATTIVO
+                    st.subheader("📈 Andamento Dettagliato HRV con Attività")
                     
-                    for i in range(1, len(rr_data) - 1):  # Salta primo e ultimo
-                        current_rr = rr_data[i]
-                        prev_rr = rr_data[i-1]
-                        next_rr = rr_data[i+1]
+                    if len(rr_intervals) > 0:
+                        timestamps = []
+                        current_time = start_time
                         
-                        # Definisci range normale basato sui vicini
-                        normal_min = min(prev_rr, next_rr) * 0.7   # -30%
-                        normal_max = max(prev_rr, next_rr) * 1.3   # +30%
+                        for rr in rr_intervals:
+                            timestamps.append(current_time)
+                            current_time += timedelta(milliseconds=rr)
                         
-                        # Se il battito corrente è anormale ma i vicini sono normali
-                        if not (normal_min <= current_rr <= normal_max) and (400 <= prev_rr <= 1200) and (400 <= next_rr <= 1200):
-                            # Interpola con la media dei vicini
-                            cleaned_data[i] = (prev_rr + next_rr) / 2
-                            artifact_count += 1
-                    
-                    if artifact_count > 0:
-                        st.success(f"🔧 Corretti {artifact_count} artefatti isolati")
-                    
-                    return cleaned_data
-                
-                # APPLICA IL FILTRO
-                filtered_rr_intervals = interpolate_artifacts(rr_intervals)
-                
-                # FILTRO SECONDARIO PER ARTEFATTI PERSISTENTI
-                final_rr_intervals = []
-                for rr in filtered_rr_intervals:
-                    if 350 <= rr <= 1300:  # Range fisiologico ampio ma realistico
-                        final_rr_intervals.append(rr)
-                    else:
-                        # Per artefatti estremi, usa un valore conservativo
-                        final_rr_intervals.append(800)  # 75 bpm default
-                
-                # CREA TIMESTAMPS
-                for rr in final_rr_intervals:
-                    timestamps.append(current_time)
-                    current_time += timedelta(milliseconds=rr)
-                
-                # CALCOLO FREQUENZA CARDIACA CON CONTROLLO FINALE
-                hr_instant = []
-                for i in range(len(final_rr_intervals)):
-                    hr = 60000 / final_rr_intervals[i]
-                    
-                    # Controllo di coerenza con i vicini
-                    if i > 0 and i < len(final_rr_intervals) - 1:
-                        prev_hr = 60000 / final_rr_intervals[i-1]
-                        next_hr = 60000 / final_rr_intervals[i+1]
-                        avg_surrounding = (prev_hr + next_hr) / 2
+                        hr_instant = [60000 / rr for rr in rr_intervals]
+                        window_size = min(300, len(rr_intervals) // 10)
+                        if window_size < 30:
+                            window_size = min(30, len(rr_intervals))
                         
-                        # Se il battito è troppo diverso dai vicini, usa la media
-                        if abs(hr - avg_surrounding) > 40:  # Differenza > 40 bpm
-                            hr = avg_surrounding
-                    
-                    # Limiti assoluti
-                    hr = max(30, min(hr, 180))  # 30-180 bpm range assoluto
-                    hr_instant.append(hr)
-                
-                # APPLICA SMOOTHING LEGGERO
-                if len(hr_instant) > 3:
-                    hr_smoothed = []
-                    for i in range(len(hr_instant)):
-                        if i == 0:
-                            hr_smoothed.append(hr_instant[i])
-                        elif i == len(hr_instant) - 1:
-                            hr_smoothed.append(hr_instant[i])
-                        else:
-                            # Media pesata: 25% precedente, 50% corrente, 25% successivo
-                            smoothed = (hr_instant[i-1] * 0.25 + hr_instant[i] * 0.5 + hr_instant[i+1] * 0.25)
-                            hr_smoothed.append(smoothed)
-                    hr_instant = hr_smoothed
-                
-                window_size = min(100, len(final_rr_intervals) // 15)
-                if window_size < 30:
-                    window_size = min(30, len(final_rr_intervals))
-                
-                sdnn_moving = []
-                rmssd_moving = []
-                moving_timestamps = []
-                
-                # FUNZIONE SMOOTHING
-                def smooth_data(data, window_size=3):
-                    if len(data) < window_size:
-                        return data
-                    smoothed = np.convolve(data, np.ones(window_size)/window_size, mode='valid')
-                    return smoothed.tolist()
-                
-                for i in range(len(final_rr_intervals) - window_size):
-                    window_rr = final_rr_intervals[i:i + window_size]
-                    
-                    sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
-                    differences = np.diff(window_rr)
-                    rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
-                    
-                    sdnn_moving.append(sdnn)
-                    rmssd_moving.append(rmssd)
-                    if i + window_size // 2 < len(timestamps):
-                        moving_timestamps.append(timestamps[i + window_size // 2])
-                
-                # APPLICA SMOOTHING
-                if len(sdnn_moving) > 5:
-                    sdnn_moving = smooth_data(sdnn_moving, 5)
-                    rmssd_moving = smooth_data(rmssd_moving, 5)
-                    if len(moving_timestamps) > 4:
-                        moving_timestamps = moving_timestamps[2:-2]
-                
-                # STATISTICHE
-                hr_stats = {
-                    'medio': np.mean(hr_instant),
-                    'massimo': np.max(hr_instant),
-                    'minimo': np.min(hr_instant),
-                    'battiti_totali': len(final_rr_intervals)
-                }
-                
-                st.info(f"""
-                **📊 Dati Filtrati:**
-                - **Battiti:** {hr_stats['battiti_totali']}
-                - **Battito medio:** {hr_stats['medio']:.1f} bpm
-                - **Range:** {hr_stats['minimo']:.1f} - {hr_stats['massimo']:.1f} bpm
-                - **Finestra mobile:** {window_size} battiti
-                """)
-                
-                fig_main = go.Figure()
-                
-                if st.session_state.activities:
-                    for activity in st.session_state.activities:
-                        activity_start = activity['start_time']
-                        activity_end = activity_start + timedelta(minutes=activity['duration'])
+                        sdnn_moving = []
+                        rmssd_moving = []
+                        moving_timestamps = []
                         
-                        color = activity.get('color', '#95a5a6')
+                        for i in range(len(rr_intervals) - window_size):
+                            window_rr = rr_intervals[i:i + window_size]
+                            window_hr = hr_instant[i:i + window_size]
+                            
+                            sdnn = np.std(window_rr, ddof=1) if len(window_rr) > 1 else 0
+                            differences = np.diff(window_rr)
+                            rmssd = np.sqrt(np.mean(np.square(differences))) if len(differences) > 0 else 0
+                            
+                            sdnn_moving.append(sdnn)
+                            rmssd_moving.append(rmssd)
+                            moving_timestamps.append(timestamps[i + window_size // 2])
                         
-                        fig_main.add_vrect(
-                            x0=activity_start,
-                            x1=activity_end,
-                            fillcolor=color,
-                            opacity=0.2,
-                            layer="below",
-                            line_width=0,
+                        fig_main = go.Figure()
+                        
+                        if st.session_state.activities:
+                            for activity in st.session_state.activities:
+                                activity_start = activity['start_time']
+                                activity_end = activity_start + timedelta(minutes=activity['duration'])
+                                
+                                color = activity.get('color', '#95a5a6')
+                                
+                                fig_main.add_vrect(
+                                    x0=activity_start,
+                                    x1=activity_end,
+                                    fillcolor=color,
+                                    opacity=0.2,
+                                    layer="below",
+                                    line_width=0,
+                                )
+                                
+                                activity_center = activity_start + (activity_end - activity_start) / 2
+                                fig_main.add_annotation(
+                                    x=activity_center,
+                                    y=1.02,
+                                    yref="paper",
+                                    text=activity['name'],
+                                    showarrow=False,
+                                    textangle=-45,
+                                    font=dict(size=9, color=color),
+                                    bgcolor="rgba(255,255,255,0.9)",
+                                    bordercolor=color,
+                                    borderwidth=1,
+                                    borderpad=2
+                                )
+                        
+                        fig_main.add_trace(go.Scatter(
+                            x=timestamps,
+                            y=hr_instant,
+                            mode='lines',
+                            name='Battito Istantaneo',
+                            line=dict(color='#e74c3c', width=1),
+                            opacity=0.8
+                        ))
+                        
+                        if sdnn_moving:
+                            fig_main.add_trace(go.Scatter(
+                                x=moving_timestamps,
+                                y=sdnn_moving,
+                                mode='lines',
+                                name='SDNN Mobile',
+                                line=dict(color='#3498db', width=2),
+                                yaxis='y2'
+                            ))
+                        
+                        if rmssd_moving:
+                            fig_main.add_trace(go.Scatter(
+                                x=moving_timestamps,
+                                y=rmssd_moving,
+                                mode='lines',
+                                name='RMSSD Mobile',
+                                line=dict(color='#2ecc71', width=2),
+                                yaxis='y3'
+                            ))
+                        
+                        fig_main.update_layout(
+                            title='Andamento Dettagliato HRV - Zoomma con mouse/touch (Aree colorate = Attività)',
+                            xaxis=dict(
+                                title='Tempo',
+                                rangeslider=dict(visible=False)
+                            ),
+                            yaxis=dict(
+                                title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
+                                tickfont=dict(color='#e74c3c')
+                            ),
+                            yaxis2=dict(
+                                title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
+                                tickfont=dict(color='#3498db'),
+                                overlaying='y',
+                                side='right',
+                                position=0.85
+                            ),
+                            yaxis3=dict(
+                                title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
+                                tickfont=dict(color='#2ecc71'),
+                                overlaying='y',
+                                side='right',
+                                position=0.15
+                            ),
+                            height=600,
+                            showlegend=True,
+                            hovermode='x unified',
+                            plot_bgcolor='rgba(240,240,240,0.1)'
                         )
-                
-                fig_main.add_trace(go.Scatter(
-                    x=timestamps,
-                    y=hr_instant,
-                    mode='lines',
-                    name='Battito Istantaneo',
-                    line=dict(color='#e74c3c', width=1),
-                    opacity=0.8
-                ))
-                
-                if sdnn_moving and len(sdnn_moving) > 0:  # CONTROLLO CORRETTO
-                    fig_main.add_trace(go.Scatter(
-                        x=moving_timestamps,
-                        y=sdnn_moving,
-                        mode='lines',
-                        name='SDNN Mobile',
-                        line=dict(color='#3498db', width=2),
-                        yaxis='y2'
-                    ))
-                
-                if rmssd_moving and len(rmssd_moving) > 0:  # CONTROLLO CORRETTO
-                    fig_main.add_trace(go.Scatter(
-                        x=moving_timestamps,
-                        y=rmssd_moving,
-                        mode='lines',
-                        name='RMSSD Mobile',
-                        line=dict(color='#2ecc71', width=2),
-                        yaxis='y3'
-                    ))
-                
-                fig_main.update_layout(
-                    title='Andamento Dettagliato HRV - Zoomma con mouse/touch (Aree colorate = Attività)',
-                    xaxis=dict(
-                        title='Tempo',
-                        rangeslider=dict(visible=False)
-                    ),
-                    yaxis=dict(
-                        title=dict(text='Battito (bpm)', font=dict(color='#e74c3c')),
-                        tickfont=dict(color='#e74c3c')
-                    ),
-                    yaxis2=dict(
-                        title=dict(text='SDNN (ms)', font=dict(color='#3498db')),
-                        tickfont=dict(color='#3498db'),
-                        overlaying='y',
-                        side='right',
-                        position=0.85
-                    ),
-                    yaxis3=dict(
-                        title=dict(text='RMSSD (ms)', font=dict(color='#2ecc71')),
-                        tickfont=dict(color='#2ecc71'),
-                        overlaying='y',
-                        side='right',
-                        position=0.15
-                    ),
-                    height=600,
-                    showlegend=True,
-                    hovermode='x unified',
-                    plot_bgcolor='rgba(240,240,240,0.1)'
-                )
-                
-                fig_main.update_layout(
-                    xaxis=dict(
-                        rangeselector=dict(
-                            buttons=list([
-                                dict(count=1, label="1h", step="hour", stepmode="backward"),
-                                dict(count=6, label="6h", step="hour", stepmode="backward"),
-                                dict(count=1, label="1gg", step="day", stepmode="backward"),
-                                dict(step="all", label="Tutto")
-                            ])
-                        ),
-                        rangeslider=dict(visible=False),
-                        type="date"
-                    )
-                )
-                
-                st.plotly_chart(fig_main, use_container_width=True)
-                
-                st.caption("""
-                **🔍 Come zoommare:**
-                - **Mouse:** Trascina per selezionare un'area da zoommare
-                - **Doppio click:** Reset dello zoom
-                - **Pulsanti sopra:** Zoom predefiniti (1h, 6h, 1 giorno, Tutto)
-                - **Aree colorate:** Periodi di attività (Allenamento=🔴, Alimentazione=🟠, Stress=🟣, Riposo=🔵)
-                """)
-                
-                st.info(f"""
-                **📊 Informazioni Dati:**
-                - **Battiti totali:** {len(rr_intervals)}
-                - **Durata registrazione:** {timeline['total_duration_hours']:.1f} ore
-                - **Finestra mobile:** {window_size} battiti
-                - **Battito medio:** {np.mean(hr_instant):.1f} bpm
-                - **SDNN medio:** {np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms
-                - **RMSSD medio:** {np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms
-                - **Attività tracciate:** {len(st.session_state.activities)}
-                """)
-            
-            else:
-                st.warning("Dati insufficienti per l'analisi dettagliata")
-            
-            st.subheader("📊 Statistiche Generali")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("Battito Medio", f"{np.mean(hr_instant):.1f} bpm")
-            with col2:
-                st.metric("SDNN Medio", f"{np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms")
-            with col3:
-                st.metric("RMSSD Medio", f"{np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms")
-            with col4:
-                st.metric("Battiti Totali", len(rr_intervals))
+                        
+                        fig_main.update_layout(
+                            xaxis=dict(
+                                rangeselector=dict(
+                                    buttons=list([
+                                        dict(count=1, label="1h", step="hour", stepmode="backward"),
+                                        dict(count=6, label="6h", step="hour", stepmode="backward"),
+                                        dict(count=1, label="1gg", step="day", stepmode="backward"),
+                                        dict(step="all", label="Tutto")
+                                    ])
+                                ),
+                                rangeslider=dict(visible=False),
+                                type="date"
+                            )
+                        )
+                        
+                        st.plotly_chart(fig_main, use_container_width=True)
+                        
+                        st.caption("""
+                        **🔍 Come zoommare:**
+                        - **Mouse:** Trascina per selezionare un'area da zoommare
+                        - **Doppio click:** Reset dello zoom
+                        - **Pulsanti sopra:** Zoom predefiniti (1h, 6h, 1 giorno, Tutto)
+                        - **Aree colorate:** Periodi di attività (Allenamento=🔴, Alimentazione=🟠, Stress=🟣, Riposo=🔵)
+                        """)
+                        
+                        st.info(f"""
+                        **📊 Informazioni Dati:**
+                        - **Battiti totali:** {len(rr_intervals)}
+                        - **Durata registrazione:** {timeline['total_duration_hours']:.1f} ore
+                        - **Finestra mobile:** {window_size} battiti
+                        - **Battito medio:** {np.mean(hr_instant):.1f} bpm
+                        - **SDNN medio:** {np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms
+                        - **RMSSD medio:** {np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms
+                        - **Attività tracciate:** {len(st.session_state.activities)}
+                        """)
+                    
+                    else:
+                        st.warning("Dati insufficienti per l'analisi dettagliata")
+                    
+                    st.subheader("📊 Statistiche Generali")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Battito Medio", f"{np.mean(hr_instant):.1f} bpm")
+                    with col2:
+                        st.metric("SDNN Medio", f"{np.mean(sdnn_moving) if sdnn_moving else 0:.1f} ms")
+                    with col3:
+                        st.metric("RMSSD Medio", f"{np.mean(rmssd_moving) if rmssd_moving else 0:.1f} ms")
+                    with col4:
+                        st.metric("Battiti Totali", len(rr_intervals))
             
             # SALVATAGGIO ANALISI - VERSIONE CORRETTA
             if st.button("💾 Salva Analisi nel Database", type="primary"):
