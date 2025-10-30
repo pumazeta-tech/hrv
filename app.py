@@ -1048,30 +1048,34 @@ def analyze_sleep_impact(activity, daily_metrics, timeline):
     }
 
 def extract_sleep_ibis(activity, timeline):
-    """Estrae SOLO gli IBI del periodo di sonno - VERSIONE CORRETTA"""
+    """Estrae SOLO gli IBI del periodo di sonno - VERSIONE SICURA"""
+    
+    # CONTROLLO DI SICUREZZA: timeline ha days_data?
+    if 'days_data' not in timeline or not timeline['days_data']:
+        print(f"❌ ERRORE CRITICO: timeline['days_data'] non esiste o è vuoto!")
+        print(f"   Keys disponibili in timeline: {list(timeline.keys())}")
+        return []
+    
     sleep_start = activity['start_time']
     sleep_end = sleep_start + timedelta(minutes=activity['duration'])
     
     sleep_ibis = []
     
-    print(f"🔍 DEBUG: Cerco IBI sonno dalle {sleep_start} alle {sleep_end}")
-    print(f"   Durata sonno: {activity['duration']} minuti")
+    print(f"🔍 Cercando IBI sonno:")
+    print(f"   Sonno: {sleep_start} -> {sleep_end}")
+    print(f"   Timeline giorni disponibili: {list(timeline['days_data'].keys())}")
     
     # Cerca negli IBI giornalieri
     for day_date, day_ibis in timeline['days_data'].items():
-        print(f"   Scannerizzo giorno {day_date} con {len(day_ibis)} IBI")
+        current_time = timeline['start_time']
         
-        # Ricrea la timeline per questo giorno
-        day_start = datetime.fromisoformat(day_date)
-        current_time = timeline['start_time']  # Inizio timeline globale
+        print(f"   Scannerizzo giorno {day_date} ({len(day_ibis)} IBI)")
         
         for rr in day_ibis:
             # Controlla se questo IBI è nel periodo di sonno
             if sleep_start <= current_time <= sleep_end:
                 sleep_ibis.append(rr)
-                print(f"     Trovato IBI: {rr}ms alle {current_time}")
             
-            # Avanza nel tempo
             current_time += timedelta(milliseconds=rr)
             
             # Se siamo oltre la fine del sonno, esci
@@ -1085,11 +1089,9 @@ def extract_sleep_ibis(activity, timeline):
     print(f"✅ Trovati {len(sleep_ibis)} IBI durante il sonno")
     
     if len(sleep_ibis) == 0:
-        print(f"❌ PROBLEMA CRITICO: Nessun IBI trovato durante il sonno!")
+        print(f"❌ Nessun IBI trovato durante il sonno!")
         print(f"   Timeline start: {timeline['start_time']}")
-        print(f"   Timeline end: {timeline['end_time']}")
         print(f"   Sonno start: {sleep_start}")
-        print(f"   Sonno end: {sleep_end}")
     
     return sleep_ibis
 
@@ -1911,7 +1913,7 @@ def parse_starttime_from_file(content):
     return starttime
 
 def calculate_recording_timeline(rr_intervals, start_time):
-    """Calcola la timeline della registrazione"""
+    """Calcola la timeline della registrazione - VERSIONE CORRETTA"""
     total_duration_ms = sum(rr_intervals)
     end_time = start_time + timedelta(milliseconds=total_duration_ms)
     
@@ -1924,20 +1926,29 @@ def calculate_recording_timeline(rr_intervals, start_time):
         day_rr_intervals.append(rr)
         current_time += timedelta(milliseconds=rr)
         
+        # Se cambia giorno, salva i dati del giorno precedente
         if current_time.date() != current_day_start:
             if day_rr_intervals:
                 days_data[current_day_start.isoformat()] = day_rr_intervals.copy()
             day_rr_intervals = []
             current_day_start = current_time.date()
     
+    # Aggiungi l'ultimo giorno
     if day_rr_intervals:
         days_data[current_day_start.isoformat()] = day_rr_intervals
+    
+    print(f"📅 Timeline creata:")
+    print(f"   Start: {start_time}")
+    print(f"   End: {end_time}") 
+    print(f"   Durata: {total_duration_ms / (1000 * 60 * 60):.1f} ore")
+    print(f"   Giorni: {list(days_data.keys())}")
+    print(f"   IBI per giorno: { {k: len(v) for k, v in days_data.items()} }")
     
     return {
         'start_time': start_time,
         'end_time': end_time,
         'total_duration_hours': total_duration_ms / (1000 * 60 * 60),
-        'days_data': days_data
+        'days_data': days_data  # QUESTA È LA CHIAVE CHE MANCAVA!
     }
 
 def calculate_daily_metrics(days_data, user_age, user_gender):
@@ -2477,6 +2488,14 @@ def main():
             
             start_time = parse_starttime_from_file(content)
             timeline = calculate_recording_timeline(rr_intervals, start_time)
+
+            # AGGIUNGI QUESTO CONTROLLO:
+            print(f"🔍 DEBUG TIMELINE:")
+            print(f"   Timeline keys: {list(timeline.keys())}")
+            print(f"   Ha days_data?: {'days_data' in timeline}")
+            if 'days_data' in timeline:
+                print(f"   Giorni in days_data: {list(timeline['days_data'].keys())}")
+                print(f"   IBI per giorno: { {k: len(v) for k, v in timeline['days_data'].items()} }")
             
             col1, col2 = st.columns(2)
             with col1:
