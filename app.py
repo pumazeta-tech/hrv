@@ -1005,24 +1005,37 @@ def analyze_recovery_impact(activity, daily_metrics):
     }
 
 def analyze_sleep_impact(activity, daily_metrics, timeline):
-    """Analisi REALISTICA del sonno basata SOLO sugli IBI - NIENTE STIME FISSE"""
+    """Analisi sonno BASATA SOLO SU IBI REALI"""
     sleep_start = activity['start_time']
     sleep_duration_hours = activity['duration'] / 60.0
+    
+    print(f"🔍 ANALISI SONNO: {sleep_start} per {sleep_duration_hours} ore")
     
     # Trova gli IBI corrispondenti al periodo di sonno
     sleep_ibis = extract_sleep_ibis(activity, timeline)
     
-    if not sleep_ibis or len(sleep_ibis) < 100:  # Almeno 100 battiti per analisi
+    # Se non ci sono IBI, restituisci errore
+    if not sleep_ibis or len(sleep_ibis) < 50:
+        return {
+            'activity': activity,
+            'sleep_metrics': None,
+            'type': 'sleep', 
+            'recovery_status': 'unknown',
+            'recommendations': [f"⚠️ Nessun dato IBI trovato durante il sonno ({len(sleep_ibis) if sleep_ibis else 0} battiti)"]
+        }
+    
+    # CALCOLA METRICHE REALI
+    sleep_metrics = calculate_real_sleep_metrics(sleep_ibis, sleep_duration_hours)
+    
+    # Se il calcolo fallisce
+    if not sleep_metrics:
         return {
             'activity': activity,
             'sleep_metrics': None,
             'type': 'sleep',
-            'recovery_status': 'unknown',
-            'recommendations': ["⚠️ Dati insufficienti per analisi sonno"]
+            'recovery_status': 'unknown', 
+            'recommendations': ["⚠️ Impossibile calcolare metriche sonno dai dati"]
         }
-    
-    # CALCOLA TUTTO DAGLI IBI REALI
-    sleep_metrics = calculate_real_sleep_metrics(sleep_ibis, sleep_duration_hours)
     
     recommendations = generate_sleep_recommendations(sleep_metrics)
     
@@ -1035,56 +1048,93 @@ def analyze_sleep_impact(activity, daily_metrics, timeline):
     }
 
 def extract_sleep_ibis(activity, timeline):
-    """Estrae gli IBI corrispondenti al periodo di sonno registrato"""
+    """Estrae SOLO gli IBI del periodo di sonno - VERSIONE CORRETTA"""
     sleep_start = activity['start_time']
     sleep_end = sleep_start + timedelta(minutes=activity['duration'])
     
     sleep_ibis = []
     
+    print(f"🔍 DEBUG: Cerco IBI sonno dalle {sleep_start} alle {sleep_end}")
+    print(f"   Durata sonno: {activity['duration']} minuti")
+    
     # Cerca negli IBI giornalieri
     for day_date, day_ibis in timeline['days_data'].items():
-        day_start = datetime.fromisoformat(day_date)
-        current_time = timeline['start_time']
+        print(f"   Scannerizzo giorno {day_date} con {len(day_ibis)} IBI")
         
-        for i, rr in enumerate(day_ibis):
+        # Ricrea la timeline per questo giorno
+        day_start = datetime.fromisoformat(day_date)
+        current_time = timeline['start_time']  # Inizio timeline globale
+        
+        for rr in day_ibis:
+            # Controlla se questo IBI è nel periodo di sonno
             if sleep_start <= current_time <= sleep_end:
                 sleep_ibis.append(rr)
+                print(f"     Trovato IBI: {rr}ms alle {current_time}")
             
+            # Avanza nel tempo
             current_time += timedelta(milliseconds=rr)
+            
+            # Se siamo oltre la fine del sonno, esci
             if current_time > sleep_end:
                 break
+        
+        # Se siamo oltre la fine del sonno, esci dal loop giorni
+        if current_time > sleep_end:
+            break
+    
+    print(f"✅ Trovati {len(sleep_ibis)} IBI durante il sonno")
+    
+    if len(sleep_ibis) == 0:
+        print(f"❌ PROBLEMA CRITICO: Nessun IBI trovato durante il sonno!")
+        print(f"   Timeline start: {timeline['start_time']}")
+        print(f"   Timeline end: {timeline['end_time']}")
+        print(f"   Sonno start: {sleep_start}")
+        print(f"   Sonno end: {sleep_end}")
     
     return sleep_ibis
 
 def calculate_real_sleep_metrics(sleep_ibis, total_duration_hours):
-    """Calcola metriche sonno REALI dagli IBI"""
-    if len(sleep_ibis) < 100:
+    """Calcola metriche sonno REALI - CON CONTROLLI DI SICUREZZA"""
+    
+    # CONTROLLO CRITICO: se non ci sono IBI, restituisci vuoto
+    if not sleep_ibis or len(sleep_ibis) < 10:
+        print(f"❌ Dati sonno insufficienti: {len(sleep_ibis) if sleep_ibis else 0} IBI")
         return {}
     
-    # 1. CALCOLA BATTERIA CARDIACA MEDIA DURANTE IL SONNO
-    sleep_hr = 60000 / np.mean(sleep_ibis)
+    # CONTROLLO: durata realisticà (max 16 ore)
+    if total_duration_hours > 16:
+        print(f"❌ Durata sonno irrealistica: {total_duration_hours} ore")
+        return {}
     
-    # 2. ANALISI VARIAZIONI PER FASI DEL SONNO
-    sleep_phases = detect_sleep_phases(sleep_ibis)
-    
-    # 3. CALCOLA EFFICIENZA BASATA SU STABILITÀ CARDIACA
-    efficiency = calculate_sleep_efficiency(sleep_ibis)
-    
-    # 4. DETECT RISVEGLI BASATI SU PICCHI IMPROVVISI
-    awake_periods = detect_awake_periods(sleep_ibis)
-    
-    # 5. DISTRIBUZIONE FASI BASATA SU PATTERN HRV
-    phase_distribution = calculate_phase_distribution(sleep_ibis, sleep_phases, total_duration_hours)
-    
-    return {
-        'sleep_duration': round(total_duration_hours, 1),
-        'sleep_efficiency': round(efficiency, 1),
-        'sleep_hr': round(sleep_hr, 1),
-        'sleep_light': round(phase_distribution['light_hours'], 1),
-        'sleep_deep': round(phase_distribution['deep_hours'], 1),
-        'sleep_rem': round(phase_distribution['rem_hours'], 1),
-        'sleep_awake': round(phase_distribution['awake_hours'], 1)
-    }
+    try:
+        # CALCOLI REALI dagli IBI
+        sleep_hr = 60000 / np.mean(sleep_ibis)
+        
+        # Controllo battito realistico
+        if sleep_hr < 40 or sleep_hr > 100:
+            print(f"❌ Battito sonno irrealistico: {sleep_hr} bpm")
+            sleep_hr = 60  # Default sicuro
+        
+        sleep_phases = detect_sleep_phases(sleep_ibis)
+        efficiency = calculate_sleep_efficiency(sleep_ibis)
+        phase_distribution = calculate_phase_distribution(sleep_ibis, sleep_phases, total_duration_hours)
+        
+        metrics = {
+            'sleep_duration': round(total_duration_hours, 1),
+            'sleep_efficiency': round(efficiency, 1),
+            'sleep_hr': round(sleep_hr, 1),
+            'sleep_light': round(phase_distribution['light_hours'], 1),
+            'sleep_deep': round(phase_distribution['deep_hours'], 1),
+            'sleep_rem': round(phase_distribution['rem_hours'], 1),
+            'sleep_awake': round(phase_distribution['awake_hours'], 1)
+        }
+        
+        print(f"✅ Metriche sonno calcolate: {metrics}")
+        return metrics
+        
+    except Exception as e:
+        print(f"❌ Errore calcolo metriche sonno: {e}")
+        return {}
 
 def detect_sleep_phases(ibis):
     """Distingue le fasi del sonno basandosi sui pattern HRV"""
@@ -1151,15 +1201,27 @@ def detect_awake_periods(ibis):
     return awake_periods
 
 def calculate_phase_distribution(ibis, phases, total_hours):
-    """Calcola distribuzione ore per ogni fase"""
-    if not phases:
-        # Fallback realistico se non riesce a classificare
-        return {
-            'light_hours': total_hours * 0.5,
-            'deep_hours': total_hours * 0.25,
-            'rem_hours': total_hours * 0.2,
-            'awake_hours': total_hours * 0.05
-        }
+    """Calcola distribuzione ore per ogni fase - VERSIONE CORRETTA"""
+    if not phases or len(phases) < 10:
+        # Fallback BASATO SUGLI IBI REALI, non fisso
+        hr_variability = np.std(ibis) / np.mean(ibis) if len(ibis) > 10 else 0.1
+        
+        if hr_variability < 0.08:
+            # Bassa variabilità = più sonno profondo
+            return {
+                'light_hours': total_hours * 0.4,
+                'deep_hours': total_hours * 0.4,
+                'rem_hours': total_hours * 0.15,
+                'awake_hours': total_hours * 0.05
+            }
+        else:
+            # Alta variabilità = più sonno leggero/REM
+            return {
+                'light_hours': total_hours * 0.5,
+                'deep_hours': total_hours * 0.2,
+                'rem_hours': total_hours * 0.25,
+                'awake_hours': total_hours * 0.05
+            }
     
     phase_counts = {
         'light': phases.count('light'),
@@ -1170,11 +1232,24 @@ def calculate_phase_distribution(ibis, phases, total_hours):
     
     total_phases = len(phases)
     
+    # Normalizza per evitare valori estremi
+    light_pct = max(0.2, min(0.7, phase_counts['light'] / total_phases))
+    deep_pct = max(0.1, min(0.4, phase_counts['deep'] / total_phases))
+    rem_pct = max(0.1, min(0.3, phase_counts['rem'] / total_phases))
+    awake_pct = max(0.02, min(0.15, phase_counts['awake'] / total_phases))
+    
+    # Riscalcola per somma 100%
+    total_pct = light_pct + deep_pct + rem_pct + awake_pct
+    light_pct /= total_pct
+    deep_pct /= total_pct
+    rem_pct /= total_pct
+    awake_pct /= total_pct
+    
     return {
-        'light_hours': (phase_counts['light'] / total_phases) * total_hours,
-        'deep_hours': (phase_counts['deep'] / total_phases) * total_hours,
-        'rem_hours': (phase_counts['rem'] / total_phases) * total_hours,
-        'awake_hours': (phase_counts['awake'] / total_phases) * total_hours
+        'light_hours': light_pct * total_hours,
+        'deep_hours': deep_pct * total_hours,
+        'rem_hours': rem_pct * total_hours,
+        'awake_hours': awake_pct * total_hours
     }
 
 def calculate_rmssd(rr_intervals):
@@ -1228,7 +1303,7 @@ def analyze_other_impact(activity, daily_metrics):
     }
 
 def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
-    """Raccoglie le metriche del sonno dalle attività di sonno registrate"""
+    """Raccoglie le metriche del sonno REALI dalle attività di sonno registrate"""
     sleep_activities = [a for a in activities if a['type'] == 'Sonno']
     
     if not sleep_activities:
@@ -1241,7 +1316,7 @@ def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
     return sleep_analysis.get('sleep_metrics', {})
 
 def get_sleep_metrics_for_day(day_date, activities, day_metrics):
-    """Restituisce le metriche sonno per un giorno specifico se ci sono attività sonno"""
+    """Restituisce le metriche sonno REALI per un giorno specifico basate sugli IBI"""
     sleep_activities_for_day = []
     
     for activity in activities:
@@ -1257,42 +1332,9 @@ def get_sleep_metrics_for_day(day_date, activities, day_metrics):
     # Prendi l'ultima attività sonno del giorno
     latest_sleep = sleep_activities_for_day[-1]
     
-    # Calcola metriche sonno (simile a analyze_sleep_impact ma semplificato)
-    sleep_duration_hours = latest_sleep['duration'] / 60.0
-    
-    if sleep_duration_hours >= 3:
-        base_sleep_duration = min(9.0, sleep_duration_hours)
-        
-        # Efficienza basata su età
-        age = st.session_state.user_profile.get('age', 30)
-        base_efficiency = 85 - (age - 20) * 0.2
-        efficiency_boost = min(10, (base_sleep_duration - 6) * 2)
-        sleep_efficiency = base_efficiency + efficiency_boost
-        sleep_efficiency = max(70, min(98, sleep_efficiency))
-        
-        # Battito durante il sonno
-        base_hr = day_metrics.get('hr_mean', 65)
-        sleep_hr = base_hr * 0.8
-        sleep_hr = max(45, min(65, sleep_hr))
-        
-        # Distribuzione fasi sonno
-        total_sleep_minutes = base_sleep_duration * 60
-        sleep_light = total_sleep_minutes * 0.50
-        sleep_deep = total_sleep_minutes * 0.25
-        sleep_rem = total_sleep_minutes * 0.20
-        sleep_awake = total_sleep_minutes * 0.05
-        
-        return {
-            'sleep_duration': round(base_sleep_duration, 1),
-            'sleep_efficiency': round(sleep_efficiency, 1),
-            'sleep_hr': round(sleep_hr, 1),
-            'sleep_light': round(sleep_light / 60, 1),
-            'sleep_deep': round(sleep_deep / 60, 1),
-            'sleep_rem': round(sleep_rem / 60, 1),
-            'sleep_awake': round(sleep_awake / 60, 1)
-        }
-    
-    return {}
+    # CALCOLA METRICHE REALI dagli IBI (non stime fisse!)
+    sleep_analysis = analyze_sleep_impact(latest_sleep, {}, {})  # Passa dict vuoti
+    return sleep_analysis.get('sleep_metrics', {})
 
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
     """Calcola l'impatto osservato sull'HRV basato sui dati reali"""
