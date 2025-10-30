@@ -530,12 +530,11 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     print(f"   End: {end_time} (hour: {end_time.hour})")
     print(f"   Duration: {recording_duration_hours:.2f}h")
     
-    # CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
-    sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age, recording_duration_hours, start_time, end_time)
+    # CORREZIONE: Le metriche sonno vengono dalle attività, non da questa funzione
+    sleep_metrics = {}
     
-    # DEBUG: Verifica cosa restituisce estimate_sleep_metrics
-    print(f"   sleep_metrics returned: {sleep_metrics}")
-    print(f"   sleep_metrics is empty: {not sleep_metrics}")
+    # DEBUG: Informa che le metriche sonno vengono dalle attività
+    print(f"   sleep_metrics: vuoto - le metriche sonno vengono dalle attività registrate")
     
     # Metriche base
     metrics = {
