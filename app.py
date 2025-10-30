@@ -542,6 +542,7 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
     except Exception as e:
         return {}
 
+# POI definisci calculate_realistic_hrv_metrics
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_time, end_time):
     """Calcola metriche HRV realistiche e fisiologicamente corrette CON ANALISI SONNO"""
     if len(rr_intervals) < 10:
