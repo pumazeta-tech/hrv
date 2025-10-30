@@ -1037,9 +1037,9 @@ def analyze_sleep_impact_simple(activity, daily_metrics, timeline=None):
     """Analisi sonno BASATA SU METRICHE REALI del giorno"""
     sleep_duration_hours = activity['duration'] / 60.0
     
-    # Se abbiamo timeline E daily_metrics, analizza con dati REALI
-    if timeline and daily_metrics:
-        sleep_metrics = calculate_sleep_from_daily_metrics(activity, timeline, daily_metrics, sleep_duration_hours)
+    # Se abbiamo timeline, analizza con dati REALI
+    if timeline:
+        sleep_metrics = calculate_sleep_from_real_ibis(activity, timeline, sleep_duration_hours)
     else:
         # Fallback
         sleep_metrics = calculate_sleep_fallback(sleep_duration_hours)
@@ -1053,7 +1053,6 @@ def analyze_sleep_impact_simple(activity, daily_metrics, timeline=None):
         'recovery_status': 'optimal' if sleep_metrics.get('sleep_efficiency', 0) > 85 else 'good',
         'recommendations': recommendations
     }
-
 def calculate_sleep_from_real_ibis(activity, timeline, sleep_duration_hours):
     """Calcola metriche sonno REALI dagli IBI"""
     sleep_ibis = extract_sleep_ibis_simple(activity, timeline)
