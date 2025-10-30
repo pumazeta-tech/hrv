@@ -1341,44 +1341,37 @@ def analyze_other_impact(activity, daily_metrics):
     }
 
 def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
-    """Raccoglie le metriche del sonno REALI dalle attività di sonno registrate - CON DEBUG"""
-    sleep_activities = [a for a in activities if a['type'] == 'Sonno']
+    """Raccoglie le metriche del sonno REALI dalle attività di sonno registrate - VERSIONE CORRETTA"""
     
-    print(f"🔍 DEBUG get_sleep_metrics_from_activities:")
+    print(f"🎯 DEBUG get_sleep_metrics_from_activities:")
+    print(f"   Numero totale attività: {len(activities)}")
+    
+    sleep_activities = [a for a in activities if a['type'] == 'Sonno']
     print(f"   Attività sonno trovate: {len(sleep_activities)}")
     
+    # DEBUG: mostra TUTTE le attività per vedere cosa c'è
+    for i, activity in enumerate(activities):
+        print(f"   Attività {i}: {activity['type']} - {activity['name']} - {activity['start_time']}")
+    
     if not sleep_activities:
-        print(f"   ❌ Nessuna attività sonno trovata!")
-        return {}  # Nessuna attività sonno → nessuna metrica sonno
+        print(f"   ❌ Nessuna attività 'Sonno' trovata!")
+        return {}
     
-    # Prendi l'ultima attività sonno (più recente)
+    # Prendi l'ultima attività sonno
     latest_sleep = sleep_activities[-1]
-    print(f"   Analizzando sonno: {latest_sleep['start_time']} -> {latest_sleep['start_time'] + timedelta(minutes=latest_sleep['duration'])}")
+    print(f"   🔍 Analizzando sonno: {latest_sleep['name']}")
+    print(f"      Orario: {latest_sleep['start_time']} -> {latest_sleep['start_time'] + timedelta(minutes=latest_sleep['duration'])}")
     
+    # FORZA il calcolo delle metriche sonno
     sleep_analysis = analyze_sleep_impact(latest_sleep, daily_metrics, timeline)
     
-    print(f"   Sleep analysis result: {sleep_analysis.get('sleep_metrics', 'NONE')}")
+    print(f"   📊 Risultato analisi sonno:")
+    print(f"      Ha sleep_metrics: {'sleep_metrics' in sleep_analysis}")
+    if 'sleep_metrics' in sleep_analysis and sleep_analysis['sleep_metrics']:
+        print(f"      Metriche: {sleep_analysis['sleep_metrics']}")
+    else:
+        print(f"      ❌ sleep_metrics è None o vuoto!")
     
-    return sleep_analysis.get('sleep_metrics', {})
-def get_sleep_metrics_for_day(day_date, activities, day_metrics):
-    """Restituisce le metriche sonno REALI per un giorno specifico basate sugli IBI"""
-    sleep_activities_for_day = []
-    
-    for activity in activities:
-        if activity['type'] == 'Sonno':
-            activity_date = activity['start_time'].date().isoformat()
-            # Se l'attività sonno è per questo giorno
-            if activity_date == day_date:
-                sleep_activities_for_day.append(activity)
-    
-    if not sleep_activities_for_day:
-        return {}  # Nessuna attività sonno per questo giorno
-    
-    # Prendi l'ultima attività sonno del giorno
-    latest_sleep = sleep_activities_for_day[-1]
-    
-    # CALCOLA METRICHE REALI dagli IBI (non stime fisse!)
-    sleep_analysis = analyze_sleep_impact(latest_sleep, {}, {})  # Passa dict vuoti
     return sleep_analysis.get('sleep_metrics', {})
 
 def calculate_observed_hrv_impact(activity, day_metrics, timeline):
