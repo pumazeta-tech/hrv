@@ -411,6 +411,10 @@ def has_valid_sleep_metrics(metrics):
 # FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
 # =============================================================================
 
+# =============================================================================
+# FUNZIONI PER CALCOLI HRV - SENZA NEUROKIT2
+# =============================================================================
+
 def filter_rr_outliers(rr_intervals):
     """Filtra gli artefatti in modo conservativo"""
     if len(rr_intervals) < 5:
@@ -462,27 +466,19 @@ def calculate_night_coverage(start_time, end_time, duration_hours):
     start_hour = start_time.hour
     end_hour = end_time.hour
     
-    # Se la registrazione finisce il giorno dopo, aggiungi 24 ore all'end_hour
     if end_time.date() > start_time.date():
         end_hour += 24
     
     coverage = 0.0
     
-    # Caso 1: Registrazione che inizia prima delle 22 e finisce dopo le 7
     if start_hour < night_start and end_hour > night_end + 24:
-        coverage = 1.0  # Copre tutta la notte
-    
-    # Caso 2: Inizia di sera e finisce di mattina
+        coverage = 1.0
     elif start_hour >= night_start and end_hour <= night_end + 24:
         night_hours_covered = min(end_hour, night_end + 24) - start_hour
-        coverage = night_hours_covered / 9.0  # 9 ore di notte
-    
-    # Caso 3: Inizia di notte
+        coverage = night_hours_covered / 9.0
     elif start_hour < night_end:
         night_hours_covered = min(end_hour, night_end) - start_hour
         coverage = night_hours_covered / 9.0
-    
-    # Caso 4: Finisce di notte
     elif end_hour > night_start:
         night_hours_covered = end_hour - max(start_hour, night_start)
         coverage = night_hours_covered / 9.0
@@ -492,79 +488,46 @@ def calculate_night_coverage(start_time, end_time, duration_hours):
 def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
     """Stima le metriche del sonno SOLO se la registrazione include ore notturne (22:00-7:00)"""
     try:
-        # DEBUG
-        print(f"   🛌 DEBUG estimate_sleep_metrics:")
-        print(f"      Start: {start_time} (hour: {start_time.hour}), End: {end_time} (hour: {end_time.hour})")
-        print(f"      Duration: {recording_duration_hours:.2f}h")
-        
-        # Determina se la registrazione comprende ore notturne (22:00 - 7:00)
         includes_night_hours = False
         
-        # Caso 1: Registrazione lunga che copre sicuramente la notte
         if recording_duration_hours >= 10:
             includes_night_hours = True
-            print("      Caso 1 - Registrazione lunga >=10h")
-        
-        # Caso 2: Inizia di sera (dopo le 20:00) e finisce di notte/mattina
         elif start_time.hour >= 20 and end_time.hour <= 12:
             includes_night_hours = True
-            print("      Caso 2 - Inizia sera, finisce mattina")
-        
-        # Caso 3: Inizia di notte (prima delle 7:00)
         elif start_time.hour < 7:
             includes_night_hours = True
-            print("      Caso 3 - Inizia di notte")
-            
-        # Caso 4: Finisce di notte (dopo le 22:00)
         elif end_time.hour >= 22:
             includes_night_hours = True
-            print("      Caso 4 - Finisce di notte")
-        
-        # Caso 5: Attraversa completamente la notte (inizia prima delle 22 e finisce dopo le 7)
         elif start_time.hour < 22 and end_time.hour > 7 and recording_duration_hours > 8:
             includes_night_hours = True
-            print("      Caso 5 - Attraversa la notte")
         
-        print(f"      includes_night_hours = {includes_night_hours}")
-        
-        # CORREZIONE: Se NON include ore notturne, NON restituire le metriche del sonno
         if not includes_night_hours:
-            print("      ❌ NESSUN SONNO - Registrazione diurna")
-            return {}  # RESTITUISCI DIZIONARIO VUOTO
+            return {}
         
-        # Se arriva qui, significa che include ore notturne
-        if len(rr_intervals) > 500:  # Almeno 500 battiti per analisi sonno
+        if len(rr_intervals) > 500:
             night_coverage = calculate_night_coverage(start_time, end_time, recording_duration_hours)
             
-            print(f"      Night coverage: {night_coverage:.2f}")
-            
-            # Se la copertura notturna è troppo bassa, non calcolare il sonno
-            if night_coverage < 0.3:  # Meno del 30% della notte coperta
-                print(f"      ❌ Copertura notturna insufficiente: {night_coverage:.2f}")
+            if night_coverage < 0.3:
                 return {}
             
-            # Calcolo durata sonno realistico basato sulla copertura notturna
-            base_sleep_duration = 7.0  # Ore base di sonno
+            base_sleep_duration = 7.0
             sleep_duration = base_sleep_duration * night_coverage
-            sleep_duration = max(3.0, min(9.0, sleep_duration))  # Limiti realistici
+            sleep_duration = max(3.0, min(9.0, sleep_duration))
             
-            # Battito durante il sonno (più basso)
             sleep_hr = hr_mean * (0.75 + np.random.normal(0, 0.03))
             sleep_hr = max(45, min(65, sleep_hr))
             
-            # Efficienza del sonno basata su HRV e età
             base_efficiency = 85 - (age - 20) * 0.2
             sleep_efficiency = base_efficiency + np.random.normal(0, 5)
             sleep_efficiency = max(70, min(95, sleep_efficiency))
             
-            # Distribuzione realistico delle fasi del sonno
             total_sleep_minutes = sleep_duration * 60
-            sleep_light = total_sleep_minutes * 0.55  # 55% sonno leggero
-            sleep_deep = total_sleep_minutes * 0.20   # 20% sonno profondo  
-            sleep_rem = total_sleep_minutes * 0.25    # 25% sonno REM
-            sleep_awake = total_sleep_minutes * 0.05  # 5% risvegli
+            sleep_light = total_sleep_minutes * 0.55
+            sleep_deep = total_sleep_minutes * 0.20
+            sleep_rem = total_sleep_minutes * 0.25
+            sleep_awake = total_sleep_minutes * 0.05
             
-            result = {
+            return {
                 'sleep_duration': round(sleep_duration, 1),
                 'sleep_efficiency': round(sleep_efficiency, 1),
                 'sleep_hr': round(sleep_hr, 1),
@@ -573,15 +536,10 @@ def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours,
                 'sleep_rem': round(sleep_rem / 60, 1),
                 'sleep_awake': round(sleep_awake / 60, 1)
             }
-            
-            print(f"      ✅ SONNO CALCOLATO: {result}")
-            return result
         else:
-            print("      ❌ Troppo pochi battiti per analisi sonno")
             return {}
             
     except Exception as e:
-        print(f"      ❌ Errore: {e}")
         return {}
 
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_time, end_time):
@@ -633,26 +591,8 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     
     recording_duration_hours = len(clean_rr) * rr_mean / (1000 * 60 * 60)
     
-    # DEBUG: Stampa gli orari per capire se dovrebbe esserci sonno
-    print(f"DEBUG calculate_realistic_hrv_metrics:")
-    print(f"  Start: {start_time}, End: {end_time}")
-    print(f"  Duration: {recording_duration_hours:.2f}h")
-    print(f"  Start hour: {start_time.hour}, End hour: {end_time.hour}")
-
-  # DEBUG DETTAGLIATO
-    print(f"🔍 DEBUG calculate_realistic_hrv_metrics:")
-    print(f"   Start: {start_time} (hour: {start_time.hour})")
-    print(f"   End: {end_time} (hour: {end_time.hour})")
-    print(f"   Duration: {recording_duration_hours:.2f}h")
-    
-    # CORREZIONE: Chiama la funzione sonno ma gestisci il caso di ritorno vuoto
     sleep_metrics = estimate_sleep_metrics(clean_rr, hr_mean, user_age, recording_duration_hours, start_time, end_time)
     
-    # DEBUG: Verifica cosa restituisce estimate_sleep_metrics
-    print(f"   sleep_metrics returned: {sleep_metrics}")
-    print(f"   sleep_metrics is empty: {not sleep_metrics}")
-    
-    # Metriche base
     metrics = {
         'sdnn': max(25, min(180, sdnn)),
         'rmssd': max(15, min(120, rmssd)),
@@ -666,22 +606,8 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
         'lf_hf_ratio': max(0.3, min(4.0, lf_hf_ratio))
     }
     
-    # CORREZIONE: AGGIUNGI SOLO SE CI SONO METRICHE DEL SONNO (non vuoto)
     if sleep_metrics and any(value > 0 for value in sleep_metrics.values() if isinstance(value, (int, float))):
         metrics.update(sleep_metrics)
-        print(f"  ✅ Aggiunte metriche sonno: {sleep_metrics}")
-    else:
-        print(f"  ❌ Nessuna metrica sonno aggiunta (vuoto o tutti zero)")
-        # ASSICURIAMOCI che non ci siano metriche sonno nel dizionario
-        # Rimuovi esplicitamente qualsiasi metrica sonno che potrebbe essere presente
-        sleep_keys_to_remove = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 
-                               'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
-        for key in sleep_keys_to_remove:
-            metrics.pop(key, None)
-    
-    print(f"   Final metrics keys: {list(metrics.keys())}")
-    print(f"   Sleep keys in final metrics: {[k for k in metrics.keys() if 'sleep' in k]}")
-    print("=" * 50)
     
     return metrics
 
@@ -698,8 +624,7 @@ def get_default_metrics(age, gender):
         base_rmssd = 35 - (age_norm - 20) * 0.3
         base_hr = 72 + (age_norm - 20) * 0.15
     
-    # CORREZIONE: Restituisci solo le metriche HRV base, NON quelle del sonno
-    metrics = {
+    return {
         'sdnn': max(28, base_sdnn),
         'rmssd': max(20, base_rmssd),
         'hr_mean': base_hr,
@@ -710,10 +635,7 @@ def get_default_metrics(age, gender):
         'lf': 1000 - (age_norm - 20) * 15,
         'hf': 1400 - (age_norm - 20) * 20,
         'lf_hf_ratio': 1.1 + (age_norm - 20) * 0.01
-        # RIMOSSE le metriche del sonno dai default
     }
-    
-    return metrics
 
 # =============================================================================
 # DATABASE NUTRIZIONALE SUPER DETTAGLIATO
