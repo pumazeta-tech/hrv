@@ -612,6 +612,10 @@ def calculate_hrv_coherence(rr_intervals, hr_mean, age):
     
     return max(25, min(90, coherence))
 
+def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
+    """Funzione placeholder - le metriche sonno vengono dalle attività registrate"""
+    return {}
+
 # CORREZIONE: RIMOSSA LA FUNZIONE DUPLICATA calculate_hrv_coherence
 
 def calculate_night_coverage(start_time, end_time, duration_hours):
@@ -648,6 +652,10 @@ def calculate_night_coverage(start_time, end_time, duration_hours):
         coverage = night_hours_covered / 9.0
     
     return max(0.1, min(1.0, coverage))
+
+def estimate_sleep_metrics(rr_intervals, hr_mean, age, recording_duration_hours, start_time, end_time):
+    """Funzione placeholder - le metriche sonno vengono dalle attività registrate"""
+    return {}
 
 def get_default_metrics(age, gender):
     """Metriche di default realistiche basate su età e genere"""
