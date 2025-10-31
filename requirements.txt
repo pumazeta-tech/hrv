@@ -9,3 +9,4 @@ google-auth
 fpdf
 fpdf2
 weasyprint
+html2text
