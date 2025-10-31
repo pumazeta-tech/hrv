@@ -2236,43 +2236,31 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
     """Analizza tutte le attività registrate e restituisce quelle problematiche"""
     attivita_problematiche = []
     
-    print(f"🔍 DEBUG: Analizzo {len(activities)} attività")
-    
-    for i, attivita in enumerate(activities):
+    for attivita in activities:
         attivita_time = attivita['start_time']
-        print(f"Attività {i}: {attivita['type']} - {attivita['name']} - {attivita_time}")
-        print(f"Timeline: {timeline['start_time']} -> {timeline['end_time']}")
         
         # Controlla se l'attività è nel periodo della registrazione
         if timeline['start_time'] <= attivita_time <= timeline['end_time']:
-            print(f"✅ Attività {i} nel periodo registrazione")
             
             # ANALISI ALIMENTAZIONE
             if attivita['type'] == "Alimentazione":
                 cibi = attivita.get('food_items', '').lower()
-                print(f"🍽️ Cibo: {cibi}")
                 punteggio_infiammatorio = 0
                 cibi_problematici = []
                 
                 for cibo in cibi.split(','):
                     cibo = cibo.strip()
-                    print(f"  - Analizzo: '{cibo}'")
                     if cibo in NUTRITION_DB:
                         dati_cibo = NUTRITION_DB[cibo]
                         score = dati_cibo.get('inflammatory_score', 0)
                         punteggio_infiammatorio += score
-                        print(f"  - Trovato in DB - Punteggio: {score}")
                         if score > 2:
                             cibi_problematici.append(cibo)
-                    else:
-                        print(f"  - NON trovato in DB")
                 
-                print(f"📊 Punteggio totale: {punteggio_infiammatorio}")
                 if punteggio_infiammatorio > 3:
                     orario = attivita_time.strftime('%H:%M')
                     problema = f"🍽️ **Pasto infiammatorio alle {orario}**: {attivita['name']} (cibi: {', '.join(cibi_problematici)})"
                     attivita_problematiche.append(problema)
-                    print(f"❌ Trovato problema: {problema}")
                 
                 elif punteggio_infiammatorio < -2:
                     orario = attivita_time.strftime('%H:%M')
@@ -2282,45 +2270,29 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
             elif attivita['type'] == "Allenamento":
                 nome_attivita = attivita['name'].lower()
                 intensita = attivita['intensity'].lower()
-                print(f"🏃‍♂️ Allenamento: {nome_attivita} - Intensità: {intensita}")
-                print(f"📊 RMSSD attuale: {avg_rmssd}")
                 
-                # Controlla tutte le possibili intensità
-                intensita_trovate = []
-                for pattern in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']:
-                    if pattern in intensita:
-                        intensita_trovate.append(pattern)
-                
-                if intensita_trovate:
-                    print(f"  - Allenamento intenso rilevato: {intensita_trovate}")
-                    if avg_rmssd < 30:
+                if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']):
+                    if avg_rmssd < 50:  # Soglia più sensibile
                         orario = attivita_time.strftime('%H:%M')
                         problema = f"🏃‍♂️ **Allenamento intenso alle {orario}**: {attivita['name']} - RMSSD troppo basso ({avg_rmssd:.1f} ms) per questa intensità"
                         attivita_problematiche.append(problema)
-                        print(f"❌ Trovato: {problema}")
-                    else:
-                        print(f"  - RMSSD ok per intensità")
-                else:
-                    print(f"  - Intensità non riconosciuta come 'intensa'")
+                
+                elif any(p in intensita for p in ['leggera', 'leggero', 'facile']):
+                    if avg_rmssd > 40:
+                        orario = attivita_time.strftime('%H:%M')
+                        attivita_problematiche.append(f"🎯 **Allenamento ben bilanciato alle {orario}**: {attivita['name']} - Intensità appropriata")
             
             # ANALISI SONNO
             elif attivita['type'] == "Sonno":
                 durata_sonno = attivita['duration'] / 60  # converti in ore
-                print(f"😴 Sonno: {durata_sonno:.1f} ore")
                 if durata_sonno < 6:
                     data_sonno = attivita_time.strftime('%d/%m')
                     problema = f"😴 **Sonno insufficiente il {data_sonno}**: solo {durata_sonno:.1f} ore (minimo raccomandato: 7 ore)"
                     attivita_problematiche.append(problema)
-                    print(f"❌ Trovato: {problema}")
                 elif durata_sonno > 9:
                     data_sonno = attivita_time.strftime('%d/%m')
                     attivita_problematiche.append(f"💤 **Sonno lungo il {data_sonno}**: {durata_sonno:.1f} ore - ottimo recupero!")
-        else:
-            print(f"❌ Attività {i} FUORI periodo registrazione")
-            print(f"   Attività: {attivita_time}")
-            print(f"   Timeline: {timeline['start_time']} -> {timeline['end_time']}")
     
-    print(f"📋 Totale problemi trovati: {len(attivita_problematiche)}")
     return attivita_problematiche
 
 # =============================================================================
@@ -3101,9 +3073,9 @@ def main():
                     st.metric("RMSSD Medio", f"{avg_rmssd_totale:.1f} ms")
                 with col3:
                     st.metric("Battito Medio", f"{avg_hr_totale:.1f} bpm")
-                
+
                 # Analizza attività per tutta la registrazione
-                attivita_problematiche = []
+                attivita_problematiche = analizza_attivita_registrazione(st.session_state.activities, timeline, avg_rmssd_totale)                     
                 
                 # DEBUG: Mostra informazioni sulle attività
                 st.write("### 🔍 Debug Attività")
@@ -3155,7 +3127,7 @@ def main():
                                 
                                 if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']):
                                     st.write("🔴 Riconosciuto come ALLENAMENTO INTENSO")
-                                    if avg_rmssd_totale < 30:
+                                    if avg_rmssd_totale < 50:
                                         orario = attivita['start_time'].strftime('%H:%M')
                                         problema = f"🏃‍♂️ **Allenamento intenso alle {orario}**: {attivita['name']} - RMSSD troppo basso ({avg_rmssd_totale:.1f} ms) per questa intensità"
                                         attivita_problematiche.append(problema)
