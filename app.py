@@ -2405,31 +2405,61 @@ def main():
     # CONTENUTO PRINCIPALE
     # =============================================================================
 
-    # NUOVA SEZIONE METODOLOGICA (aggiungi qui)
-    with st.expander("📖 Metodologia Scientifica & Bibliografia", expanded=False):
-        st.markdown("""
-        ### METODOLOGIA DI ANALISI HRV
-        
-        **Metriche Dominio del Tempo:**
-        - **SDNN**: Deviazione standard degli intervalli NN (variabilità totale)
-        - **RMSSD**: Radice quadrata della media delle differenze successive (variabilità parasimpatica)
-        
-        **Metriche Dominio della Frequenza:**
-        - **LF (0.04-0.15 Hz)**: Componente a bassa frequenza (simpatica/parasimpatica)
-        - **HF (0.15-0.4 Hz)**: Componente ad alta frequenza (parasimpatica)
-        - **LF/HF**: Rapporto simpatico-vagale
-        
-        **Analisi del Sonno:**
-        - Classificazione fasi sonno basata su pattern RMSSD
-        - Efficienza calcolata dalla stabilità dell'HR
-        
-        **Riferimenti Bibliografici Principali:**
-        - Task Force (1996) - Standard misurazione HRV
-        - Umetani et al. (1998) - Variazioni età/sesso  
-        - Boudreau et al. (2012) - HRV durante il sonno
-        - Sandercock et al. (2005) - Impatto attività fisica
-        - Young & Benton (2018) - Influenza nutrizionale
-        """)
+# SEZIONE BIBLIOGRAFICA
+with st.expander("📚 Riferimenti Bibliografici", expanded=False):
+    st.markdown("""
+    **PRINCIPALI RIFERIMENTI BIBLIOGRAFICI:**
+
+    **1. HEART RATE VARIABILITY STANDARDS (Task Force, 1996)**
+    - Task Force of the European Society of Cardiology. "Heart rate variability: 
+      standards of measurement, physiological interpretation, and clinical use."
+      Circulation, 1996.
+
+    **2. HRV AND AGING (Umetani et al., 1998)**
+    - Umetani K, Singer DH, McCraty R, Atkinson M. "Twenty-four hour time domain 
+      heart rate variability and heart rate: relations to age and gender over nine decades."
+      J Am Coll Cardiol, 1998.
+
+    **3. SLEEP HRV ANALYSIS (Boudreau et al., 2012)**  
+    - Boudreau P, Yeh WH, Dumont GA, Boivin DB. "Circadian variation of heart rate variability 
+      across sleep stages."
+      Sleep, 2012.
+
+    **4. PHYSICAL ACTIVITY AND HRV (Sandercock et al., 2005)**
+    - Sandercock GR, Bromley PD, Brodie DA. "Effects of exercise on heart rate variability: 
+      inferences from meta-analysis."
+      Med Sci Sports Exerc, 2005.
+
+    **5. NUTRITIONAL IMPACT ON HRV (Young & Benton, 2018)**
+    - Young HA, Benton D. "Heart-rate variability: a biomarker to study the influence 
+      of nutrition on physiological and psychological health?"
+      Behav Pharmacol, 2018.
+    """)
+
+# SEZIONE METODOLOGICA
+with st.expander("🔬 Metodologia di Analisi", expanded=False):
+    st.markdown("""
+    **METODOLOGIA DI ANALISI HRV:**
+
+    **Metriche Dominio del Tempo:**
+    - **SDNN**: Deviazione standard degli intervalli NN (variabilità totale)
+    - **RMSSD**: Radice quadrata della media delle differenze successive (variabilità parasimpatica)
+
+    **Metriche Dominio della Frequenza:**
+    - **LF (0.04-0.15 Hz)**: Componente a bassa frequenza (simpatica/parasimpatica)
+    - **HF (0.15-0.4 Hz)**: Componente ad alta frequenza (parasimpatica)
+    - **LF/HF**: Rapporto simpatico-vagale
+
+    **Analisi del Sonno:**
+    - Classificazione fasi sonno basata su pattern RMSSD
+    - Efficienza calcolata dalla stabilità dell'HR
+
+    **Pre-processing Dati:**
+    - Filtraggio outlier: Interquartile Range (IQR) con bounds 400-1800 ms
+    - Correzione artefatti: Sostituzione con media valori adiacenti
+    - Grading qualità: Basato su % battiti corretti
+    """)
+
     
     st.header("📤 Carica File IBI")
     uploaded_file = st.file_uploader("Carica il tuo file .txt, .csv o .sdf con gli intervalli IBI", type=['txt', 'csv', 'sdf'], key="file_uploader")
