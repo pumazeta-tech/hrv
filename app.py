@@ -2729,7 +2729,7 @@ def main():
                 else:
                     hr_smooth = heart_rate
                 
-            # GRAFICO IBI DETTAGLIATO CON FILTRO AGGRESSIVO - OTTIMIZZATO
+            # GRAFICO IBI DETTAGLIATO CON ORARIO REALE - OTTIMIZZATO
             st.subheader("📈 Grafico Dettagliato IBI (Tutti i Battiti)")
             
             if len(rr_intervals) > 0:
@@ -2738,7 +2738,7 @@ def main():
                 
                 st.info(f"📊 **Dati filtrati:** {len(clean_rr)} IBI su {len(rr_intervals)} totali ({len(clean_rr)/len(rr_intervals)*100:.1f}% conservati)")
                 
-                # CALCOLA RMSSD E SDNN IN TEMPO REALE (finestra mobile)
+                # CALCOLA RMSSD E SDNN IN TEMPO REALE (finestra mobile) CON ORARIO REALE
                 window_size = 300  # 5 minuti circa di finestra
                 time_points = []
                 rmssd_values = []
@@ -2747,6 +2747,9 @@ def main():
                 
                 # Campiona ogni N punti per performance (mantenendo dettaglio)
                 sampling_step = max(1, len(clean_rr) // 5000)  # Massimo 5000 punti
+                
+                # Calcola timeline reale
+                current_time = start_time
                 
                 for i in range(0, len(clean_rr) - window_size, window_size // 2):  # Finestra scorrevole
                     if i % sampling_step == 0:  # Campionamento per performance
@@ -2757,15 +2760,16 @@ def main():
                             sdnn = np.std(window)
                             hr = 60000 / np.mean(window)
                             
-                            # Tempo in minuti dal inizio
-                            time_minutes = np.sum(clean_rr[:i]) / 1000 / 60
+                            # Tempo REALE (centro della finestra)
+                            window_start_time = current_time + timedelta(milliseconds=np.sum(clean_rr[:i]))
+                            window_center_time = window_start_time + timedelta(milliseconds=np.sum(window) / 2)
                             
-                            time_points.append(time_minutes)
+                            time_points.append(window_center_time)
                             rmssd_values.append(rmssd)
                             sdnn_values.append(sdnn)
                             hr_values.append(hr)
                 
-                # Crea il grafico principale
+                # Crea il grafico principale con ORARIO REALE
                 fig = go.Figure()
                 
                 # SDNN
@@ -2774,7 +2778,7 @@ def main():
                     mode='lines',
                     name='SDNN',
                     line=dict(color='#3498db', width=2),
-                    hovertemplate='<b>%{x:.1f} min</b><br>SDNN: %{y:.1f} ms<extra></extra>'
+                    hovertemplate='<b>%{x|%H:%M:%S}</b><br>SDNN: %{y:.1f} ms<extra></extra>'
                 ))
                 
                 # RMSSD
@@ -2783,7 +2787,7 @@ def main():
                     mode='lines',
                     name='RMSSD',
                     line=dict(color='#2ecc71', width=2),
-                    hovertemplate='<b>%{x:.1f} min</b><br>RMSSD: %{y:.1f} ms<extra></extra>'
+                    hovertemplate='<b>%{x|%H:%M:%S}</b><br>RMSSD: %{y:.1f} ms<extra></extra>'
                 ))
                 
                 # Battito Cardiaco (asse destro)
@@ -2792,24 +2796,20 @@ def main():
                     mode='lines',
                     name='Battito Cardiaco',
                     line=dict(color='#e74c3c', width=2),
-                    hovertemplate='<b>%{x:.1f} min</b><br>Battito: %{y:.1f} bpm<extra></extra>',
+                    hovertemplate='<b>%{x|%H:%M:%S}</b><br>Battito: %{y:.1f} bpm<extra></extra>',
                     yaxis='y2'
                 ))
                 
-                # Aggiungi attività come aree colorate
+                # Aggiungi attività come aree colorate (ORA CON ORARI REALI)
                 for activity in st.session_state.activities:
                     try:
                         activity_start = activity['start_time']
                         activity_end = activity_start + timedelta(minutes=activity['duration'])
                         
-                        # Calcola i minuti dall'inizio
-                        start_minutes = (activity_start - start_time).total_seconds() / 60
-                        end_minutes = (activity_end - start_time).total_seconds() / 60
-                        
-                        # Area dell'attività
+                        # Area dell'attività con orari reali
                         fig.add_vrect(
-                            x0=start_minutes,
-                            x1=end_minutes,
+                            x0=activity_start,
+                            x1=activity_end,
                             fillcolor=activity['color'],
                             opacity=0.2,
                             line_width=0,
@@ -2821,10 +2821,10 @@ def main():
                     except Exception as e:
                         continue
                 
-                # Layout del grafico
+                # Layout del grafico con FORMATTAZIONE DATA/ORA
                 fig.update_layout(
                     title="Analisi HRV in Tempo Reale con Attività",
-                    xaxis_title="Tempo dalla registrazione (minuti)",
+                    xaxis_title="Orario",
                     yaxis_title="HRV (ms)",
                     yaxis2=dict(
                         title="Battito Cardiaco (bpm)",
@@ -2833,12 +2833,25 @@ def main():
                     ),
                     hovermode='x unified',
                     height=500,
-                    showlegend=True
+                    showlegend=True,
+                    xaxis=dict(
+                        type='date',
+                        tickformat='%H:%M\n%d/%m',
+                        tickangle=0
+                    )
                 )
                 
-                # Rangeslider OTTIMIZZATO (solo se non troppi dati)
+                # Rangeslider OTTIMIZZATO con formattazione data/ora
                 if len(time_points) < 1000:
-                    fig.update_layout(xaxis=dict(rangeslider=dict(visible=True, thickness=0.05)))
+                    fig.update_layout(
+                        xaxis=dict(
+                            rangeslider=dict(
+                                visible=True, 
+                                thickness=0.05,
+                                bgcolor='lightgray'
+                            )
+                        )
+                    )
                 else:
                     st.warning("🔍 **Zoom disponibile:** Usa lo strumento zoom del grafico per dettagli")
                 
@@ -2858,21 +2871,9 @@ def main():
                 with col4:
                     st.metric("Finestre Analizzate", len(time_points))
                 
-                # VARIABILITÀ NEL TEMPO
-                with st.expander("📈 Analisi Variabilità", expanded=False):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write("**SDNN nel tempo:**")
-                        st.line_chart(pd.DataFrame({
-                            'SDNN': sdnn_values
-                        }, index=time_points))
-                    
-                    with col2:
-                        st.write("**RMSSD nel tempo:**")
-                        st.line_chart(pd.DataFrame({
-                            'RMSSD': rmssd_values
-                        }, index=time_points))
+                # INFO PERIODO
+                if time_points:
+                    st.info(f"**📅 Periodo analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")
             
             # ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
