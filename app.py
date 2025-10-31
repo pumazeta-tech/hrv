@@ -2229,6 +2229,69 @@ def calculate_segment_analysis(time_points, sdnn_values, rmssd_values, hr_values
     return comparison_data
 
 # =============================================================================
+# FUNZIONE PER ANALIZZARE LE ATTIVITÀ
+# =============================================================================
+
+def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
+    """Analizza tutte le attività registrate e restituisce quelle problematiche"""
+    attivita_problematiche = []
+    
+    for attivita in activities:
+        attivita_time = attivita['start_time']
+        
+        # Controlla se l'attività è nel periodo della registrazione
+        if timeline['start_time'] <= attivita_time <= timeline['end_time']:
+            
+            # ANALISI ALIMENTAZIONE
+            if attivita['type'] == "Alimentazione":
+                cibi = attivita.get('food_items', '').lower()
+                punteggio_infiammatorio = 0
+                cibi_problematici = []
+                
+                for cibo in cibi.split(','):
+                    cibo = cibo.strip()
+                    if cibo in NUTRITION_DB:
+                        dati_cibo = NUTRITION_DB[cibo]
+                        punteggio_infiammatorio += dati_cibo.get('inflammatory_score', 0)
+                        if dati_cibo.get('inflammatory_score', 0) > 2:
+                            cibi_problematici.append(cibo)
+                
+                if punteggio_infiammatorio > 3:
+                    orario = attivita_time.strftime('%H:%M')
+                    attivita_problematiche.append(f"🍽️ **Pasto infiammatorio alle {orario}**: {attivita['name']} (cibi: {', '.join(cibi_problematici)})")
+                
+                elif punteggio_infiammatorio < -2:
+                    orario = attivita_time.strftime('%H:%M')
+                    attivita_problematiche.append(f"🥗 **Pasto salutare alle {orario}**: {attivita['name']}")
+            
+            # ANALISI ALLENAMENTI
+            elif attivita['type'] == "Allenamento":
+                nome_attivita = attivita['name'].lower()
+                intensita = attivita['intensity'].lower()
+                
+                if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante']):
+                    if avg_rmssd < 30:
+                        orario = attivita_time.strftime('%H:%M')
+                        attivita_problematiche.append(f"🏃‍♂️ **Allenamento intenso alle {orario}**: {attivita['name']} - RMSSD troppo basso ({avg_rmssd:.1f} ms) per questa intensità")
+                
+                elif any(p in intensita for p in ['leggera', 'leggero', 'facile']):
+                    if avg_rmssd > 40:
+                        orario = attivita_time.strftime('%H:%M')
+                        attivita_problematiche.append(f"🎯 **Allenamento ben bilanciato alle {orario}**: {attivita['name']} - Intensità appropriata")
+            
+            # ANALISI SONNO
+            elif attivita['type'] == "Sonno":
+                durata_sonno = attivita['duration'] / 60  # converti in ore
+                if durata_sonno < 6:
+                    data_sonno = attivita_time.strftime('%d/%m')
+                    attivita_problematiche.append(f"😴 **Sonno insufficiente il {data_sonno}**: solo {durata_sonno:.1f} ore (minimo raccomandato: 7 ore)")
+                elif durata_sonno > 9:
+                    data_sonno = attivita_time.strftime('%d/%m')
+                    attivita_problematiche.append(f"💤 **Sonno lungo il {data_sonno}**: {durata_sonno:.1f} ore - ottimo recupero!")
+    
+    return attivita_problematiche
+
+# =============================================================================
 # FUNZIONE PRINCIPALE
 # =============================================================================
 
