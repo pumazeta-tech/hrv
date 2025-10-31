@@ -2479,7 +2479,7 @@ if uploaded_file is not None:
         
         if len(rr_intervals) == 0:
             st.error("❌ Nessun dato IBI valido trovato nel file")
-            return  # ← QUESTO return È CORRETTO (dentro if e dentro try)
+            return
         
         st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
         
@@ -2504,20 +2504,20 @@ if uploaded_file is not None:
             user_profile['age'], 
             user_profile['gender']
         )
-            
-            avg_metrics = {}
-            
-            try:
-                calculated_metrics = calculate_professional_hrv_metrics(
-                    rr_intervals, user_profile['age'], user_profile['gender'], start_time, timeline['end_time']
-                )
-                if calculated_metrics:
-                    avg_metrics = calculated_metrics
-                else:
-                    raise ValueError("calculate_realistic_hrv_metrics ha restituito None")
-            except Exception as e:
-                st.sidebar.warning(f"Calcolo metriche fallito: {e}")
-                avg_metrics = get_default_metrics(user_profile['age'], user_profile['gender'])
+        
+        avg_metrics = {}  # ← QUESTA RIGA DEVE AVERE LA STESSA INDENTAZIONE DELLE ALTRE NEL try
+        
+        try:
+            calculated_metrics = calculate_professional_hrv_metrics(
+                rr_intervals, user_profile['age'], user_profile['gender'], start_time, timeline['end_time']
+            )
+            if calculated_metrics:
+                avg_metrics = calculated_metrics
+            else:
+                raise ValueError("calculate_realistic_hrv_metrics ha restituito None")
+        except Exception as e:
+            st.sidebar.warning(f"Calcolo metriche fallito: {e}")
+            avg_metrics = get_default_metrics(user_profile['age'], user_profile['gender'])
 
             # AGGIUNGI METRICHE SONNO REALI
             sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
