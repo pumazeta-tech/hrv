@@ -2416,6 +2416,155 @@ def analizza_impatto_attivita_su_hrv(activities, time_points, sdnn_values, rmssd
     return analisi_impatto
 
 # =============================================================================
+# FUNZIONE PER GENERARE REPORT COMPLETO
+# =============================================================================
+
+def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, attivita_problematiche, analisi_impatto):
+    """Genera un report completo in formato HTML"""
+    
+    # Informazioni paziente
+    report = f"""
+<div class="header">
+    <h1>📊 REPORT ANALISI HRV COMPLETO</h1>
+    <p>Generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}</p>
+</div>
+
+<div class="section">
+    <h2>👤 INFORMAZIONI PAZIENTE</h2>
+    <p><strong>Nome:</strong> {user_profile['name']} {user_profile['surname']}</p>
+    <p><strong>Data di nascita:</strong> {user_profile['birth_date'].strftime('%d/%m/%Y')}</p>
+    <p><strong>Età:</strong> {user_profile['age']} anni</p>
+    <p><strong>Sesso:</strong> {user_profile['gender']}</p>
+</div>
+
+<div class="section">
+    <h2>📅 PERIODO REGISTRAZIONE</h2>
+    <p><strong>Inizio:</strong> {timeline['start_time'].strftime('%d/%m/%Y %H:%M:%S')}</p>
+    <p><strong>Fine:</strong> {timeline['end_time'].strftime('%d/%m/%Y %H:%M:%S')}</p>
+    <p><strong>Durata totale:</strong> {timeline['total_duration_hours']:.1f} ore</p>
+</div>
+
+<div class="section">
+    <h2>❤️ METRICHE HRV PRINCIPALI</h2>
+    <div class="metric-grid">
+        <div class="metric-card">
+            <h3>💓 Battito Medio</h3>
+            <p class="metric-value">{avg_metrics.get('hr_mean', 0):.1f} bpm</p>
+        </div>
+        <div class="metric-card">
+            <h3>📊 SDNN</h3>
+            <p class="metric-value">{avg_metrics.get('sdnn', 0):.1f} ms</p>
+        </div>
+        <div class="metric-card">
+            <h3>🔄 RMSSD</h3>
+            <p class="metric-value">{avg_metrics.get('rmssd', 0):.1f} ms</p>
+        </div>
+        <div class="metric-card">
+            <h3>🎯 Coerenza</h3>
+            <p class="metric-value">{avg_metrics.get('coherence', 0):.1f}%</p>
+        </div>
+        <div class="metric-card">
+            <h3>⚡ Potenza Totale</h3>
+            <p class="metric-value">{avg_metrics.get('total_power', 0):.0f} ms²</p>
+        </div>
+        <div class="metric-card">
+            <h3>⚖️ LF/HF</h3>
+            <p class="metric-value">{avg_metrics.get('lf_hf_ratio', 0):.2f}</p>
+        </div>
+    </div>
+</div>
+"""
+
+    # Aggiungi sezione sonno se disponibile
+    if has_valid_sleep_metrics(avg_metrics):
+        report += f"""
+<div class="section">
+    <h2>😴 ANALISI DEL SONNO</h2>
+    <div class="metric-grid">
+        <div class="metric-card">
+            <h3>🛌 Durata Sonno</h3>
+            <p class="metric-value">{avg_metrics.get('sleep_duration', 0):.1f} ore</p>
+        </div>
+        <div class="metric-card">
+            <h3>📊 Efficienza</h3>
+            <p class="metric-value">{avg_metrics.get('sleep_efficiency', 0):.1f}%</p>
+        </div>
+        <div class="metric-card">
+            <h3>💓 HR Sonno</h3>
+            <p class="metric-value">{avg_metrics.get('sleep_hr', 0):.1f} bpm</p>
+        </div>
+    </div>
+    <div class="recommendation">
+        <h3>📈 Distribuzione Fasi Sonno</h3>
+        <p><strong>Sonno Leggero:</strong> {avg_metrics.get('sleep_light', 0):.1f} ore</p>
+        <p><strong>Sonno Profondo:</strong> {avg_metrics.get('sleep_deep', 0):.1f} ore</p>
+        <p><strong>Sonno REM:</strong> {avg_metrics.get('sleep_rem', 0):.1f} ore</p>
+        <p><strong>Risvegli:</strong> {avg_metrics.get('sleep_awake', 0):.1f} ore</p>
+    </div>
+</div>
+"""
+
+    # Aggiungi attività problematiche se presenti
+    if attivita_problematiche:
+        report += """
+<div class="section">
+    <h2>⚠️ ATTIVITÀ PROBLEMATICHE RILEVATE</h2>
+    <div class="recommendation warning">
+        <ul>
+"""
+        for problema in attivita_problematiche:
+            # Rimuovi il markup per il report testuale
+            problema_clean = problema.replace('**', '').replace('🍽️', '🍽').replace('🏃‍♂️', '🏃').replace('😴', '😴')
+            report += f"<li>{problema_clean}</li>\n"
+        report += """
+        </ul>
+    </div>
+</div>
+"""
+
+    # Aggiungi analisi impatto se presente
+    if analisi_impatto:
+        report += """
+<div class="section">
+    <h2>📊 ANALISI IMPATTO ATTIVITÀ SU HRV</h2>
+    <div class="recommendation excellent">
+        <ul>
+"""
+        for impatto in analisi_impatto:
+            impatto_clean = impatto.replace('**', '').replace('📉', '↓').replace('📈', '↑').replace('💚', '✓').replace('🍽️', '🍽').replace('💤', '😴')
+            report += f"<li>{impatto_clean}</li>\n"
+        report += """
+        </ul>
+    </div>
+</div>
+"""
+
+    # Raccomandazioni generali
+    report += """
+<div class="section">
+    <h2>💡 RACCOMANDAZIONI GENERALE</h2>
+    <div class="recommendation">
+        <h3>🎯 Per migliorare la tua variabilità cardiaca:</h3>
+        <ul>
+            <li>Mantieni una routine di sonno regolare (7-9 ore per notte)</li>
+            <li>Pratica tecniche di respirazione e rilassamento quotidiane</li>
+            <li>Bilancia attività fisica intensa con adeguato recupero</li>
+            <li>Mantieni un'alimentazione ricca di antiossidanti e omega-3</li>
+            <li>Riduci il consumo di cibi infiammatori e zuccheri raffinati</li>
+            <li>Gestisci lo stress attraverso meditazione o mindfulness</li>
+        </ul>
+    </div>
+</div>
+
+<div class="footer">
+    <p>Report generato automaticamente da HRV Analytics ULTIMATE</p>
+    <p>I dati forniti hanno scopo informativo e non sostituiscono il parere medico</p>
+</div>
+"""
+
+    return report
+
+# =============================================================================
 # FUNZIONI PER CREARE PDF
 # =============================================================================
 
