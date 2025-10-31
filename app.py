@@ -2935,6 +2935,131 @@ def main():
                     st.warning("🔍 **Zoom disponibile:** Usa lo strumento zoom del grafico per dettagli")
                 
                 st.plotly_chart(fig, use_container_width=True)
+
+                            # CONFRONTO TEMPORALE A 3 FASI
+                            st.subheader("⏰ Confronto Temporale: Prima-Durante-Dopo")
+                            
+                            # Calcola gli intervalli: 1h prima, selezione, 1h dopo
+                            try:
+                                one_hour_before = selected_start - timedelta(hours=1)
+                                one_hour_after = selected_end + timedelta(hours=1)
+                                
+                                # Trova i dati per ogni intervallo
+                                intervals_data = {
+                                    '1h Prima': (one_hour_before, selected_start),
+                                    'Selezione': (selected_start, selected_end), 
+                                    '1h Dopo': (selected_end, one_hour_after)
+                                }
+                                
+                                comparison_data = []
+                                
+                                for interval_name, (int_start, int_end) in intervals_data.items():
+                                    interval_indices = []
+                                    for i, tp in enumerate(time_points):
+                                        if int_start <= tp <= int_end:
+                                            interval_indices.append(i)
+                                    
+                                    if interval_indices:
+                                        int_sdnn = np.mean([sdnn_values[i] for i in interval_indices])
+                                        int_rmssd = np.mean([rmssd_values[i] for i in interval_indices])
+                                        int_hr = np.mean([hr_values[i] for i in interval_indices])
+                                        
+                                        comparison_data.append({
+                                            'Periodo': interval_name,
+                                            'Orario': f"{int_start.strftime('%H:%M')}-{int_end.strftime('%H:%M')}",
+                                            'SDNN (ms)': f"{int_sdnn:.1f}",
+                                            'RMSSD (ms)': f"{int_rmssd:.1f}",
+                                            'HR (bpm)': f"{int_hr:.1f}",
+                                            'Finestre': len(interval_indices)
+                                        })
+                                    else:
+                                        comparison_data.append({
+                                            'Periodo': interval_name,
+                                            'Orario': f"{int_start.strftime('%H:%M')}-{int_end.strftime('%H:%M')}",
+                                            'SDNN (ms)': 'N/D',
+                                            'RMSSD (ms)': 'N/D', 
+                                            'HR (bpm)': 'N/D',
+                                            'Finestre': 0
+                                        })
+                                
+                                # Crea la tabella comparativa
+                                if comparison_data:
+                                    comp_df = pd.DataFrame(comparison_data)
+                                    
+                                    # Styling per evidenziare la selezione
+                                    def highlight_selection(row):
+                                        if row['Periodo'] == 'Selezione':
+                                            return ['background-color: #e8f5e8'] * len(row)
+                                        elif row['Periodo'] == '1h Dopo':
+                                            return ['background-color: #fff3cd'] * len(row)
+                                        else:
+                                            return ['background-color: #f8f9fa'] * len(row)
+                                    
+                                    styled_df = comp_df.style.apply(highlight_selection, axis=1)
+                                    
+                                    st.dataframe(
+                                        styled_df,
+                                        use_container_width=True,
+                                        hide_index=True
+                                    )
+                                    
+                                    # ANALISI DEL TREND
+                                    st.subheader("📈 Analisi del Trend")
+                                    
+                                    # Calcola le variazioni percentuali
+                                    if (comparison_data[0]['SDNN (ms)'] != 'N/D' and 
+                                        comparison_data[1]['SDNN (ms)'] != 'N/D' and
+                                        comparison_data[2]['SDNN (ms)'] != 'N/D'):
+                                        
+                                        sdnn_before = float(comparison_data[0]['SDNN (ms)'])
+                                        sdnn_during = float(comparison_data[1]['SDNN (ms)']) 
+                                        sdnn_after = float(comparison_data[2]['SDNN (ms)'])
+                                        
+                                        rmssd_before = float(comparison_data[0]['RMSSD (ms)'])
+                                        rmssd_during = float(comparison_data[1]['RMSSD (ms)'])
+                                        rmssd_after = float(comparison_data[2]['RMSSD (ms)'])
+                                        
+                                        hr_before = float(comparison_data[0]['HR (bpm)'])
+                                        hr_during = float(comparison_data[1]['HR (bpm)'])
+                                        hr_after = float(comparison_data[2]['HR (bpm)'])
+                                        
+                                        col1, col2, col3 = st.columns(3)
+                                        
+                                        with col1:
+                                            trend_sdnn = ((sdnn_after - sdnn_before) / sdnn_before) * 100
+                                            st.metric("Trend SDNN", f"{trend_sdnn:+.1f}%",
+                                                     delta=f"{trend_sdnn:+.1f}%")
+                                        
+                                        with col2:
+                                            trend_rmssd = ((rmssd_after - rmssd_before) / rmssd_before) * 100
+                                            st.metric("Trend RMSSD", f"{trend_rmssd:+.1f}%",
+                                                     delta=f"{trend_rmssd:+.1f}%")
+                                            
+                                        with col3:
+                                            trend_hr = ((hr_after - hr_before) / hr_before) * 100
+                                            st.metric("Trend HR", f"{trend_hr:+.1f}%",
+                                                     delta=f"{trend_hr:+.1f}%")
+                                        
+                                        # INTERPRETAZIONE DEL TREND
+                                        trend_interpretation = []
+                                        
+                                        if trend_sdnn > 10 and trend_rmssd > 15:
+                                            trend_interpretation.append("📈 **Recupero efficace** - Variabilità in miglioramento")
+                                        elif trend_sdnn < -10 and trend_rmssd < -15:
+                                            trend_interpretation.append("📉 **Affaticamento accumulato** - Variabilità in peggioramento")
+                                        
+                                        if trend_hr < -8:
+                                            trend_interpretation.append("💤 **Transizione verso riposo** - Battito in calo")
+                                        elif trend_hr > 12:
+                                            trend_interpretation.append("⚡ **Attivazione fisiologica** - Battito in aumento")
+                                            
+                                        if trend_interpretation:
+                                            st.write("**🎯 Interpretazione Trend:**")
+                                            for item in trend_interpretation:
+                                                st.write(f"• {item}")
+                                                
+                            except Exception as e:
+                                st.warning("Dati insufficienti per il confronto temporale completo")
                 
                 # STATISTICHE DETTAGLIATE
                 st.subheader("📊 Statistiche Dettagliate")
