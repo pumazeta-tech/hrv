@@ -7,3 +7,5 @@ scipy
 gspread
 google-auth
 fpdf
+fpdf2
+weasyprint
