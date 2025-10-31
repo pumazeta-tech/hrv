@@ -2988,355 +2988,176 @@ def main():
                 
                 st.plotly_chart(fig, use_container_width=True)
                 
-            # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA
-            st.subheader("🔍 Analisi Segmentale Interattiva")
-
-            # Inizializza la selezione
-            selected_data_exists = False
-            selected_start = None
-            selected_end = None
-
-            # INTERFACCIA PER SELEZIONE MANUALE (alternativa alla selezione grafico)
-            st.info("**Seleziona un periodo per l'analisi:**")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                # Usa le date dalla timeline reale
-                min_date = timeline['start_time']
-                max_date = timeline['end_time']
+                # =============================================================================
+                # VALUTAZIONE GENERALE DELLA REGISTRAZIONE (SEMPRE VISIBILE)
+                # =============================================================================
+                st.subheader("📊 Valutazione Generale della Registrazione")
                 
-                selection_start_date = st.date_input(
-                    "Data inizio selezione",
-                    value=min_date.date(),
-                    min_value=min_date.date(),
-                    max_value=max_date.date(),
-                    key="selection_start_date"
-                )
-                selection_start_time = st.time_input(
-                    "Ora inizio selezione", 
-                    value=min_date.time(),
-                    key="selection_start_time"
-                )
-
-            with col2:
-                selection_end_date = st.date_input(
-                    "Data fine selezione",
-                    value=max_date.date(),
-                    min_value=min_date.date(),
-                    max_value=max_date.date(),
-                    key="selection_end_date"
-                )
-                selection_end_time = st.time_input(
-                    "Ora fine selezione",
-                    value=max_date.time(),
-                    key="selection_end_time"
-                )
-
-            # Combina date e ore
-            selected_start = datetime.combine(selection_start_date, selection_start_time)
-            selected_end = datetime.combine(selection_end_date, selection_end_time)
-
-            # Pulsante per eseguire l'analisi
-            if st.button("📊 Analizza Periodo Selezionato", use_container_width=True):
-                if selected_start >= selected_end:
-                    st.error("❌ La data/ora di fine deve essere successiva a quella di inizio")
-                elif selected_start < min_date or selected_end > max_date:
-                    st.error("❌ Il periodo selezionato è fuori dalla registrazione")
+                # Calcola medie generali di tutta la registrazione
+                avg_sdnn_totale = np.mean(sdnn_values)
+                avg_rmssd_totale = np.mean(rmssd_values)
+                avg_hr_totale = np.mean(hr_values)
+                
+                # Mostra metriche generali
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("SDNN Medio", f"{avg_sdnn_totale:.1f} ms")
+                with col2:
+                    st.metric("RMSSD Medio", f"{avg_rmssd_totale:.1f} ms")
+                with col3:
+                    st.metric("Battito Medio", f"{avg_hr_totale:.1f} bpm")
+                
+                # Analizza attività per tutta la registrazione
+                attivita_problematiche = analizza_attivita_registrazione(st.session_state.activities, timeline, avg_rmssd_totale)
+                
+                # Mostra problemi attività immediatamente
+                if attivita_problematiche:
+                    st.error("### ⚠️ Attività Problematiche Rilevate")
+                    for problema in attivita_problematiche:
+                        st.write(f"• {problema}")
                 else:
-                    selected_data_exists = True
+                    st.success("### ✅ Nessuna attività problematica rilevata")
+                
+                # =============================================================================
+                # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA
+                # =============================================================================
+                st.subheader("🔍 Analisi Segmentale Interattiva")
 
-            # Se c'è una selezione valida, esegui l'analisi
-            if selected_data_exists and selected_start and selected_end:
-                st.success(f"**📅 Periodo selezionato:** {selected_start.strftime('%d/%m/%Y %H:%M')} - {selected_end.strftime('%d/%m/%Y %H:%M')}")
-                
-                # Filtra i dati nel range selezionato
-                selected_indices = []
-                for i, tp in enumerate(time_points):
-                    if selected_start <= tp <= selected_end:
-                        selected_indices.append(i)
-                
-                if selected_indices:
-                    selected_sdnn = [sdnn_values[i] for i in selected_indices]
-                    selected_rmssd = [rmssd_values[i] for i in selected_indices]
-                    selected_hr = [hr_values[i] for i in selected_indices]
+                # Inizializza la selezione
+                selected_data_exists = False
+                selected_start = None
+                selected_end = None
+
+                # INTERFACCIA PER SELEZIONE MANUALE (alternativa alla selezione grafico)
+                st.info("**Seleziona un periodo per l'analisi:**")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    # Usa le date dalla timeline reale
+                    min_date = timeline['start_time']
+                    max_date = timeline['end_time']
                     
-                    # CONFRONTO TEMPORALE A 3 FASI
-                    st.subheader("⏰ Confronto Temporale: Prima-Durante-Dopo")
-                    
-                    # Calcola l'analisi per i tre periodi
-                    comparison_data = calculate_segment_analysis(
-                        time_points, sdnn_values, rmssd_values, hr_values, 
-                        selected_start, selected_end
+                    selection_start_date = st.date_input(
+                        "Data inizio selezione",
+                        value=min_date.date(),
+                        min_value=min_date.date(),
+                        max_value=max_date.date(),
+                        key="selection_start_date"
                     )
+                    selection_start_time = st.time_input(
+                        "Ora inizio selezione", 
+                        value=min_date.time(),
+                        key="selection_start_time"
+                    )
+
+                with col2:
+                    selection_end_date = st.date_input(
+                        "Data fine selezione",
+                        value=max_date.date(),
+                        min_value=min_date.date(),
+                        max_value=max_date.date(),
+                        key="selection_end_date"
+                    )
+                    selection_end_time = st.time_input(
+                        "Ora fine selezione",
+                        value=max_date.time(),
+                        key="selection_end_time"
+                    )
+
+                # Combina date e ore
+                selected_start = datetime.combine(selection_start_date, selection_start_time)
+                selected_end = datetime.combine(selection_end_date, selection_end_time)
+
+                # Pulsante per eseguire l'analisi
+                if st.button("📊 Analizza Periodo Selezionato", use_container_width=True):
+                    if selected_start >= selected_end:
+                        st.error("❌ La data/ora di fine deve essere successiva a quella di inizio")
+                    elif selected_start < min_date or selected_end > max_date:
+                        st.error("❌ Il periodo selezionato è fuori dalla registrazione")
+                    else:
+                        selected_data_exists = True
+
+                # Se c'è una selezione valida, esegui l'analisi
+                if selected_data_exists and selected_start and selected_end:
+                    st.success(f"**📅 Periodo selezionato:** {selected_start.strftime('%d/%m/%Y %H:%M')} - {selected_end.strftime('%d/%m/%Y %H:%M')}")
                     
-                    # Crea la tabella comparativa
-                    if comparison_data:
-                        comp_df = pd.DataFrame(comparison_data)
+                    # Filtra i dati nel range selezionato
+                    selected_indices = []
+                    for i, tp in enumerate(time_points):
+                        if selected_start <= tp <= selected_end:
+                            selected_indices.append(i)
+                    
+                    if selected_indices:
+                        # CONFRONTO TEMPORALE A 3 FASI
+                        st.subheader("⏰ Confronto Temporale: Prima-Durante-Dopo")
                         
-                        # Styling per evidenziare la selezione
-                        def highlight_selection(row):
-                            if row['Periodo'] == 'Selezione':
-                                return ['background-color: #e8f5e8'] * len(row)
-                            elif row['Periodo'] == '1h Dopo':
-                                return ['background-color: #fff3cd'] * len(row)
-                            else:
-                                return ['background-color: #f8f9fa'] * len(row)
-                        
-                        styled_df = comp_df.style.apply(highlight_selection, axis=1)
-                        
-                        st.dataframe(
-                            styled_df,
-                            use_container_width=True,
-                            hide_index=True
+                        # Calcola l'analisi per i tre periodi
+                        comparison_data = calculate_segment_analysis(
+                            time_points, sdnn_values, rmssd_values, hr_values, 
+                            selected_start, selected_end
                         )
                         
-                        # 1. VALUTAZIONE SINTETICA DEL PERIODO SELEZIONATO
-                        st.subheader("🎯 Valutazione Periodo Selezionato")
-                        
-                        selezione_data = comparison_data[1]  # Secondo elemento è "Selezione"
-                        
-                        try:
-                            sdnn_selezione = float(selezione_data['SDNN (ms)']) if selezione_data['SDNN (ms)'] != 'N/D' else None
-                            rmssd_selezione = float(selezione_data['RMSSD (ms)']) if selezione_data['RMSSD (ms)'] != 'N/D' else None
-                            hr_selezione = float(selezione_data['HR (bpm)']) if selezione_data['HR (bpm)'] != 'N/D' else None
+                        # Crea la tabella comparativa
+                        if comparison_data:
+                            comp_df = pd.DataFrame(comparison_data)
                             
-                            if sdnn_selezione and rmssd_selezione and hr_selezione:
-                                if sdnn_selezione > 50 and rmssd_selezione > 30 and hr_selezione < 75:
-                                    st.success("🌟 **Stato di benessere ottimale** - buon equilibrio autonomico")
-                                elif sdnn_selezione < 30 or rmssd_selezione < 20:
-                                    st.warning("⚠️ **Possibile stato di stress** - ridotta variabilità cardiaca")
+                            # Styling per evidenziare la selezione
+                            def highlight_selection(row):
+                                if row['Periodo'] == 'Selezione':
+                                    return ['background-color: #e8f5e8'] * len(row)
+                                elif row['Periodo'] == '1h Dopo':
+                                    return ['background-color: #fff3cd'] * len(row)
                                 else:
-                                    st.info("💪 **Stato fisiologico nella norma**")
-                        except:
-                            pass
-                        
-                        # 2. VALUTAZIONE GENERALE DETTAGLIATA DELL'INTERA REGISTRAZIONE
-                        st.subheader("📊 Valutazione Completa Registrazione")
-                        
-                        # Calcola medie generali di tutta la registrazione
-                        avg_sdnn_totale = np.mean(sdnn_values)
-                        avg_rmssd_totale = np.mean(rmssd_values)
-                        avg_hr_totale = np.mean(hr_values)
-                        
-                        # ANALISI DELLE ATTIVITÀ REGISTRATE
-                        attivita_problematiche = []
-                        attivita_positive = []
-                        
-                        # Analizza tutte le attività nel periodo della registrazione
-                        for attivita in st.session_state.activities:
-                            attivita_time = attivita['start_time']
-                            if timeline['start_time'] <= attivita_time <= timeline['end_time']:
+                                    return ['background-color: #f8f9fa'] * len(row)
+                            
+                            styled_df = comp_df.style.apply(highlight_selection, axis=1)
+                            
+                            st.dataframe(
+                                styled_df,
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                            
+                            # 1. VALUTAZIONE SINTETICA DEL PERIODO SELEZIONATO
+                            st.subheader("🎯 Valutazione Periodo Selezionato")
+                            
+                            selezione_data = comparison_data[1]  # Secondo elemento è "Selezione"
+                            
+                            try:
+                                sdnn_selezione = float(selezione_data['SDNN (ms)']) if selezione_data['SDNN (ms)'] != 'N/D' else None
+                                rmssd_selezione = float(selezione_data['RMSSD (ms)']) if selezione_data['RMSSD (ms)'] != 'N/D' else None
+                                hr_selezione = float(selezione_data['HR (bpm)']) if selezione_data['HR (bpm)'] != 'N/D' else None
                                 
-                                # ANALISI ALIMENTAZIONE
-                                if attivita['type'] == "Alimentazione":
-                                    cibi = attivita.get('food_items', '').lower()
-                                    punteggio_infiammatorio = 0
-                                    cibi_problematici = []
-                                    
-                                    for cibo in cibi.split(','):
-                                        cibo = cibo.strip()
-                                        if cibo in NUTRITION_DB:
-                                            dati_cibo = NUTRITION_DB[cibo]
-                                            punteggio_infiammatorio += dati_cibo.get('inflammatory_score', 0)
-                                            if dati_cibo.get('inflammatory_score', 0) > 2:
-                                                cibi_problematici.append(cibo)
-                                    
-                                    if punteggio_infiammatorio > 3:
-                                        attivita_problematiche.append(f"🍽️ **Pasto infiammatorio**: {attivita['name']} (cibi: {', '.join(cibi_problematici)})")
-                                    elif punteggio_infiammatorio < -2:
-                                        attivita_positive.append(f"🥗 **Pasto salutare**: {attivita['name']}")
-                                
-                                # ANALISI ALLENAMENTI
-                                elif attivita['type'] == "Allenamento":
-                                    nome_attivita = attivita['name'].lower()
-                                    intensita = attivita['intensity'].lower()
-                                    
-                                    if "intens" in intensita and avg_rmssd_totale < 30:
-                                        attivita_problematiche.append(f"🏃‍♂️ **Allenamento intenso con recupero insufficiente**: {attivita['name']} (RMSSD basso: {avg_rmssd_totale:.1f} ms)")
-                                    elif "legger" in intensita and avg_rmssd_totale > 40:
-                                        attivita_positive.append(f"💪 **Allenamento ben bilanciato**: {attivita['name']}")
-                                
-                                # ANALISI SONNO
-                                elif attivita['type'] == "Sonno":
-                                    durata_sonno = attivita['duration'] / 60  # converti in ore
-                                    if durata_sonno < 6:
-                                        attivita_problematiche.append(f"😴 **Sonno insufficiente**: solo {durata_sonno:.1f} ore")
-                                    elif durata_sonno > 8:
-                                        attivita_positive.append(f"💤 **Buona durata sonno**: {durata_sonno:.1f} ore")
-                        
-                        # ANALISI DETTAGLIATA GENERALE
-                        problemi_riscontrati = []
-                        punti_di_forza = []
-                        consigli_pratici = []
-                        
-                        # Valutazione SDNN (Variabilità Totale)
-                        if avg_sdnn_totale > 60:
-                            punti_di_forza.append("**Alta variabilità cardiaca** (SDNN > 60 ms) - ottima resilienza cardiovascolare")
-                        elif avg_sdnn_totale > 40:
-                            punti_di_forza.append("**Variabilità cardiaca nella norma** (SDNN 40-60 ms) - buona salute cardiaca")
-                        elif avg_sdnn_totale > 25:
-                            problemi_riscontrati.append("**Variabilità cardiaca ridotta** (SDNN 25-40 ms) - possibile affaticamento")
-                            consigli_pratici.append("💤 **Priorità al recupero**: aumenta le ore di sonno e riduci gli allenamenti intensi")
-                            consigli_pratici.append("🌿 **Integrazione**: considera Magnesio 400mg serale per migliorare il recupero")
-                        else:
-                            problemi_riscontrati.append("**Variabilità cardiaca molto bassa** (SDNN < 25 ms) - stato di stress/fatica elevato")
-                            consigli_pratici.append("🛑 **Recupero urgente**: sospendi allenamenti intensi per 2-3 giorni")
-                            consigli_pratici.append("🧘 **Tecniche rilassamento**: pratica respirazione diaframmatica 10 minuti 2x al giorno")
-                            consigli_pratici.append("🍎 **Alimentazione**: aumenta cibi anti-infiammatori (salmone, frutti di bosco, spinaci)")
-                        
-                        # Valutazione RMSSD (Attività Parasimpatica)
-                        if avg_rmssd_totale > 50:
-                            punti_di_forza.append("**Eccellente attività parasimpatica** (RMSSD > 50 ms) - ottima capacità di recupero")
-                        elif avg_rmssd_totale > 35:
-                            punti_di_forza.append("**Buona attività parasimpatica** (RMSSD 35-50 ms) - recupero adeguato")
-                        elif avg_rmssd_totale > 25:
-                            problemi_riscontrati.append("**Attività parasimpatica ridotta** (RMSSD 25-35 ms) - recupero insufficiente")
-                            consigli_pratici.append("😴 **Qualità sonno**: crea routine serale (niente schermi 1h prima di dormire)")
-                            consigli_pratici.append("🌅 **Attività rigenerative**: yoga, meditazione o camminate nella natura")
-                            consigli_pratici.append("💧 **Idratazione**: bevi almeno 2L di acqua al giorno")
-                        else:
-                            problemi_riscontrati.append("**Attività parasimpatica molto bassa** (RMSSD < 25 ms) - sistema nervoso sovraccarico")
-                            consigli_pratici.append("🔄 **Bilanciamento attività**: inserisci 2 giorni di recupero per ogni allenamento intenso")
-                            consigli_pratici.append("🌱 **Integratori**: Ashwagandha 500mg al giorno per 3 settimane per ridurre lo stress")
-                            consigli_pratici.append("📵 **Digital detox**: riduci l'uso di dispositivi elettronici la sera")
-                        
-                        # Valutazione Frequenza Cardiaca
-                        if avg_hr_totale < 65:
-                            punti_di_forza.append("**Frequenza cardiaca ottimale** (< 65 bpm) - buon stato di forma")
-                        elif avg_hr_totale < 75:
-                            punti_di_forza.append("**Frequenza cardiaca nella norma** (65-75 bpm) - condizione normale")
-                        elif avg_hr_totale < 85:
-                            problemi_riscontrati.append("**Frequenza cardiaca elevata** (75-85 bpm) - possibile stress o disidratazione")
-                            consigli_pratici.append("☕ **Riduci eccitanti**: limita caffè, tè e energy drinks dopo le 15:00")
-                            consigli_pratici.append("🌬️ **Respirazione**: pratica respirazione 4-7-8 (4s inspiro, 7s pausa, 8s espiro)")
-                        else:
-                            problemi_riscontrati.append("**Frequenza cardiaca molto elevata** (> 85 bpm) - stress significativo o affaticamento")
-                            consigli_pratici.append("🏥 **Consulta medico**: se persistente, valuta con professionista sanitario")
-                            consigli_pratici.append("🌿 **Tisane rilassanti**: camomilla, passiflora o valeriana prima di dormire")
-                        
-                        # AGGIUNGI PROBLEMI SPECIFICI DELLE ATTIVITÀ
-                        for attivita_problematica in attivita_problematiche:
-                            problemi_riscontrati.append(attivita_problematica)
-                        
-                        for attivita_positiva in attivita_positive:
-                            punti_di_forza.append(attivita_positiva)
-                        
-                        # VALUTAZIONE FINALE GENERALE
-                        st.subheader("💡 Diagnosi Completa")
-                        
-                        if not problemi_riscontrati:
-                            st.success("## 🌟 STATO OTTIMALE DI SALUTE")
-                            st.info("**Tutti i parametri sono nella norma o superiori!** Il tuo sistema cardiovascolare mostra ottima resilienza.")
-                        elif len(problemi_riscontrati) == 1:
-                            st.warning("## ⚠️ STATO DISCRETO CON ALCUNE ATTENZIONI")
-                            st.info("**La maggior parte dei parametri è buona**, ma c'è un aspetto da migliorare.")
-                        else:
-                            st.error("## 🔴 STATO DI AFFATICAMENTO O STRESS")
-                            st.info("**Più parametri indicano uno squilibrio**. È importante intervenire con strategie di recupero.")
-                        
-                        # VISUALIZZAZIONE PUNTI DI FORZA E PROBLEMI
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            if punti_di_forza:
-                                st.success("### ✅ Punti di Forza")
-                                for punto in punti_di_forza:
-                                    st.write(f"• {punto}")
-                        
-                        with col2:
-                            if problemi_riscontrati:
-                                st.error("### ❌ Problematiche Rilevate")
-                                for problema in problemi_riscontrati:
-                                    st.write(f"• {problema}")
-                        
-                        # CONSIGLI PRATICI PERSONALIZZATI
-                        if consigli_pratici:
-                            st.success("### 🎯 Piano d'Azione Personalizzato")
-                            
-                            # Raggruppa consigli per categoria
-                            consigli_sonno = [c for c in consigli_pratici if '💤' in c or '😴' in c]
-                            consigli_alimentazione = [c for c in consigli_pratici if '🍎' in c or '💧' in c or '☕' in c]
-                            consigli_attivita = [c for c in consigli_pratici if '🧘' in c or '🌅' in c or '🔄' in c]
-                            consigli_integratori = [c for c in consigli_pratici if '🌿' in c or '💊' in c]
-                            consigli_altro = [c for c in consigli_pratici if c not in consigli_sonno + consigli_alimentazione + consigli_attivita + consigli_integratori]
-                            
-                            if consigli_sonno:
-                                with st.expander("😴 **Migliora il Sonno e il Recupero**", expanded=True):
-                                    for consiglio in consigli_sonno:
-                                        st.write(f"• {consiglio}")
-                            
-                            if consigli_alimentazione:
-                                with st.expander("🍎 **Ottimizza l'Alimentazione**", expanded=True):
-                                    for consiglio in consigli_alimentazione:
-                                        st.write(f"• {consiglio}")
-                            
-                            if consigli_attivita:
-                                with st.expander("🏃‍♂️ **Bilanciamento Attività Fisica**", expanded=True):
-                                    for consiglio in consigli_attivita:
-                                        st.write(f"• {consiglio}")
-                            
-                            if consigli_integratori:
-                                with st.expander("💊 **Integrazione Supportiva**", expanded=True):
-                                    for consiglio in consigli_integratori:
-                                        st.write(f"• {consiglio}")
-                            
-                            if consigli_altro:
-                                with st.expander("🔧 **Altri Consigli Pratici**", expanded=True):
-                                    for consiglio in consigli_altro:
-                                        st.write(f"• {consiglio}")
-                            
-                            # TIMELINE RACCOMANDAZIONI
-                            st.info("""
-                            **⏰ Timeline raccomandata:**
-                            - **Immediato** (oggi): Inizia con idratazione e tecniche respirazione
-                            - **Breve termine** (3-7 giorni): Implementa modifiche alimentari e routine sonno  
-                            - **Medio termine** (1-3 settimane): Valuta integratori e bilanciamento attività
-                            """)
-                        
-                        # RACCOMANDAZIONI BASATE SUL DATABASE ATTIVITÀ
-                        st.subheader("🏋️‍♂️ Attività Consigliate")
-                        
-                        if problemi_riscontrati:
-                            st.write("**Per il recupero:**")
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.info("**Yoga**\n- Migliora RMSSD\n- Riduce stress\n- 30-60 minuti")
-                            with col2:
-                                st.info("**Meditazione**\n- Aumenta coerenza cardiaca\n- 10-30 minuti\n- Mattina/sera")
-                            with col3:
-                                st.info("**Camminata**\n- Leggera rigenerazione\n- 30-60 minuti\n- Frequenza quotidiana")
-                        else:
-                            st.write("**Per mantenimento:**")
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.success("**Nuoto**\n- Full body\n- Basso impatto\n- 30-60 minuti")
-                            with col2:
-                                st.success("**Ciclismo**\n- Cardio moderato\n- Resistenza\n- 45-120 minuti")
-                            with col3:
-                                st.success("**Corsa leggera**\n- Cardio\n- Umore e metabolismo\n- 30-45 minuti")
-                else:
-                    st.warning("⚠️ Nessun dato trovato nel periodo selezionato")
+                                if sdnn_selezione and rmssd_selezione and hr_selezione:
+                                    if sdnn_selezione > 50 and rmssd_selezione > 30 and hr_selezione < 75:
+                                        st.success("🌟 **Stato di benessere ottimale** - buon equilibrio autonomico")
+                                    elif sdnn_selezione < 30 or rmssd_selezione < 20:
+                                        st.warning("⚠️ **Possibile stato di stress** - ridotta variabilità cardiaca")
+                                    else:
+                                        st.info("💪 **Stato fisiologico nella norma**")
+                            except:
+                                pass
+                    else:
+                        st.warning("⚠️ Nessun dato trovato nel periodo selezionato")
 
-            # SOLO SE NON C'È SELEZIONE, MOSTRA LE STATISTICHE GENERALI
-            if not selected_data_exists:
-                st.subheader("📊 Statistiche Generali della Registrazione")
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
-                with col2:
-                    st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
-                with col3:
-                    st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
-                with col4:
-                    st.metric("Finestre Totali", len(time_points))
+                # SOLO SE NON C'È SELEZIONE, MOSTRA LE STATISTICHE GENERALI
+                if not selected_data_exists:
+                    st.subheader("📈 Statistiche Generali della Registrazione")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
+                    with col2:
+                        st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
+                    with col3:
+                        st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
+                    with col4:
+                        st.metric("Finestre Totali", len(time_points))
 
-            # INFO PERIODO (sempre visibile)
-            if time_points:
-                st.info(f"**📅 Periodo totale analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")
-
-        except Exception as e:  # ← QUESTO except CHIUDE IL try PRINCIPALE
+                # INFO PERIODO (sempre visibile)
+                if time_points:
+                    st.info(f"**📅 Periodo totale analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")        except Exception as e:  # ← QUESTO except CHIUDE IL try PRINCIPALE
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
     
     else:  # ← ORA QUESTO else È CORRETTO
