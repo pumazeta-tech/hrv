@@ -2811,8 +2811,157 @@ def main():
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
 
-        except Exception as e:  # ← AGGIUNGI QUESTO except PER CHIUDERE IL try PRINCIPALE
+            # GRAFICO IBI DETTAGLIATO CON ORARIO REALE - OTTIMIZZATO
+            st.subheader("📈 Grafico Dettagliato IBI (Tutti i Battiti)")
+            
+            if len(rr_intervals) > 0:
+                # FILTRO AGGRESSIVO per rimuovere picchi anomali
+                clean_rr = filter_rr_outliers(rr_intervals)
+                
+                st.info(f"📊 **Dati filtrati:** {len(clean_rr)} IBI su {len(rr_intervals)} totali ({len(clean_rr)/len(rr_intervals)*100:.1f}% conservati)")
+                
+                # CALCOLA RMSSD E SDNN IN TEMPO REALE (finestra mobile) CON ORARIO REALE
+                window_size = 300  # 5 minuti circa di finestra
+                time_points = []
+                rmssd_values = []
+                sdnn_values = []
+                hr_values = []
+                
+                # Campiona ogni N punti per performance (mantenendo dettaglio)
+                sampling_step = max(1, len(clean_rr) // 5000)  # Massimo 5000 punti
+                
+                # Calcola timeline reale
+                current_time = start_time
+                
+                for i in range(0, len(clean_rr) - window_size, window_size // 2):  # Finestra scorrevole
+                    if i % sampling_step == 0:  # Campionamento per performance
+                        window = clean_rr[i:i + window_size]
+                        if len(window) >= 50:  # Finestra valida
+                            # Calcola metriche per questa finestra
+                            rmssd = np.sqrt(np.mean(np.square(np.diff(window))))
+                            sdnn = np.std(window)
+                            hr = 60000 / np.mean(window)
+                            
+                            # Tempo REALE (centro della finestra)
+                            window_start_time = current_time + timedelta(milliseconds=np.sum(clean_rr[:i]))
+                            window_center_time = window_start_time + timedelta(milliseconds=np.sum(window) / 2)
+                            
+                            time_points.append(window_center_time)
+                            rmssd_values.append(rmssd)
+                            sdnn_values.append(sdnn)
+                            hr_values.append(hr)
+                
+                # Crea il grafico principale con ORARIO REALE
+                fig = go.Figure()
+                
+                # SDNN
+                fig.add_trace(go.Scatter(
+                    x=time_points, y=sdnn_values,
+                    mode='lines',
+                    name='SDNN',
+                    line=dict(color='#3498db', width=2),
+                    hovertemplate='<b>%{x|%H:%M:%S}</b><br>SDNN: %{y:.1f} ms<extra></extra>'
+                ))
+                
+                # RMSSD
+                fig.add_trace(go.Scatter(
+                    x=time_points, y=rmssd_values,
+                    mode='lines',
+                    name='RMSSD',
+                    line=dict(color='#2ecc71', width=2),
+                    hovertemplate='<b>%{x|%H:%M:%S}</b><br>RMSSD: %{y:.1f} ms<extra></extra>'
+                ))
+                
+                # Battito Cardiaco (asse destro)
+                fig.add_trace(go.Scatter(
+                    x=time_points, y=hr_values,
+                    mode='lines',
+                    name='Battito Cardiaco',
+                    line=dict(color='#e74c3c', width=2),
+                    hovertemplate='<b>%{x|%H:%M:%S}</b><br>Battito: %{y:.1f} bpm<extra></extra>',
+                    yaxis='y2'
+                ))
+                
+                # Aggiungi attività come aree colorate (ORA CON ORARI REALI)
+                for activity in st.session_state.activities:
+                    try:
+                        activity_start = activity['start_time']
+                        activity_end = activity_start + timedelta(minutes=activity['duration'])
+                        
+                        # Area dell'attività con orari reali
+                        fig.add_vrect(
+                            x0=activity_start,
+                            x1=activity_end,
+                            fillcolor=activity['color'],
+                            opacity=0.2,
+                            line_width=0,
+                            annotation_text=activity['name'],
+                            annotation_position="top left",
+                            annotation_font_size=10
+                        )
+                        
+                    except Exception as e:
+                        continue
+                
+                # Layout del grafico con FORMATTAZIONE DATA/ORA
+                fig.update_layout(
+                    title="Analisi HRV in Tempo Reale con Attività",
+                    xaxis_title="Orario",
+                    yaxis_title="HRV (ms)",
+                    yaxis2=dict(
+                        title="Battito Cardiaco (bpm)",
+                        overlaying='y',
+                        side='right'
+                    ),
+                    hovermode='x unified',
+                    height=500,
+                    showlegend=True,
+                    xaxis=dict(
+                        type='date',
+                        tickformat='%H:%M\n%d/%m',
+                        tickangle=0
+                    )
+                )
+                
+                # Rangeslider OTTIMIZZATO con formattazione data/ora
+                if len(time_points) < 1000:
+                    fig.update_layout(
+                        xaxis=dict(
+                            rangeslider=dict(
+                                visible=True, 
+                                thickness=0.05,
+                                bgcolor='lightgray'
+                            )
+                        )
+                    )
+                else:
+                    st.warning("🔍 **Zoom disponibile:** Usa lo strumento zoom del grafico per dettagli")
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # STATISTICHE DETTAGLIATE
+                st.subheader("📊 Statistiche Dettagliate")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
+                with col2:
+                    st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
+                with col3:
+                    st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
+                with col4:
+                    st.metric("Finestre Analizzate", len(time_points))
+                
+                # INFO PERIODO
+                if time_points:
+                    st.info(f"**📅 Periodo analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")
+
+        except Exception as e:  # ← QUESTA È LA CHIUSURA DEL try PRINCIPALE
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
+    
+    else:  # ← ORA QUESTO else È CORRETTO
+        display_analysis_history()
     
     else:  # ← ORA QUESTO else APPARTIENE CORRETTAMENTE ALL'if uploaded_file is not None:
         display_analysis_history()
