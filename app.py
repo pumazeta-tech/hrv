@@ -2706,8 +2706,86 @@ def main():
             st.subheader("📈 Andamento Dettagliato HRV con Attività")
             
             if len(rr_intervals) > 0:
-                # [RIMOSSO PER BREVITÀ - IL CODICE DEL GRAFICO È IDENTICO A PRIMA]
-                st.info("Grafico interattivo HRV disponibile - codice identico alla versione precedente")
+                # Crea il grafico interattivo con Plotly
+                fig = go.Figure()
+                
+                # Aggiungi le metriche HRV
+                dates = list(daily_metrics.keys())
+                sdnn_values = [daily_metrics[date].get('sdnn', 0) for date in dates]
+                rmssd_values = [daily_metrics[date].get('rmssd', 0) for date in dates]
+                hr_values = [daily_metrics[date].get('hr_mean', 0) for date in dates]
+                
+                # Converti le date in formato datetime per il grafico
+                date_objects = [datetime.fromisoformat(date) for date in dates]
+                
+                fig.add_trace(go.Scatter(
+                    x=date_objects, y=sdnn_values,
+                    mode='lines+markers',
+                    name='SDNN',
+                    line=dict(color='#3498db', width=3),
+                    marker=dict(size=8)
+                ))
+                
+                fig.add_trace(go.Scatter(
+                    x=date_objects, y=rmssd_values,
+                    mode='lines+markers',
+                    name='RMSSD',
+                    line=dict(color='#2ecc71', width=3),
+                    marker=dict(size=8)
+                ))
+                
+                fig.add_trace(go.Scatter(
+                    x=date_objects, y=hr_values,
+                    mode='lines+markers',
+                    name='Battito Cardiaco',
+                    line=dict(color='#e74c3c', width=3),
+                    marker=dict(size=8),
+                    yaxis='y2'
+                ))
+                
+                # Aggiungi le attività come linee verticali
+                for activity in st.session_state.activities:
+                    activity_time = activity['start_time']
+                    activity_color = activity['color']
+                    
+                    fig.add_vline(
+                        x=activity_time,
+                        line_dash="dash",
+                        line_color=activity_color,
+                        opacity=0.7
+                    )
+                    
+                    # Aggiungi etichetta attività
+                    fig.add_annotation(
+                        x=activity_time,
+                        y=max(sdnn_values + rmssd_values) * 0.9,
+                        text=activity['name'],
+                        showarrow=False,
+                        textangle=-90,
+                        font=dict(size=10, color=activity_color),
+                        bgcolor="white",
+                        bordercolor=activity_color,
+                        borderwidth=1,
+                        borderpad=4
+                    )
+                
+                # Layout del grafico
+                fig.update_layout(
+                    title="Andamento HRV e Attività nel Tempo",
+                    xaxis_title="Data",
+                    yaxis_title="HRV (ms)",
+                    yaxis2=dict(
+                        title="Battito Cardiaco (bpm)",
+                        overlaying='y',
+                        side='right',
+                        range=[min(hr_values)-5, max(hr_values)+5]
+                    ),
+                    hovermode='x unified',
+                    height=500,
+                    showlegend=True
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
             
             # ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
