@@ -702,6 +702,10 @@ def extract_sleep_ibis_corrected(sleep_activity, timeline):
     
     print(f"🔍 Cercando IBI sonno: {sleep_start} -> {sleep_end}")
     print(f"   Timeline giorni: {list(timeline['days_data'].keys())}")
+
+    # DEBUG STREAMLIT
+    st.write(f"🔍 **DEBUG Sonno:** Cercando IBI dalle {sleep_start} alle {sleep_end}")
+    st.write(f"   Timeline giorni disponibili: {list(timeline['days_data'].keys())}")
     
     sleep_ibis = []
     current_time = timeline['start_time']
@@ -709,6 +713,7 @@ def extract_sleep_ibis_corrected(sleep_activity, timeline):
     # Scansiona tutti gli IBI nella timeline
     for day_date, day_ibis in timeline['days_data'].items():
         print(f"   Scannerizzo giorno {day_date} ({len(day_ibis)} IBI)")
+        st.write(f"   📅 Scannerizzo giorno {day_date} ({len(day_ibis)} IBI)")
         day_found = 0
         
         for rr in day_ibis:
@@ -723,14 +728,18 @@ def extract_sleep_ibis_corrected(sleep_activity, timeline):
                 break
         
         print(f"     Trovati {day_found} IBI in questo giorno")
+        st.write(f"     ✅ Trovati {day_found} IBI in questo giorno")
         
         # Ottimizzazione: esci se abbiamo superato la fine del sonno
         if current_time > sleep_end:
             break
     
     print(f"   TOTALE IBI trovati: {len(sleep_ibis)}")
+    st.write(f"   🎯 **TOTALE IBI sonno trovati: {len(sleep_ibis)}**")
     
     return sleep_ibis
+
+
 
 def calculate_dynamic_sleep_metrics(sleep_activity):
     """Calcola metriche sonno dinamiche quando non ci sono IBI sufficienti"""
@@ -2340,16 +2349,57 @@ def main():
                 st.sidebar.warning(f"Calcolo metriche fallito: {e}")
                 avg_metrics = get_default_metrics(user_profile['age'], user_profile['gender'])
 
-            # AGGIUNGI METRICHE SONNO REALI
-            sleep_metrics = get_sleep_metrics_from_activities(
-                st.session_state.activities, daily_metrics, timeline
-            )
-
-            if sleep_metrics:
-                avg_metrics.update(sleep_metrics)
-                st.success(f"😴 SONNO ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore (fonte: {sleep_metrics.get('data_source', 'unknown')})")
+            # AGGIUNGI METRICHE SONNO REALI - VERSIONE MIGLIORATA CON DEBUG
+            st.subheader("🔍 DEBUG Analisi Sonno")
+            
+            # Debug: mostra tutte le attività
+            st.write(f"📋 Totale attività registrate: {len(st.session_state.activities)}")
+            sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
+            st.write(f"😴 Attività 'Sonno' trovate: {len(sleep_activities)}")
+            
+            if sleep_activities:
+                for i, sleep_act in enumerate(sleep_activities):
+                    st.write(f"**Sonno {i+1}:** {sleep_act['name']}")
+                    st.write(f"   Inizio: {sleep_act['start_time']}")
+                    st.write(f"   Durata: {sleep_act['duration']} minuti")
+                    
+                # Analizza l'ULTIMA attività sonno
+                latest_sleep = sleep_activities[-1]
+                st.write(f"🎯 Analizzando l'ultimo sonno: {latest_sleep['name']}")
+                
+                sleep_metrics = get_sleep_metrics_from_activities(
+                    st.session_state.activities, daily_metrics, timeline
+                )
+                
+                if sleep_metrics:
+                    st.success("✅ METRICHE SONNO TROVATE!")
+                    st.write(f"📊 Dettaglio metriche: {sleep_metrics}")
+                    avg_metrics.update(sleep_metrics)
+                    
+                    # Mostra metriche sonno in modo prominente
+                    st.success(f"😴 SONNO ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
+                    st.success(f"📈 Efficienza: {sleep_metrics.get('sleep_efficiency', 0):.1f}%")
+                    st.success(f"💤 Battito a riposo: {sleep_metrics.get('sleep_hr', 0):.1f} bpm")
+                    
+                else:
+                    st.error("❌ Nessuna metrica sonno restituita nonostante attività trovata")
+                    st.info("💡 Il problema potrebbe essere nella timeline o negli IBI")
+                    
             else:
-                st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno'")
+                st.warning("⚠️ Nessuna attività 'Sonno' trovata nel tracker")
+                st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel pannello laterale")
+                sleep_metrics = {}
+
+            # SOLUZIONE ALTERNATIVA: analisi sonno forzata
+            if not sleep_metrics and sleep_activities:
+                st.warning("🔄 Tentativo analisi sonno alternativa...")
+                
+                latest_sleep = sleep_activities[-1]
+                sleep_metrics_alt = calculate_real_sleep_metrics(latest_sleep, timeline)
+                
+                if sleep_metrics_alt:
+                    avg_metrics.update(sleep_metrics_alt)
+                    st.success(f"😴 SONNO ANALIZZATO (metodo alternativo): {sleep_metrics_alt.get('sleep_duration', 0):.1f} ore")
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
