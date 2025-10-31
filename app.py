@@ -2519,10 +2519,10 @@ if uploaded_file is not None:
             st.sidebar.warning(f"Calcolo metriche fallito: {e}")
             avg_metrics = get_default_metrics(user_profile['age'], user_profile['gender'])
 
-            # AGGIUNGI METRICHE SONNO REALI
-            sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
-            
-            if sleep_activities:
+        # AGGIUNGI METRICHE SONNO REALI
+        sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
+        
+        if sleep_activities:
                 # Analizza l'ULTIMA attività sonno per le metriche complessive
                 latest_sleep = sleep_activities[-1]
                 sleep_metrics = get_sleep_metrics_from_activities(
@@ -2532,9 +2532,9 @@ if uploaded_file is not None:
                 if sleep_metrics:
                     avg_metrics.update(sleep_metrics)
                     st.success(f"😴 SONNO ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
-            else:
-                st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel pannello laterale")
-                sleep_metrics = {}
+        else:
+            st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel pannello laterale")
+            sleep_metrics = {}
 
             # SOLUZIONE ALTERNATIVA: analisi sonno forzata
             if not sleep_metrics and sleep_activities:
