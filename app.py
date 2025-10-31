@@ -2939,17 +2939,8 @@ def main():
                 # ANALISI INTERATTIVA PER SELEZIONE
                 st.subheader("🔍 Analisi Segmentale Interattiva")
                 
-                st.info("""
-                **🎯 Istruzioni:**
-                1. **Seleziona un'area** nel grafico sopra usando lo strumento zoom
-                2. **Clicca fuori** dalla selezione per confermare
-                3. **Le metriche qui sotto** si aggiorneranno automaticamente
-                4. **Confronta** diversi periodi della giornata
-                """)
-
-                # Inizializza lo stato della sessione per la selezione
-                if 'last_selection' not in st.session_state:
-                    st.session_state.last_selection = None
+                # ELIMINA le statistiche fisse qui e spostale dopo l'analisi segmentale
+                selected_data_exists = False
                 
                 # Usa il layout del grafico per ottenere la selezione
                 try:
@@ -2970,19 +2961,22 @@ def main():
                                 selected_indices.append(i)
                         
                         if selected_indices:
+                            selected_data_exists = True
                             selected_sdnn = [sdnn_values[i] for i in selected_indices]
                             selected_rmssd = [rmssd_values[i] for i in selected_indices]
                             selected_hr = [hr_values[i] for i in selected_indices]
                             
-                            # Calcola le metriche per la selezione
+                            # STATISTICHE AGGIORNATE PER LA SELEZIONE
+                            st.subheader("📊 Statistiche Area Selezionata")
+                            
                             col1, col2, col3, col4 = st.columns(4)
                             
                             with col1:
-                                st.metric("SDNN Selezionato", f"{np.mean(selected_sdnn):.1f} ms")
+                                st.metric("SDNN", f"{np.mean(selected_sdnn):.1f} ms")
                             with col2:
-                                st.metric("RMSSD Selezionato", f"{np.mean(selected_rmssd):.1f} ms")
+                                st.metric("RMSSD", f"{np.mean(selected_rmssd):.1f} ms")
                             with col3:
-                                st.metric("HR Selezionato", f"{np.mean(selected_hr):.1f} bpm")
+                                st.metric("Battito", f"{np.mean(selected_hr):.1f} bpm")
                             with col4:
                                 st.metric("Finestre", len(selected_sdnn))
                             
@@ -3059,43 +3053,25 @@ def main():
                         else:
                             st.warning("Nessun dato trovato nel periodo selezionato")
                     
-                    else:
-                        st.warning("🔍 **Seleziona un'area nel grafico** usando lo strumento zoom per attivare l'analisi segmentale")
-                        
                 except Exception as e:
-                    st.warning("🔍 **Seleziona un'area nel grafico** per analizzare periodi specifici")
+                    pass  # Silenzioso - non mostrare warning
 
-                # STATISTICHE DETTAGLIATE
-                st.subheader("📊 Dettaglio Analisi")
+                # SOLO SE NON C'È SELEZIONE, MOSTRA LE STATISTICHE GENERALI
+                if not selected_data_exists:
+                    st.subheader("📊 Statistiche Generali")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
+                    with col2:
+                        st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
+                    with col3:
+                        st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
+                    with col4:
+                        st.metric("Finestre", len(time_points))
                 
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.metric("IBI Totali", len(rr_intervals))
-                with col2:
-                    st.metric("IBI Dopo Filtro", len(clean_rr))
-                with col3:
-                    st.metric("Finestre Analizzate", len(time_points))
-                
-                # INFO PERIODO
-                if time_points:
-                    st.info(f"**📅 Periodo analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")
-                
-                # STATISTICHE DETTAGLIATE
-                st.subheader("📊 Statistiche Dettagliate")
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
-                with col2:
-                    st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
-                with col3:
-                    st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
-                with col4:
-                    st.metric("Finestre Analizzate", len(time_points))
-                
-                # INFO PERIODO
+                # INFO PERIODO (sempre visibile)
                 if time_points:
                     st.info(f"**📅 Periodo analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")
 
