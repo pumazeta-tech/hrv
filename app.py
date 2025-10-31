@@ -2215,6 +2215,18 @@ def main():
         border-radius: 4px;
         margin: 2px 0;
     }
+    .sleep-phase-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.7rem;
+        margin-bottom: 0.2rem;
+    }
+    .sleep-phase-labels-bottom {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.7rem;
+        margin-top: 0.2rem;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -2646,14 +2658,16 @@ def main():
                         <div class="compact-metric-card">
                             <div class="metric-label">Distribuzione Fasi Sonno</div>
                             <div style="margin-top: 0.5rem;">
-                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem;">
+                                <div class="sleep-phase-labels">
                                     <span>Leggero: {light_pct:.0f}%</span>
                                     <span>Profondo: {deep_pct:.0f}%</span>
+                                    <span>REM: {rem_pct:.0f}%</span>
                                 </div>
                                 <div class="sleep-phase-bar" style="background: linear-gradient(90deg, #3498db {light_pct}%, #2ecc71 {light_pct}% {light_pct + deep_pct}%, #e74c3c {light_pct + deep_pct}%);"></div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 0.2rem;">
-                                    <span>REM: {rem_pct:.0f}%</span>
+                                <div class="sleep-phase-labels-bottom">
+                                    <span></span>
                                     <span>Risvegli: {awake_pct:.0f}%</span>
+                                    <span></span>
                                 </div>
                             </div>
                         </div>
