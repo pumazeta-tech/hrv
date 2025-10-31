@@ -503,7 +503,6 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     Task Force, 1996 - Standard measurement
     Umetani et al., 1998 - Age/gender corrections
     """
-    """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
     
@@ -583,7 +582,6 @@ def filter_rr_outliers(rr_intervals):
     RIFERIMENTI:  
     Statistical outlier detection standards
     """
-    """Filtra gli artefatti in modo conservativo"""
     if len(rr_intervals) < 5:
         return rr_intervals
     
@@ -677,7 +675,6 @@ def calculate_real_sleep_metrics(sleep_activity, timeline):
     RIFERIMENTI:
     Boudreau et al., 2012 - Sleep stage HRV patterns
     """
-    """Calcola metriche sonno REALI dagli IBI - VERSIONE MIGLIORATA"""
     
     # Estrai IBI del sonno con timeline corretta
     sleep_ibis = extract_sleep_ibis_corrected(sleep_activity, timeline)
