@@ -2461,49 +2461,49 @@ with st.expander("🔬 Metodologia di Analisi", expanded=False):
     """)
 
     
-    st.header("📤 Carica File IBI")
-    uploaded_file = st.file_uploader("Carica il tuo file .txt, .csv o .sdf con gli intervalli IBI", type=['txt', 'csv', 'sdf'], key="file_uploader")
-    
-    if uploaded_file is not None:
-        try:
-            content = uploaded_file.getvalue().decode('utf-8')
-            lines = content.strip().split('\n')
-            
-            rr_intervals = []
-            for line in lines:
-                if line.strip():
-                    try:
-                        rr_intervals.append(float(line.strip()))
-                    except ValueError:
-                        continue
-            
-            if len(rr_intervals) == 0:
-                st.error("❌ Nessun dato IBI valido trovato nel file")
-                return
-            
-            st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
-            
-            st.header("📊 Analisi HRV Completa")
-            
-            start_time = parse_starttime_from_file(content)
-            timeline = calculate_recording_timeline(rr_intervals, start_time)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("📅 Inizio Registrazione", 
-                         timeline['start_time'].strftime('%d/%m/%Y %H:%M:%S'))
-            with col2:
-                st.metric("📅 Fine Registrazione", 
-                         timeline['end_time'].strftime('%d/%m/%Y %H:%M:%S'))
-            
-            st.metric("⏱️ Durata Totale", f"{timeline['total_duration_hours']:.1f} ore")
-            
-            user_profile = st.session_state.user_profile
-            daily_metrics = calculate_daily_metrics(
-                timeline['days_data'], 
-                user_profile['age'], 
-                user_profile['gender']
-            )
+st.header("📤 Carica File IBI")
+uploaded_file = st.file_uploader("Carica il tuo file .txt, .csv o .sdf con gli intervalli IBI", type=['txt', 'csv', 'sdf'], key="file_uploader")
+
+if uploaded_file is not None:
+    try:
+        content = uploaded_file.getvalue().decode('utf-8')
+        lines = content.strip().split('\n')
+        
+        rr_intervals = []
+        for line in lines:
+            if line.strip():
+                try:
+                    rr_intervals.append(float(line.strip()))
+                except ValueError:
+                    continue
+        
+        if len(rr_intervals) == 0:
+            st.error("❌ Nessun dato IBI valido trovato nel file")
+            return  # ← QUESTO return È CORRETTO (dentro if e dentro try)
+        
+        st.success(f"✅ File caricato con successo! {len(rr_intervals)} intervalli RR trovati")
+        
+        st.header("📊 Analisi HRV Completa")
+        
+        start_time = parse_starttime_from_file(content)
+        timeline = calculate_recording_timeline(rr_intervals, start_time)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("📅 Inizio Registrazione", 
+                     timeline['start_time'].strftime('%d/%m/%Y %H:%M:%S'))
+        with col2:
+            st.metric("📅 Fine Registrazione", 
+                     timeline['end_time'].strftime('%d/%m/%Y %H:%M:%S'))
+        
+        st.metric("⏱️ Durata Totale", f"{timeline['total_duration_hours']:.1f} ore")
+        
+        user_profile = st.session_state.user_profile
+        daily_metrics = calculate_daily_metrics(
+            timeline['days_data'], 
+            user_profile['age'], 
+            user_profile['gender']
+        )
             
             avg_metrics = {}
             
