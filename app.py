@@ -2236,39 +2236,43 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
     """Analizza tutte le attività registrate e restituisce quelle problematiche"""
     attivita_problematiche = []
     
-    st.sidebar.info(f"🔍 DEBUG: Analizzo {len(activities)} attività")
+    print(f"🔍 DEBUG: Analizzo {len(activities)} attività")
     
     for i, attivita in enumerate(activities):
         attivita_time = attivita['start_time']
-        st.sidebar.write(f"Attività {i}: {attivita['type']} - {attivita['name']} - {attivita_time}")
+        print(f"Attività {i}: {attivita['type']} - {attivita['name']} - {attivita_time}")
+        print(f"Timeline: {timeline['start_time']} -> {timeline['end_time']}")
         
         # Controlla se l'attività è nel periodo della registrazione
         if timeline['start_time'] <= attivita_time <= timeline['end_time']:
-            st.sidebar.success(f"✅ Attività {i} nel periodo registrazione")
+            print(f"✅ Attività {i} nel periodo registrazione")
             
             # ANALISI ALIMENTAZIONE
             if attivita['type'] == "Alimentazione":
                 cibi = attivita.get('food_items', '').lower()
-                st.sidebar.info(f"🍽️ Cibo: {cibi}")
+                print(f"🍽️ Cibo: {cibi}")
                 punteggio_infiammatorio = 0
                 cibi_problematici = []
                 
                 for cibo in cibi.split(','):
                     cibo = cibo.strip()
-                    st.sidebar.write(f"  - Analizzo: '{cibo}'")
+                    print(f"  - Analizzo: '{cibo}'")
                     if cibo in NUTRITION_DB:
                         dati_cibo = NUTRITION_DB[cibo]
-                        punteggio_infiammatorio += dati_cibo.get('inflammatory_score', 0)
-                        st.sidebar.write(f"  - Punteggio: {dati_cibo.get('inflammatory_score', 0)}")
-                        if dati_cibo.get('inflammatory_score', 0) > 2:
+                        score = dati_cibo.get('inflammatory_score', 0)
+                        punteggio_infiammatorio += score
+                        print(f"  - Trovato in DB - Punteggio: {score}")
+                        if score > 2:
                             cibi_problematici.append(cibo)
+                    else:
+                        print(f"  - NON trovato in DB")
                 
-                st.sidebar.info(f"📊 Punteggio totale: {punteggio_infiammatorio}")
+                print(f"📊 Punteggio totale: {punteggio_infiammatorio}")
                 if punteggio_infiammatorio > 3:
                     orario = attivita_time.strftime('%H:%M')
                     problema = f"🍽️ **Pasto infiammatorio alle {orario}**: {attivita['name']} (cibi: {', '.join(cibi_problematici)})"
                     attivita_problematiche.append(problema)
-                    st.sidebar.error(f"❌ Trovato: {problema}")
+                    print(f"❌ Trovato problema: {problema}")
                 
                 elif punteggio_infiammatorio < -2:
                     orario = attivita_time.strftime('%H:%M')
@@ -2278,39 +2282,45 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
             elif attivita['type'] == "Allenamento":
                 nome_attivita = attivita['name'].lower()
                 intensita = attivita['intensity'].lower()
-                st.sidebar.info(f"🏃‍♂️ Allenamento: {nome_attivita} - Intensità: {intensita}")
+                print(f"🏃‍♂️ Allenamento: {nome_attivita} - Intensità: {intensita}")
+                print(f"📊 RMSSD attuale: {avg_rmssd}")
                 
-                if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante']):
-                    st.sidebar.write(f"  - Allenamento intenso rilevato")
+                # Controlla tutte le possibili intensità
+                intensita_trovate = []
+                for pattern in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']:
+                    if pattern in intensita:
+                        intensita_trovate.append(pattern)
+                
+                if intensita_trovate:
+                    print(f"  - Allenamento intenso rilevato: {intensita_trovate}")
                     if avg_rmssd < 30:
                         orario = attivita_time.strftime('%H:%M')
                         problema = f"🏃‍♂️ **Allenamento intenso alle {orario}**: {attivita['name']} - RMSSD troppo basso ({avg_rmssd:.1f} ms) per questa intensità"
                         attivita_problematiche.append(problema)
-                        st.sidebar.error(f"❌ Trovato: {problema}")
+                        print(f"❌ Trovato: {problema}")
                     else:
-                        st.sidebar.success(f"  - RMSSD ok per intensità")
-                
-                elif any(p in intensita for p in ['leggera', 'leggero', 'facile']):
-                    if avg_rmssd > 40:
-                        orario = attivita_time.strftime('%H:%M')
-                        attivita_problematiche.append(f"🎯 **Allenamento ben bilanciato alle {orario}**: {attivita['name']} - Intensità appropriata")
+                        print(f"  - RMSSD ok per intensità")
+                else:
+                    print(f"  - Intensità non riconosciuta come 'intensa'")
             
             # ANALISI SONNO
             elif attivita['type'] == "Sonno":
                 durata_sonno = attivita['duration'] / 60  # converti in ore
-                st.sidebar.info(f"😴 Sonno: {durata_sonno:.1f} ore")
+                print(f"😴 Sonno: {durata_sonno:.1f} ore")
                 if durata_sonno < 6:
                     data_sonno = attivita_time.strftime('%d/%m')
                     problema = f"😴 **Sonno insufficiente il {data_sonno}**: solo {durata_sonno:.1f} ore (minimo raccomandato: 7 ore)"
                     attivita_problematiche.append(problema)
-                    st.sidebar.error(f"❌ Trovato: {problema}")
+                    print(f"❌ Trovato: {problema}")
                 elif durata_sonno > 9:
                     data_sonno = attivita_time.strftime('%d/%m')
                     attivita_problematiche.append(f"💤 **Sonno lungo il {data_sonno}**: {durata_sonno:.1f} ore - ottimo recupero!")
         else:
-            st.sidebar.warning(f"❌ Attività {i} FUORI periodo registrazione")
+            print(f"❌ Attività {i} FUORI periodo registrazione")
+            print(f"   Attività: {attivita_time}")
+            print(f"   Timeline: {timeline['start_time']} -> {timeline['end_time']}")
     
-    st.sidebar.info(f"📋 Totale problemi trovati: {len(attivita_problematiche)}")
+    print(f"📋 Totale problemi trovati: {len(attivita_problematiche)}")
     return attivita_problematiche
 
 # =============================================================================
