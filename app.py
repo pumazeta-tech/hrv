@@ -2729,96 +2729,116 @@ def main():
                 else:
                     hr_smooth = heart_rate
                 
-                # GRAFICO PRINCIPALE SEMPLIFICATO
-                fig_main = go.Figure()
+            # GRAFICO HRV COMPLETO (SDNN, RMSSD, HR) - OTTIMIZZATO
+            st.subheader("📈 Andamento HRV (SDNN, RMSSD, Battito)")
+            
+            if len(rr_intervals) > 0 and daily_metrics:
+                # Usa le daily_metrics che abbiamo già calcolato (già ottimizzate)
+                dates = list(daily_metrics.keys())
+                date_objects = [datetime.fromisoformat(date) for date in dates]
                 
-                # Solo linea smoothed (NON i punti originali)
-                fig_main.add_trace(go.Scatter(
-                    x=time_points,
-                    y=hr_smooth,
-                    mode='lines',
-                    name='Battito Cardiaco',
-                    line=dict(color='#e74c3c', width=1.5),
-                    hovertemplate='<b>%{x:.1f} min</b><br>Battito: %{y:.1f} bpm<extra></extra>'
+                sdnn_values = [daily_metrics[date].get('sdnn', 0) for date in dates]
+                rmssd_values = [daily_metrics[date].get('rmssd', 0) for date in dates]
+                hr_values = [daily_metrics[date].get('hr_mean', 0) for date in dates]
+                
+                fig = go.Figure()
+                
+                # SDNN
+                fig.add_trace(go.Scatter(
+                    x=date_objects, y=sdnn_values,
+                    mode='lines+markers',
+                    name='SDNN',
+                    line=dict(color='#3498db', width=3),
+                    marker=dict(size=8, symbol='circle'),
+                    hovertemplate='<b>%{x|%d/%m/%Y}</b><br>SDNN: %{y:.1f} ms<extra></extra>'
                 ))
                 
-                # Aggiungi SOLO le attività principali (non tutte)
-                main_activities = [a for a in st.session_state.activities if a['duration'] > 30]  # Solo attività >30min
+                # RMSSD
+                fig.add_trace(go.Scatter(
+                    x=date_objects, y=rmssd_values,
+                    mode='lines+markers',
+                    name='RMSSD',
+                    line=dict(color='#2ecc71', width=3),
+                    marker=dict(size=8, symbol='square'),
+                    hovertemplate='<b>%{x|%d/%m/%Y}</b><br>RMSSD: %{y:.1f} ms<extra></extra>'
+                ))
                 
-                for activity in main_activities[-5:]:  # Solo ultime 5 attività
-                    try:
-                        activity_start = activity['start_time']
-                        activity_end = activity_start + timedelta(minutes=activity['duration'])
-                        
-                        # Calcola i minuti dall'inizio
-                        start_minutes = (activity_start - start_time).total_seconds() / 60
-                        end_minutes = (activity_end - start_time).total_seconds() / 60
-                        
-                        # Solo linea verticale (NO area, NO annotazione complessa)
-                        if 0 <= start_minutes <= time_points[-1]:
-                            fig_main.add_vline(
-                                x=start_minutes,
-                                line_dash="dash",
-                                line_color=activity['color'],
-                                line_width=2,
-                                opacity=0.7
-                            )
-                    except:
-                        continue
+                # Battito Cardiaco (asse destro)
+                fig.add_trace(go.Scatter(
+                    x=date_objects, y=hr_values,
+                    mode='lines+markers',
+                    name='Battito Cardiaco',
+                    line=dict(color='#e74c3c', width=3),
+                    marker=dict(size=8, symbol='diamond'),
+                    hovertemplate='<b>%{x|%d/%m/%Y}</b><br>Battito: %{y:.1f} bpm<extra></extra>',
+                    yaxis='y2'
+                ))
                 
-                # Layout SEMPLIFICATO
-                fig_main.update_layout(
-                    title="Battito Cardiaco - Vista Ottimizzata",
-                    xaxis_title="Tempo (minuti)",
-                    yaxis_title="Battito Cardiaco (bpm)",
-                    hovermode='x unified',
-                    height=400,
-                    showlegend=True
-                )
-                
-                # DISABILITA rangeslider (consuma troppe risorse)
-                fig_main.update_layout(xaxis=dict(rangeslider=dict(visible=False)))
-                
-                st.plotly_chart(fig_main, use_container_width=True)
-                
-                # ZOOM 5 MINUTI (solo su sottoinsieme)
-                with st.expander("🔍 Dettaglio 5 Minuti Casuali", expanded=False):
-                    if len(clean_rr) > 300:
-                        # Prendi un sottoinsieme piccolo per lo zoom
-                        zoom_size = min(500, len(clean_rr) // 10)
-                        zoom_start = np.random.randint(0, len(clean_rr) - zoom_size)
-                        zoom_end = zoom_start + min(300, zoom_size)
-                        
-                        zoom_rr = clean_rr[zoom_start:zoom_end]
-                        zoom_time = np.cumsum(zoom_rr) / 1000 / 60
-                        zoom_hr = [60000 / rr for rr in zoom_rr]
-                        
-                        fig_zoom = go.Figure()
-                        fig_zoom.add_trace(go.Scatter(
-                            x=zoom_time,
-                            y=zoom_hr,
-                            mode='lines+markers',
-                            name='Battito',
-                            line=dict(color='#3498db', width=2),
-                            marker=dict(size=4)
-                        ))
-                        
-                        fig_zoom.update_layout(
-                            title=f"Dettaglio {len(zoom_rr)} battiti",
-                            height=300,
-                            showlegend=False
+                # Aggiungi attività come linee verticali
+                for activity in st.session_state.activities:
+                    activity_time = activity['start_time']
+                    
+                    # Controlla se l'attività è nel range del grafico
+                    if date_objects and activity_time.date() >= date_objects[0].date() and activity_time.date() <= date_objects[-1].date():
+                        fig.add_vline(
+                            x=activity_time,
+                            line_dash="dash",
+                            line_color=activity['color'],
+                            line_width=2,
+                            opacity=0.7
                         )
                         
-                        st.plotly_chart(fig_zoom, use_container_width=True)
+                        # Etichetta attività (solo se c'è spazio)
+                        fig.add_annotation(
+                            x=activity_time,
+                            y=max(sdnn_values + rmssd_values) * 0.9,
+                            text=activity['name'],
+                            showarrow=False,
+                            textangle=-90,
+                            font=dict(size=9, color=activity['color']),
+                            bgcolor="rgba(255,255,255,0.8)",
+                            bordercolor=activity['color'],
+                            borderwidth=1,
+                            borderpad=2
+                        )
                 
-                # STATISTICHE RAPIDE
-                col1, col2, col3 = st.columns(3)
+                # Layout del grafico
+                fig.update_layout(
+                    title="Andamento Giornaliero HRV e Attività",
+                    xaxis_title="Data",
+                    yaxis_title="HRV (ms)",
+                    yaxis2=dict(
+                        title="Battito Cardiaco (bpm)",
+                        overlaying='y',
+                        side='right',
+                        range=[max(10, min(hr_values)-10), max(hr_values)+10]
+                    ),
+                    hovermode='x unified',
+                    height=500,
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # METRICHE MEDIE
+                st.subheader("📊 Medie Periodo")
+                col1, col2, col3, col4 = st.columns(4)
+                
                 with col1:
-                    st.metric("IBI Totali", len(rr_intervals))
+                    st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
                 with col2:
-                    st.metric("IBI Dopo Filtro", len(clean_rr))
+                    st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
                 with col3:
-                    st.metric("Battito Medio", f"{np.mean(heart_rate):.1f} bpm")
+                    st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
+                with col4:
+                    st.metric("Giorni Analizzati", len(dates))
             
             # ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
