@@ -3118,6 +3118,52 @@ def main():
                         avg_rmssd_totale = np.mean(rmssd_values)
                         avg_hr_totale = np.mean(hr_values)
                         
+                        # ANALISI DELLE ATTIVITÀ REGISTRATE
+                        attivita_problematiche = []
+                        attivita_positive = []
+                        
+                        # Analizza tutte le attività nel periodo della registrazione
+                        for attivita in st.session_state.activities:
+                            attivita_time = attivita['start_time']
+                            if timeline['start_time'] <= attivita_time <= timeline['end_time']:
+                                
+                                # ANALISI ALIMENTAZIONE
+                                if attivita['type'] == "Alimentazione":
+                                    cibi = attivita.get('food_items', '').lower()
+                                    punteggio_infiammatorio = 0
+                                    cibi_problematici = []
+                                    
+                                    for cibo in cibi.split(','):
+                                        cibo = cibo.strip()
+                                        if cibo in NUTRITION_DB:
+                                            dati_cibo = NUTRITION_DB[cibo]
+                                            punteggio_infiammatorio += dati_cibo.get('inflammatory_score', 0)
+                                            if dati_cibo.get('inflammatory_score', 0) > 2:
+                                                cibi_problematici.append(cibo)
+                                    
+                                    if punteggio_infiammatorio > 3:
+                                        attivita_problematiche.append(f"🍽️ **Pasto infiammatorio**: {attivita['name']} (cibi: {', '.join(cibi_problematici)})")
+                                    elif punteggio_infiammatorio < -2:
+                                        attivita_positive.append(f"🥗 **Pasto salutare**: {attivita['name']}")
+                                
+                                # ANALISI ALLENAMENTI
+                                elif attivita['type'] == "Allenamento":
+                                    nome_attivita = attivita['name'].lower()
+                                    intensita = attivita['intensity'].lower()
+                                    
+                                    if "intens" in intensita and avg_rmssd_totale < 30:
+                                        attivita_problematiche.append(f"🏃‍♂️ **Allenamento intenso con recupero insufficiente**: {attivita['name']} (RMSSD basso: {avg_rmssd_totale:.1f} ms)")
+                                    elif "legger" in intensita and avg_rmssd_totale > 40:
+                                        attivita_positive.append(f"💪 **Allenamento ben bilanciato**: {attivita['name']}")
+                                
+                                # ANALISI SONNO
+                                elif attivita['type'] == "Sonno":
+                                    durata_sonno = attivita['duration'] / 60  # converti in ore
+                                    if durata_sonno < 6:
+                                        attivita_problematiche.append(f"😴 **Sonno insufficiente**: solo {durata_sonno:.1f} ore")
+                                    elif durata_sonno > 8:
+                                        attivita_positive.append(f"💤 **Buona durata sonno**: {durata_sonno:.1f} ore")
+                        
                         # ANALISI DETTAGLIATA GENERALE
                         problemi_riscontrati = []
                         punti_di_forza = []
@@ -3167,6 +3213,13 @@ def main():
                             problemi_riscontrati.append("**Frequenza cardiaca molto elevata** (> 85 bpm) - stress significativo o affaticamento")
                             consigli_pratici.append("🏥 **Consulta medico**: se persistente, valuta con professionista sanitario")
                             consigli_pratici.append("🌿 **Tisane rilassanti**: camomilla, passiflora o valeriana prima di dormire")
+                        
+                        # AGGIUNGI PROBLEMI SPECIFICI DELLE ATTIVITÀ
+                        for attivita_problematica in attivita_problematiche:
+                            problemi_riscontrati.append(attivita_problematica)
+                        
+                        for attivita_positiva in attivita_positive:
+                            punti_di_forza.append(attivita_positiva)
                         
                         # VALUTAZIONE FINALE GENERALE
                         st.subheader("💡 Diagnosi Completa")
