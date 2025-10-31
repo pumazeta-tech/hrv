@@ -2444,19 +2444,28 @@ def main():
                     st.write(f"📅 Cercando di associare sonno al giorno: {sleep_date}")
                     
                     if sleep_date in daily_metrics:
-                        st.success(f"✅ Giorno {sleep_date} trovato in daily_metrics - aggiungo metriche sonno")
-                        # Aggiungi le metriche sonno a questo giorno
-                        daily_metrics[sleep_date].update({
-                            'sleep_duration': sleep_metrics.get('sleep_duration', 0),
-                            'sleep_efficiency': sleep_metrics.get('sleep_efficiency', 0),
-                            'sleep_hr': sleep_metrics.get('sleep_hr', 0),
-                            'sleep_light': sleep_metrics.get('sleep_light', 0),
-                            'sleep_deep': sleep_metrics.get('sleep_deep', 0),
-                            'sleep_rem': sleep_metrics.get('sleep_rem', 0),
-                            'sleep_awake': sleep_metrics.get('sleep_awake', 0)
-                        })
+                        st.success(f"✅ Giorno {sleep_date} trovato in daily_metrics - CALCOLO metriche sonno specifiche")
+                        
+                        # CALCOLA METRICHE SONNO SPECIFICHE per questa notte
+                        sleep_metrics_specific = calculate_real_sleep_metrics(sleep_activity, timeline)
+                        
+                        if sleep_metrics_specific:
+                            st.write(f"📊 Metriche sonno specifiche per {sleep_date}: {sleep_metrics_specific}")
+                            # Aggiungi le metriche sonno SPECIFICHE a questo giorno
+                            daily_metrics[sleep_date].update(sleep_metrics_specific)
+                        else:
+                            st.warning(f"⚠️ Impossibile calcolare metriche sonno per {sleep_date}")
                     else:
                         st.warning(f"⚠️ Giorno {sleep_date} NON trovato in daily_metrics")
+
+            # DEBUG FINALE: verifica che le metriche sonno siano diverse per ogni giorno
+            st.subheader("🔍 DEBUG Finale - Verifica Metriche Sonno per Giorno")
+            for day_date, day_metrics in daily_metrics.items():
+                if has_valid_sleep_metrics(day_metrics):
+                    st.success(f"✅ {day_date} - HA metriche sonno:")
+                    st.write(f"   💤 Durata: {day_metrics.get('sleep_duration', 0):.1f}h")
+                    st.write(f"   📈 Efficienza: {day_metrics.get('sleep_efficiency', 0):.1f}%")
+                    st.write(f"   💓 HR: {day_metrics.get('sleep_hr', 0):.1f}bpm")	
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
