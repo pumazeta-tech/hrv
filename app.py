@@ -3155,15 +3155,14 @@ def main():
                     with col4:
                         st.metric("Finestre Totali", len(time_points))
 
-                # INFO PERIODO (sempre visibile)
-                if time_points:
-                    st.info(f"**📅 Periodo totale analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")                    else:
-                st.warning("❌ Nessun dato IBI valido per l'analisi del grafico")
+            # INFO PERIODO (sempre visibile)
+            if time_points:
+                st.info(f"**📅 Periodo totale analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")
 
         except Exception as e:  # ← QUESTO except CHIUDE IL try PRINCIPALE
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
     
-    else:  # ← ORA QUESTO else È CORRETTO
+    else:  # ← ORA QUESTO else È CORRETTO (quando NON c'è file caricato)
         display_analysis_history()
         
         st.info("""
