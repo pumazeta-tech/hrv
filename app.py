@@ -2810,8 +2810,11 @@ def main():
                                 
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
+
+        except Exception as e:  # ← AGGIUNGI QUESTO except PER CHIUDERE IL try PRINCIPALE
+            st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
     
-    else:
+    else:  # ← ORA QUESTO else APPARTIENE CORRETTAMENTE ALL'if uploaded_file is not None:
         display_analysis_history()
         
         st.info("""
