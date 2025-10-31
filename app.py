@@ -2424,6 +2424,39 @@ def main():
                     st.write(f"✅ {key}: {avg_metrics[key]}")
                 else:
                     st.write(f"❌ {key}: NON presente")
+
+            # DEBUG: verifica le daily_metrics
+            st.subheader("🔍 DEBUG Daily Metrics")
+            st.write(f"📅 Giorni nelle daily_metrics: {list(daily_metrics.keys())}")
+            
+            for day_date, day_metrics in daily_metrics.items():
+                has_sleep = has_valid_sleep_metrics(day_metrics)
+                st.write(f"📊 {day_date}: has_sleep_metrics = {has_sleep}")
+                if has_sleep:
+                    st.write(f"   💤 Metriche sonno: { {k: v for k, v in day_metrics.items() if k.startswith('sleep_')} }")
+
+            # PROPAGA le metriche sonno alle daily_metrics corrispondenti
+            if has_sleep_metrics and sleep_activities:
+                st.subheader("🔄 Propagazione Metriche Sonno")
+                
+                for sleep_activity in sleep_activities:
+                    sleep_date = sleep_activity['start_time'].date().isoformat()
+                    st.write(f"📅 Cercando di associare sonno al giorno: {sleep_date}")
+                    
+                    if sleep_date in daily_metrics:
+                        st.success(f"✅ Giorno {sleep_date} trovato in daily_metrics - aggiungo metriche sonno")
+                        # Aggiungi le metriche sonno a questo giorno
+                        daily_metrics[sleep_date].update({
+                            'sleep_duration': sleep_metrics.get('sleep_duration', 0),
+                            'sleep_efficiency': sleep_metrics.get('sleep_efficiency', 0),
+                            'sleep_hr': sleep_metrics.get('sleep_hr', 0),
+                            'sleep_light': sleep_metrics.get('sleep_light', 0),
+                            'sleep_deep': sleep_metrics.get('sleep_deep', 0),
+                            'sleep_rem': sleep_metrics.get('sleep_rem', 0),
+                            'sleep_awake': sleep_metrics.get('sleep_awake', 0)
+                        })
+                    else:
+                        st.warning(f"⚠️ Giorno {sleep_date} NON trovato in daily_metrics")
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
