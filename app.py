@@ -2339,6 +2339,83 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
     return attivita_problematiche
 
 # =============================================================================
+# FUNZIONE PER ANALISI IMPATTO ATTIVITÀ SU HRV
+# =============================================================================
+
+def analizza_impatto_attivita_su_hrv(activities, time_points, sdnn_values, rmssd_values, hr_values):
+    """Analizza l'impatto delle attività sui valori HRV confrontando prima/dopo"""
+    analisi_impatto = []
+    
+    for attivita in activities:
+        attivita_time = attivita['start_time']
+        attivita_end = attivita_time + timedelta(minutes=attivita['duration'])
+        
+        # Trova indici temporali
+        indici_pre = []
+        indici_post = []
+        
+        for i, tp in enumerate(time_points):
+            # 1 ora prima dell'attività
+            if attivita_time - timedelta(hours=1) <= tp < attivita_time:
+                indici_pre.append(i)
+            # 2 ore dopo l'attività
+            elif attivita_end <= tp <= attivita_end + timedelta(hours=2):
+                indici_post.append(i)
+        
+        # Calcola medie prima e dopo se ci sono dati sufficienti
+        if len(indici_pre) >= 3 and len(indici_post) >= 3:
+            rmssd_pre = np.mean([rmssd_values[i] for i in indici_pre])
+            rmssd_post = np.mean([rmssd_values[i] for i in indici_post])
+            
+            hr_pre = np.mean([hr_values[i] for i in indici_pre])
+            hr_post = np.mean([hr_values[i] for i in indici_post])
+            
+            # Calcola variazioni percentuali
+            if rmssd_pre > 0:
+                variazione_rmssd = ((rmssd_post - rmssd_pre) / rmssd_pre) * 100
+            else:
+                variazione_rmssd = 0
+                
+            if hr_pre > 0:
+                variazione_hr = ((hr_post - hr_pre) / hr_pre) * 100
+            else:
+                variazione_hr = 0
+            
+            # ANALISI IMPATTO ALLENAMENTI
+            if attivita['type'] == "Allenamento":
+                intensita = attivita['intensity'].lower()
+                
+                if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']):
+                    if variazione_rmssd < -25:  # Calo drastico RMSSD
+                        analisi_impatto.append(f"📉 **Impatto negativo intenso**: {attivita['name']} - RMSSD calato del {abs(variazione_rmssd):.1f}%")
+                    elif variazione_rmssd < -15:  # Calo moderato RMSSD
+                        analisi_impatto.append(f"📉 **Impatto negativo**: {attivita['name']} - RMSSD calato del {abs(variazione_rmssd):.1f}%")
+                    elif variazione_rmssd > 10:  # Miglioramento RMSSD
+                        analisi_impatto.append(f"📈 **Recupero ottimale**: {attivita['name']} - RMSSD aumentato del {variazione_rmssd:.1f}%")
+                
+                elif any(p in intensita for p in ['leggera', 'leggero', 'facile', 'moderata']):
+                    if variazione_rmssd > 5:  # Miglioramento con allenamento leggero
+                        analisi_impatto.append(f"💚 **Attività rigenerante**: {attivita['name']} - RMSSD aumentato del {variazione_rmssd:.1f}%")
+            
+            # ANALISI IMPATTO ALIMENTAZIONE
+            elif attivita['type'] == "Alimentazione":
+                if variazione_hr > 20:  # Forte aumento battito dopo pasto
+                    analisi_impatto.append(f"🍽️ **Pasto molto pesante**: {attivita['name']} - Battito aumentato del {variazione_hr:.1f}%")
+                elif variazione_hr > 10:  # Aumento moderato battito
+                    analisi_impatto.append(f"🍽️ **Pasto pesante**: {attivita['name']} - Battito aumentato del {variazione_hr:.1f}%")
+                elif variazione_hr < -5:  # Battito diminuito (effetto positivo)
+                    analisi_impatto.append(f"🥗 **Pasto leggero**: {attivita['name']} - Battito diminuito del {abs(variazione_hr):.1f}%")
+            
+            # ANALISI IMPATTO RIPOSO
+            elif attivita['type'] in ["Riposo", "Sonno"]:
+                if variazione_rmssd > 15:  # Forte miglioramento RMSSD
+                    analisi_impatto.append(f"💤 **Recupero eccellente**: {attivita['name']} - RMSSD aumentato del {variazione_rmssd:.1f}%")
+                elif variazione_rmssd > 5:  # Miglioramento RMSSD
+                    analisi_impatto.append(f"😴 **Recupero buono**: {attivita['name']} - RMSSD aumentato del {variazione_rmssd:.1f}%")
+    
+    return analisi_impatto
+
+# =============================================================================
 # FUNZIONE PRINCIPALE
 # =============================================================================
 
@@ -3127,7 +3204,17 @@ def main():
                         st.write(f"• {problema}")
                 else:
                     st.success("### ✅ Nessuna attività problematica rilevata")
+ 
+                # Analizza impatto attività sui valori HRV
+                analisi_impatto = analizza_impatto_attivita_su_hrv(
+                    st.session_state.activities, time_points, sdnn_values, rmssd_values, hr_values
+                )
                 
+                if analisi_impatto:
+                    st.warning("### 📊 Analisi Impatto Attività su HRV")
+                    for impatto in analisi_impatto:
+                        st.write(f"• {impatto}")
+               
                 # =============================================================================
                 # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA
                 # =============================================================================
