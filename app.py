@@ -397,13 +397,23 @@ def init_session_state():
         st.session_state.editing_activity_index = None
 
 def has_valid_sleep_metrics(metrics):
-    """Verifica se ci sono metriche del sonno valide (non zero)"""
+    """Verifica se ci sono metriche del sonno valide - VERSIONE MENO RESTRITTIVA"""
     sleep_keys = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 
                   'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
     
+    # Controlla se ALMENO UNA metrica del sonno è presente e maggiore di 0
     for key in sleep_keys:
         if key in metrics and metrics.get(key, 0) > 0:
             return True
+    
+    # DEBUG: se non trova metriche, mostra perché
+    print(f"🔍 DEBUG has_valid_sleep_metrics: nessuna metrica valida trovata")
+    for key in sleep_keys:
+        if key in metrics:
+            print(f"   {key}: {metrics[key]} (tipo: {type(metrics[key])})")
+        else:
+            print(f"   {key}: NON presente")
+    
     return False
 
 # =============================================================================
@@ -2400,6 +2410,20 @@ def main():
                 if sleep_metrics_alt:
                     avg_metrics.update(sleep_metrics_alt)
                     st.success(f"😴 SONNO ANALIZZATO (metodo alternativo): {sleep_metrics_alt.get('sleep_duration', 0):.1f} ore")
+
+            # DEBUG: verifica perché le metriche sonno non appaiono
+            st.subheader("🔍 DEBUG Visualizzazione Metriche Sonno")
+            
+            has_sleep_metrics = has_valid_sleep_metrics(avg_metrics)
+            st.write(f"📊 has_valid_sleep_metrics restituisce: {has_sleep_metrics}")
+            st.write(f"📋 Tutte le metriche in avg_metrics: {list(avg_metrics.keys())}")
+            
+            sleep_keys = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
+            for key in sleep_keys:
+                if key in avg_metrics:
+                    st.write(f"✅ {key}: {avg_metrics[key]}")
+                else:
+                    st.write(f"❌ {key}: NON presente")
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
