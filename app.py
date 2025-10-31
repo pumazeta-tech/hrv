@@ -2236,29 +2236,39 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
     """Analizza tutte le attività registrate e restituisce quelle problematiche"""
     attivita_problematiche = []
     
-    for attivita in activities:
+    st.sidebar.info(f"🔍 DEBUG: Analizzo {len(activities)} attività")
+    
+    for i, attivita in enumerate(activities):
         attivita_time = attivita['start_time']
+        st.sidebar.write(f"Attività {i}: {attivita['type']} - {attivita['name']} - {attivita_time}")
         
         # Controlla se l'attività è nel periodo della registrazione
         if timeline['start_time'] <= attivita_time <= timeline['end_time']:
+            st.sidebar.success(f"✅ Attività {i} nel periodo registrazione")
             
             # ANALISI ALIMENTAZIONE
             if attivita['type'] == "Alimentazione":
                 cibi = attivita.get('food_items', '').lower()
+                st.sidebar.info(f"🍽️ Cibo: {cibi}")
                 punteggio_infiammatorio = 0
                 cibi_problematici = []
                 
                 for cibo in cibi.split(','):
                     cibo = cibo.strip()
+                    st.sidebar.write(f"  - Analizzo: '{cibo}'")
                     if cibo in NUTRITION_DB:
                         dati_cibo = NUTRITION_DB[cibo]
                         punteggio_infiammatorio += dati_cibo.get('inflammatory_score', 0)
+                        st.sidebar.write(f"  - Punteggio: {dati_cibo.get('inflammatory_score', 0)}")
                         if dati_cibo.get('inflammatory_score', 0) > 2:
                             cibi_problematici.append(cibo)
                 
+                st.sidebar.info(f"📊 Punteggio totale: {punteggio_infiammatorio}")
                 if punteggio_infiammatorio > 3:
                     orario = attivita_time.strftime('%H:%M')
-                    attivita_problematiche.append(f"🍽️ **Pasto infiammatorio alle {orario}**: {attivita['name']} (cibi: {', '.join(cibi_problematici)})")
+                    problema = f"🍽️ **Pasto infiammatorio alle {orario}**: {attivita['name']} (cibi: {', '.join(cibi_problematici)})"
+                    attivita_problematiche.append(problema)
+                    st.sidebar.error(f"❌ Trovato: {problema}")
                 
                 elif punteggio_infiammatorio < -2:
                     orario = attivita_time.strftime('%H:%M')
@@ -2268,11 +2278,17 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
             elif attivita['type'] == "Allenamento":
                 nome_attivita = attivita['name'].lower()
                 intensita = attivita['intensity'].lower()
+                st.sidebar.info(f"🏃‍♂️ Allenamento: {nome_attivita} - Intensità: {intensita}")
                 
                 if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante']):
+                    st.sidebar.write(f"  - Allenamento intenso rilevato")
                     if avg_rmssd < 30:
                         orario = attivita_time.strftime('%H:%M')
-                        attivita_problematiche.append(f"🏃‍♂️ **Allenamento intenso alle {orario}**: {attivita['name']} - RMSSD troppo basso ({avg_rmssd:.1f} ms) per questa intensità")
+                        problema = f"🏃‍♂️ **Allenamento intenso alle {orario}**: {attivita['name']} - RMSSD troppo basso ({avg_rmssd:.1f} ms) per questa intensità"
+                        attivita_problematiche.append(problema)
+                        st.sidebar.error(f"❌ Trovato: {problema}")
+                    else:
+                        st.sidebar.success(f"  - RMSSD ok per intensità")
                 
                 elif any(p in intensita for p in ['leggera', 'leggero', 'facile']):
                     if avg_rmssd > 40:
@@ -2282,13 +2298,19 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
             # ANALISI SONNO
             elif attivita['type'] == "Sonno":
                 durata_sonno = attivita['duration'] / 60  # converti in ore
+                st.sidebar.info(f"😴 Sonno: {durata_sonno:.1f} ore")
                 if durata_sonno < 6:
                     data_sonno = attivita_time.strftime('%d/%m')
-                    attivita_problematiche.append(f"😴 **Sonno insufficiente il {data_sonno}**: solo {durata_sonno:.1f} ore (minimo raccomandato: 7 ore)")
+                    problema = f"😴 **Sonno insufficiente il {data_sonno}**: solo {durata_sonno:.1f} ore (minimo raccomandato: 7 ore)"
+                    attivita_problematiche.append(problema)
+                    st.sidebar.error(f"❌ Trovato: {problema}")
                 elif durata_sonno > 9:
                     data_sonno = attivita_time.strftime('%d/%m')
                     attivita_problematiche.append(f"💤 **Sonno lungo il {data_sonno}**: {durata_sonno:.1f} ore - ottimo recupero!")
+        else:
+            st.sidebar.warning(f"❌ Attività {i} FUORI periodo registrazione")
     
+    st.sidebar.info(f"📋 Totale problemi trovati: {len(attivita_problematiche)}")
     return attivita_problematiche
 
 # =============================================================================
