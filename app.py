@@ -2416,6 +2416,230 @@ def analizza_impatto_attivita_su_hrv(activities, time_points, sdnn_values, rmssd
     return analisi_impatto
 
 # =============================================================================
+# FUNZIONE PER GENERARE REPORT COMPLETO
+# =============================================================================
+
+def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, attivita_problematiche, analisi_impatto):
+    """Genera un report completo per il paziente"""
+    
+    report = []
+    
+    # HEADER DEL REPORT
+    report.append("# 📊 REPORT COMPLETO ANALISI HRV")
+    report.append(f"**Paziente:** {user_profile['name']} {user_profile['surname']}")
+    report.append(f"**Età:** {user_profile['age']} anni | **Sesso:** {user_profile['gender']}")
+    report.append(f"**Periodo analizzato:** {timeline['start_time'].strftime('%d/%m/%Y %H:%M')} - {timeline['end_time'].strftime('%d/%m/%Y %H:%M')}")
+    report.append("---")
+    
+    # 1. SINTESI STATO GENERALE
+    report.append("## 🎯 SINTESI STATO DI SALUTE")
+    
+    # Valutazione generale basata su RMSSD
+    rmssd_avg = avg_metrics.get('rmssd', 0)
+    if rmssd_avg > 50:
+        valutazione = "**OTTIMO** - Alta resilienza cardiovascolare"
+        colore = "🟢"
+    elif rmssd_avg > 35:
+        valutazione = "**BUONO** - Stato di salute normale"
+        colore = "🟡"
+    elif rmssd_avg > 25:
+        valutazione = "**DISCRETO** - Leggero affaticamento"
+        colore = "🟠"
+    else:
+        valutazione = "**DA MIGLIORARE** - Stress o affaticamento significativo"
+        colore = "🔴"
+    
+    report.append(f"{colore} **Valutazione Generale:** {valutazione}")
+    report.append(f"**RMSSD Medio:** {rmssd_avg:.1f} ms | **SDNN Medio:** {avg_metrics.get('sdnn', 0):.1f} ms")
+    report.append(f"**Battito Cardiaco Medio:** {avg_metrics.get('hr_mean', 0):.1f} bpm")
+    report.append("")
+    
+    # 2. PUNTI DI FORZA
+    report.append("## ✅ **PUNTI DI FORZA**")
+    
+    punti_forza = []
+    if rmssd_avg > 40:
+        punti_forza.append("**Ottima variabilità parasimpatica** - Buona capacità di recupero")
+    if avg_metrics.get('sdnn', 0) > 50:
+        punti_forza.append("**Alta resilienza cardiovascolare** - Sistema nervoso ben bilanciato")
+    if avg_metrics.get('hr_mean', 0) < 70:
+        punti_forza.append("**Frequenza cardiaca ottimale** - Buon stato di forma")
+    if any("🥗" in problema for problema in attivita_problematiche):
+        punti_forza.append("**Scelte alimentari salutari** rilevate")
+    if any("💤" in problema for problema in attivita_problematiche):
+        punti_forza.append("**Buona durata del sonno** - Recupero adeguato")
+    
+    if punti_forza:
+        for punto in punti_forza:
+            report.append(f"• {punto}")
+    else:
+        report.append("*Nessun punto di forza significativo identificato*")
+    report.append("")
+    
+    # 3. AREE DI MIGLIORAMENTO
+    report.append("## 📋 **AREE DI MIGLIORAMENTO**")
+    
+    aree_miglioramento = []
+    if rmssd_avg < 30:
+        aree_miglioramento.append("**Variabilità cardiaca ridotta** - Prioritizzare il recupero")
+    if avg_metrics.get('hr_mean', 0) > 80:
+        aree_miglioramento.append("**Frequenza cardiaca elevata** - Ridurre lo stress")
+    if any("🍽️" in problema for problema in attivita_problematiche):
+        aree_miglioramento.append("**Pasti infiammatori** - Ottimizzare l'alimentazione")
+    if any("😴" in problema for problema in attivita_problematiche):
+        aree_miglioramento.append("**Sonno insufficiente** - Migliorare qualità e quantità sonno")
+    if any("📉" in impatto for impatto in analisi_impatto):
+        aree_miglioramento.append("**Attività troppo intense** - Bilanciare carico e recupero")
+    
+    if aree_miglioramento:
+        for area in aree_miglioramento:
+            report.append(f"• {area}")
+    else:
+        report.append("*Nessuna area critica significativa identificata*")
+    report.append("")
+    
+    # 4. ANALISI ATTIVITÀ E IMPATTO
+    report.append("## 🏃‍♂️ **ANALISI ATTIVITÀ E IMPATTO**")
+    
+    if attivita_problematiche or analisi_impatto:
+        report.append("### Attività Rilevate:")
+        for problema in attivita_problematiche:
+            # Rimuovi emoji per report più pulito
+            problema_pulito = problema.split('**', 1)[-1].split('**', 1)[-1] if '**' in problema else problema
+            if "🍽️" in problema:
+                report.append(f"• 🔴 **Alimentazione:** {problema_pulito}")
+            elif "🏃‍♂️" in problema:
+                report.append(f"• 🔴 **Allenamento:** {problema_pulito}")
+            elif "😴" in problema:
+                report.append(f"• 🔴 **Sonno:** {problema_pulito}")
+        
+        if analisi_impatto:
+            report.append("")
+            report.append("### Impatto su HRV:")
+            for impatto in analisi_impatto:
+                report.append(f"• {impatto}")
+    else:
+        report.append("*Nessuna attività problematica rilevata*")
+    report.append("")
+    
+    # 5. PIANO D'AZIONE PERSONALIZZATO
+    report.append("## 🎯 **PIANO D'AZIONE RACCOMANDATO**")
+    
+    report.append("### 🔴 **Priorità Alta** (intervenire subito):")
+    if rmssd_avg < 25:
+        report.append("• **Ridurre immediatamente** carico di allenamento")
+        report.append("• **Priorità assoluta al sonno** - almeno 7-8 ore per notte")
+        report.append("• **Tecniche di respirazione** 2x al giorno (10 minuti)")
+    
+    if any("🍽️" in problema for problema in attivita_problematiche):
+        report.append("• **Modificare alimentazione**: ridurre cibi infiammatori")
+        report.append("• **Aumentare** verdure, pesce grasso, frutti di bosco")
+        report.append("• **Evitare** pasti pesanti dopo le 20:00")
+    
+    report.append("")
+    report.append("### 🟡 **Priorità Media** (implementare nelle prossime 2 settimane):")
+    report.append("• **Bilanciamento attività**: 1 giorno recupero per ogni allenamento intenso")
+    report.append("• **Idratazione**: almeno 2L di acqua al giorno")
+    report.append("• **Gestione stress**: meditazione o yoga 3x/settimana")
+    
+    report.append("")
+    report.append("### 🟢 **Mantenimento** (abitudini da conservare):")
+    if rmssd_avg > 40:
+        report.append("• **Mantenere** l'attuale equilibrio attività/recupero")
+    if avg_metrics.get('hr_mean', 0) < 70:
+        report.append("• **Continua** con la gestione dello stress")
+    report.append("• **Monitoraggio regolare** HRV per ottimizzare prestazioni")
+    report.append("")
+    
+    # 6. ANALISI GIORNALIERA DETTAGLIATA
+    report.append("## 📅 **ANALISI GIORNALIERA**")
+    
+    if daily_metrics:
+        for day_date, day_metrics in list(daily_metrics.items())[:3]:  # Mostra max 3 giorni
+            day_dt = datetime.fromisoformat(day_date)
+            report.append(f"### {day_dt.strftime('%d/%m/%Y')}:")
+            report.append(f"- **RMSSD:** {day_metrics.get('rmssd', 0):.1f} ms | **SDNN:** {day_metrics.get('sdnn', 0):.1f} ms")
+            report.append(f"- **Battito:** {day_metrics.get('hr_mean', 0):.1f} bpm | **Coerenza:** {day_metrics.get('coherence', 0):.1f}%")
+            
+            # Valutazione giornaliera
+            rmssd_day = day_metrics.get('rmssd', 0)
+            if rmssd_day > 45:
+                report.append("- 📈 **Giornata ottimale**")
+            elif rmssd_day > 30:
+                report.append("- ➡️ **Giornata nella norma**")
+            else:
+                report.append("- 📉 **Giornata di affaticamento**")
+            report.append("")
+    else:
+        report.append("*Dati giornalieri non disponibili*")
+    report.append("")
+    
+    # 7. RACCOMANDAZIONI TECNICHE
+    report.append("## 🔬 **RACCOMANDAZIONI TECNICHE**")
+    
+    report.append("### Per migliorare RMSSD (recupero parasimpatico):")
+    report.append("• **Sonno**: 7-9 ore con routine regolare")
+    report.append("• **Respirazione**: tecnica 4-7-8 (4s inspiro, 7s pausa, 8s espiro)")
+    report.append("• **Integrazione**: Magnesio 400mg serale, Omega-3 2000mg")
+    
+    report.append("")
+    report.append("### Per migliorare SDNN (resilienza cardiovascolare):")
+    report.append("• **Allenamento**: mix di cardio moderato e forza")
+    report.append("• **Alimentazione**: dieta mediterranea, anti-infiammatoria")
+    report.append("• **Gestione stress**: mindfulness, natura, hobbies")
+    report.append("")
+    
+    # 8. RIFERIMENTI BIBLIOGRAFICI
+    report.append("## 📚 **RIFERIMENTI SCIENTIFICI**")
+    report.append("• **Task Force ESC 1996**: Standard misurazione HRV")
+    report.append("• **Umetani et al. 1998**: Variazioni HRV con età e genere")
+    report.append("• **Boudreau et al. 2012**: HRV durante le fasi del sonno")
+    report.append("• **Sandercock et al. 2005**: Effetti esercizio su HRV")
+    report.append("")
+    
+    # 9. NOTE FINALI
+    report.append("## 💡 **NOTE IMPORTANTI**")
+    report.append("• Questo report è basato su analisi algoritmiche dei dati HRV")
+    report.append("• I risultati devono essere interpretati da professionisti sanitari")
+    report.append("• Monitorare le tendenze nel tempo è più importante dei valori singoli")
+    report.append("• Consultare medico per condizioni specifiche o preoccupazioni")
+    report.append("")
+    report.append(f"*Report generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}*")
+    
+    return "\n".join(report)
+
+def esporta_report_pdf(report_text, filename="report_hrv.pdf"):
+    """Esporta il report in formato PDF"""
+    from fpdf import FPDF
+    
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=10)
+    
+    # Dividi il testo in linee più corte per il PDF
+    lines = report_text.split('\n')
+    for line in lines:
+        if line.startswith('# '):
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(200, 10, txt=line[2:], ln=True, align='L')
+        elif line.startswith('## '):
+            pdf.set_font("Arial", 'B', 14)
+            pdf.cell(200, 8, txt=line[3:], ln=True, align='L')
+        elif line.startswith('### '):
+            pdf.set_font("Arial", 'B', 12)
+            pdf.cell(200, 6, txt=line[4:], ln=True, align='L')
+        elif line.startswith('• '):
+            pdf.set_font("Arial", size=10)
+            pdf.multi_cell(0, 5, txt=line)
+        else:
+            pdf.set_font("Arial", size=10)
+            pdf.multi_cell(0, 5, txt=line)
+        pdf.ln(2)
+    
+    pdf.output(filename)
+    return filename
+
+# =============================================================================
 # FUNZIONE PRINCIPALE
 # =============================================================================
 
@@ -3214,7 +3438,53 @@ def main():
                     st.warning("### 📊 Analisi Impatto Attività su HRV")
                     for impatto in analisi_impatto:
                         st.write(f"• {impatto}")
-               
+  
+                # =============================================================================
+                # REPORT COMPLETO ESPORTABILE
+                # =============================================================================
+                st.subheader("📄 Report Completo")
+                
+                with st.expander("📋 **Visualizza Report Completo**", expanded=False):
+                    # Genera il report
+                    report_completo = genera_report_completo(
+                        st.session_state.user_profile,
+                        timeline,
+                        daily_metrics,
+                        avg_metrics,
+                        attivita_problematiche,
+                        analisi_impatto
+                    )
+                    
+                    # Mostra il report
+                    st.markdown(report_completo)
+                    
+                    # Pulsante esportazione
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("📥 Scarica Report come PDF", use_container_width=True):
+                            try:
+                                filename = esporta_report_pdf(report_completo, f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf")
+                                with open(filename, "rb") as file:
+                                    st.download_button(
+                                        label="⬇️ Scarica PDF",
+                                        data=file,
+                                        file_name=filename,
+                                        mime="application/pdf",
+                                        use_container_width=True
+                                    )
+                            except Exception as e:
+                                st.warning("Funzione PDF non disponibile. Copia il testo qui sopra.")
+                    
+                    with col2:
+                        # Copia testo
+                        st.download_button(
+                            label="📋 Copia Testo Report",
+                            data=report_completo,
+                            file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+             
                 # =============================================================================
                 # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA
                 # =============================================================================
