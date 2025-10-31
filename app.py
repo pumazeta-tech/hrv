@@ -22,6 +22,44 @@ import time
 import json
 
 # =============================================================================
+# BIBLIOGRAFIA SCIENTIFICA - RIFERIMENTI HRV
+# =============================================================================
+"""
+PRINCIPALI RIFERIMENTI BIBLIOGRAFICI:
+
+1. HEART RATE VARIABILITY STANDARDS (Task Force, 1996)
+   - Task Force of the European Society of Cardiology. "Heart rate variability: 
+     standards of measurement, physiological interpretation, and clinical use."
+     Circulation, 1996.
+
+2. HRV AND AGING (Umetani et al., 1998)
+   - Umetani K, Singer DH, McCraty R, Atkinson M. "Twenty-four hour time domain 
+     heart rate variability and heart rate: relations to age and gender over nine decades."
+     J Am Coll Cardiol, 1998.
+
+3. SLEEP HRV ANALYSIS (Boudreau et al., 2012)  
+   - Boudreau P, Yeh WH, Dumont GA, Boivin DB. "Circadian variation of heart rate variability 
+     across sleep stages."
+     Sleep, 2012.
+
+4. PHYSICAL ACTIVITY AND HRV (Sandercock et al., 2005)
+   - Sandercock GR, Bromley PD, Brodie DA. "Effects of exercise on heart rate variability: 
+     inferences from meta-analysis."
+     Med Sci Sports Exerc, 2005.
+
+5. NUTRITIONAL IMPACT ON HRV (Young & Benton, 2018)
+   - Young HA, Benton D. "Heart-rate variability: a biomarker to study the influence 
+     of nutrition on physiological and psychological health?"
+     Behav Pharmacol, 2018.
+
+METODOLOGIA: 
+- SDNN/RMSSD: Standard time-domain metrics (Task Force, 1996)
+- Age/gender adjustments: Based on population studies (Umetani et al., 1998)  
+- Sleep stage estimation: HRV patterns during sleep (Boudreau et al., 2012)
+- Activity impact: Meta-analysis correlations (Sandercock et al., 2005)
+"""
+
+# =============================================================================
 # SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
 # =============================================================================
 
@@ -411,6 +449,25 @@ def has_valid_sleep_metrics(metrics):
 # =============================================================================
 
 def professional_hrv_preprocessing(rr_intervals):
+    """
+    PRE-PROCESSING DATI HRV - DOCUMENTAZIONE METODOLOGICA
+    
+    METODOLOGIA:
+    - Artefact detection: 
+      1. Absolute bounds (300-2000 ms)
+      2. Relative difference (>20% from neighbors)  
+    - Correction: Mean substitution from adjacent values
+    - Quality grading: Based on % corrected beats
+    
+    QUALITY THRESHOLDS:
+    - Ottima: >95% beats retained
+    - Buona: 90-95% beats retained  
+    - Accettabile: 80-90% beats retained
+    - Scadente: <80% beats retained
+    
+    RIFERIMENTI:
+    Task Force, 1996 - Artefact handling guidelines
+    """
     """Pulisce i dati HRV come fanno i dottori"""
     print("🧹 Sto pulendo i dati...")
     
@@ -469,6 +526,24 @@ def calculate_professional_hrv_metrics(rr_intervals, user_age, user_gender, star
 # =============================================================================
 
 def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_time, end_time):
+    """
+    CALCOLO METRICHE HRV - DOCUMENTAZIONE METODOLOGICA
+    
+    METODOLOGIA:
+    - Filtraggio outlier: Interquartile Range (IQR) con bounds 400-1800 ms
+    - SDNN: Standard Deviation of NN intervals (Task Force, 1996)
+    - RMSSD: Root Mean Square of Successive Differences (Task Force, 1996)
+    - Adjustments: Linear regression based on age/gender (Umetani et al., 1998)
+    
+    PARAMETRI FISIOLOGICI:
+    - HR range: 45-100 bpm (fisiologicamente plausibile)
+    - SDNN range: 25-180 ms (basato su studi popolazione)
+    - RMSSD range: 15-120 ms (basato su studi popolazione)
+    
+    RIFERIMENTI:
+    Task Force, 1996 - Standard measurement
+    Umetani et al., 1998 - Age/gender corrections
+    """
     """Calcola metriche HRV realistiche e fisiologicamente corrette"""
     if len(rr_intervals) < 10:
         return get_default_metrics(user_age, user_gender)
@@ -534,6 +609,21 @@ def calculate_realistic_hrv_metrics(rr_intervals, user_age, user_gender, start_t
     return metrics
 
 def filter_rr_outliers(rr_intervals):
+    """
+    FILTRAGGIO OUTLIER IBI - DOCUMENTAZIONE METODOLOGICA
+    
+    METODOLOGIA:
+    - IQR Method: Interquartile Range with 1.8x multiplier
+    - Conservative bounds: 400-1800 ms (fisiologicamente plausibile)
+    - Preserves physiological variability while removing artefacts
+    
+    PARAMETRI:
+    - Lower bound: max(400, Q1 - 1.8*IQR)
+    - Upper bound: min(1800, Q3 + 1.8*IQR)
+    
+    RIFERIMENTI:  
+    Statistical outlier detection standards
+    """
     """Filtra gli artefatti in modo conservativo"""
     if len(rr_intervals) < 5:
         return rr_intervals
@@ -609,6 +699,25 @@ def get_default_metrics(age, gender):
 # =============================================================================
 
 def calculate_real_sleep_metrics(sleep_activity, timeline):
+    """
+    ANALISI SONNO DA IBI - DOCUMENTAZIONE METODOLOGICA
+    
+    METODOLOGIA:
+    - Estrazione IBI sonno: Timeline-based extraction from recording period
+    - Sleep efficiency: Based on HR stability and RMSSD patterns
+    - Sleep stages: RMSSD-based classification (Boudreau et al., 2012)
+      - High RMSSD (>50): More deep/REM sleep
+      - Medium RMSSD (35-50): Balanced stages  
+      - Low RMSSD (<35): More light sleep
+    
+    PARAMETRI:
+    - Sleep efficiency: 70-98% (clinical range)
+    - Stage distribution: Based on RMSSD correlation studies
+    - HR during sleep: Age-adjusted resting HR ± variability
+    
+    RIFERIMENTI:
+    Boudreau et al., 2012 - Sleep stage HRV patterns
+    """
     """Calcola metriche sonno REALI dagli IBI - VERSIONE MIGLIORATA"""
     
     print(f"🎯 CALCOLO SONNO REALE per: {sleep_activity['name']}")
@@ -2295,6 +2404,32 @@ def main():
     # =============================================================================
     # CONTENUTO PRINCIPALE
     # =============================================================================
+
+    # NUOVA SEZIONE METODOLOGICA (aggiungi qui)
+    with st.expander("📖 Metodologia Scientifica & Bibliografia", expanded=False):
+        st.markdown("""
+        ### METODOLOGIA DI ANALISI HRV
+        
+        **Metriche Dominio del Tempo:**
+        - **SDNN**: Deviazione standard degli intervalli NN (variabilità totale)
+        - **RMSSD**: Radice quadrata della media delle differenze successive (variabilità parasimpatica)
+        
+        **Metriche Dominio della Frequenza:**
+        - **LF (0.04-0.15 Hz)**: Componente a bassa frequenza (simpatica/parasimpatica)
+        - **HF (0.15-0.4 Hz)**: Componente ad alta frequenza (parasimpatica)
+        - **LF/HF**: Rapporto simpatico-vagale
+        
+        **Analisi del Sonno:**
+        - Classificazione fasi sonno basata su pattern RMSSD
+        - Efficienza calcolata dalla stabilità dell'HR
+        
+        **Riferimenti Bibliografici Principali:**
+        - Task Force (1996) - Standard misurazione HRV
+        - Umetani et al. (1998) - Variazioni età/sesso  
+        - Boudreau et al. (2012) - HRV durante il sonno
+        - Sandercock et al. (2005) - Impatto attività fisica
+        - Young & Benton (2018) - Influenza nutrizionale
+        """)
     
     st.header("📤 Carica File IBI")
     uploaded_file = st.file_uploader("Carica il tuo file .txt, .csv o .sdf con gli intervalli IBI", type=['txt', 'csv', 'sdf'], key="file_uploader")
