@@ -2807,17 +2807,9 @@ def main():
                                 )
                             else:
                                 st.empty()
-
-
                                 
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
-
-        except Exception as e:  # ← AGGIUNGI QUESTO except PER CHIUDERE IL try PRINCIPALE
-            st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
-    
-    else:  # ← ORA QUESTO else APPARTIENE CORRETTAMENTE ALL'if uploaded_file is not None:
-        display_analysis_history()
 
             # GRAFICO IBI DETTAGLIATO CON ORARIO REALE - OTTIMIZZATO
             st.subheader("📈 Grafico Dettagliato IBI (Tutti i Battiti)")
@@ -2965,7 +2957,7 @@ def main():
                 if time_points:
                     st.info(f"**📅 Periodo analizzato:** {time_points[0].strftime('%d/%m/%Y %H:%M')} - {time_points[-1].strftime('%d/%m/%Y %H:%M')}")
 
-        except Exception as e:  # ← QUESTA È LA CHIUSURA DEL try PRINCIPALE
+        except Exception as e:  # ← QUESTO except CHIUDE IL try PRINCIPALE
             st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
     
     else:  # ← ORA QUESTO else È CORRETTO
