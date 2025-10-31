@@ -20,8 +20,6 @@ from email.mime.text import MIMEText
 import secrets
 import time
 import json
-import base64
-from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -2424,219 +2422,218 @@ def analizza_impatto_attivita_su_hrv(activities, time_points, sdnn_values, rmssd
     return analisi_impatto
 
 # =============================================================================
-# FUNZIONE PER GENERARE REPORT COMPLETO (VERSIONE PROFESSIONALE)
+# FUNZIONI PER CREARE PDF
 # =============================================================================
 
-def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, attivita_problematiche, analisi_impatto):
-    """Genera un report moderno ed elegante per il paziente"""
-    
-    report = []
-    
-    # HEADER ELEGANTE
-    report.append('<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 12px; color: white; margin-bottom: 25px;">')
-    report.append('<h1 style="margin: 0; font-size: 28px; font-weight: 600;">Analisi HRV Completa</h1>')
-    report.append('<p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 16px;">Report Personalizzato di Variabilità Cardiaca</p>')
-    report.append('</div>')
-    
-    # INFORMAZIONI PAZIENTE
-    report.append('<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #3498db; margin-bottom: 20px;">')
-    report.append('<h3 style="color: #2c3e50; margin-top: 0;">📋 Informazioni Paziente</h3>')
-    report.append(f"<p><strong>Nome:</strong> {user_profile['name']} {user_profile['surname']}</p>")
-    report.append(f"<p><strong>Età:</strong> {user_profile['age']} anni | <strong>Sesso:</strong> {user_profile['gender']}</p>")
-    report.append(f"<p><strong>Periodo analisi:</strong> {timeline['start_time'].strftime('%d/%m/%Y %H:%M')} - {timeline['end_time'].strftime('%d/%m/%Y %H:%M')}</p>")
-    report.append('</div>')
-    
-    # VALUTAZIONE PRINCIPALE
-    rmssd_avg = avg_metrics.get('rmssd', 0)
-    sdnn_avg = avg_metrics.get('sdnn', 0)
-    hr_avg = avg_metrics.get('hr_mean', 0)
-    
-    if rmssd_avg > 50:
-        colore_valutazione = "#27ae60"
-        icona_valutazione = "🎯"
-        valutazione = "Eccellente"
-    elif rmssd_avg > 35:
-        colore_valutazione = "#f39c12" 
-        icona_valutazione = "✓"
-        valutazione = "Buona"
-    elif rmssd_avg > 25:
-        colore_valutazione = "#e67e22"
-        icona_valutazione = "⚠️"
-        valutazione = "Discreta"
-    else:
-        colore_valutazione = "#e74c3c"
-        icona_valutazione = "🔴"
-        valutazione = "Da migliorare"
-    
-    report.append(f'''
-    <div style="background: {colore_valutazione}15; padding: 20px; border-radius: 12px; border: 2px solid {colore_valutazione}30; margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <div style="font-size: 32px;">{icona_valutazione}</div>
-            <div>
-                <h3 style="color: #2c3e50; margin: 0;">Valutazione Generale</h3>
-                <p style="font-size: 18px; color: {colore_valutazione}; font-weight: 600; margin: 5px 0;">{valutazione}</p>
-                <p style="margin: 0; color: #7f8c8d;">Basata sull'analisi della variabilità cardiaca</p>
+def crea_pdf_moderno(report_html):
+    """Crea un PDF moderno ed elegante dal report HTML"""
+    try:
+        # Prova con weasyprint (più probabile su Streamlit Cloud)
+        from weasyprint import HTML
+        import tempfile
+        import os
+        
+        # Crea HTML completo con stili eleganti
+        html_completo = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: 'Arial', sans-serif;
+                    margin: 30px;
+                    color: #2c3e50;
+                    line-height: 1.6;
+                    background: #f8f9fa;
+                }}
+                .container {{
+                    max-width: 800px;
+                    margin: 0 auto;
+                    background: white;
+                    padding: 30px;
+                    border-radius: 15px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 30px;
+                    border-radius: 12px;
+                    margin-bottom: 25px;
+                    text-align: center;
+                }}
+                .section {{
+                    margin-bottom: 25px;
+                    padding: 20px;
+                    border-radius: 10px;
+                }}
+                .metric-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 15px;
+                    margin: 20px 0;
+                }}
+                .metric-card {{
+                    background: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                    text-align: center;
+                    border: 1px solid #e9ecef;
+                }}
+                .recommendation {{
+                    background: #f8f9fa;
+                    padding: 20px;
+                    border-radius: 10px;
+                    margin: 15px 0;
+                    border-left: 4px solid #3498db;
+                }}
+                h1 {{ 
+                    color: white; 
+                    margin: 0;
+                    font-size: 28px;
+                }}
+                h2 {{ 
+                    color: #3498db; 
+                    border-bottom: 2px solid #3498db; 
+                    padding-bottom: 10px;
+                    margin-top: 0;
+                }}
+                h3 {{ 
+                    color: #2c3e50; 
+                    margin-bottom: 10px;
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 30px;
+                    padding: 20px;
+                    background: #2c3e50;
+                    color: white;
+                    border-radius: 8px;
+                }}
+                .good {{
+                    background: #d4edda;
+                    border-left: 4px solid #28a745;
+                }}
+                .warning {{
+                    background: #fff3cd;
+                    border-left: 4px solid #ffc107;
+                }}
+                .excellent {{
+                    background: #d1ecf1;
+                    border-left: 4px solid #17a2b8;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                {report_html}
             </div>
-        </div>
-    </div>
-    ''')
-    
-    # METRICHE PRINCIPALI
-    report.append('<div style="margin-bottom: 25px;">')
-    report.append('<h3 style="color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 8px;">📊 Metriche Principali</h3>')
-    
-    report.append('<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">')
-    report.append(f'''
-    <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center;">
-        <div style="font-size: 24px; color: #3498db;">💓</div>
-        <div style="font-size: 20px; font-weight: 600; color: #2c3e50;">{rmssd_avg:.1f} ms</div>
-        <div style="color: #7f8c8d; font-size: 14px;">RMSSD</div>
-    </div>
-    ''')
-    report.append(f'''
-    <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center;">
-        <div style="font-size: 24px; color: #2ecc71;">📈</div>
-        <div style="font-size: 20px; font-weight: 600; color: #2c3e50;">{sdnn_avg:.1f} ms</div>
-        <div style="color: #7f8c8d; font-size: 14px;">SDNN</div>
-    </div>
-    ''')
-    report.append(f'''
-    <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center;">
-        <div style="font-size: 24px; color: #e74c3c;">❤️</div>
-        <div style="font-size: 20px; font-weight: 600; color: #2c3e50;">{hr_avg:.1f} bpm</div>
-        <div style="color: #7f8c8d; font-size: 14px;">Frequenza Cardiaca</div>
-    </div>
-    ''')
-    report.append('</div>')
-    report.append('</div>')
-    
-    # ANALISI ATTIVITÀ
-    if attivita_problematiche or analisi_impatto:
-        report.append('<div style="background: #fff3cd; padding: 20px; border-radius: 10px; border-left: 4px solid #ffc107; margin-bottom: 20px;">')
-        report.append('<h3 style="color: #856404; margin-top: 0;">🎯 Analisi Attività e Comportamenti</h3>')
+        </body>
+        </html>
+        """
         
-        if attivita_problematiche:
-            report.append('<p><strong>Aspetti da ottimizzare:</strong></p>')
-            for problema in attivita_problematiche:
-                report.append(f'<div style="margin: 8px 0; padding: 8px 12px; background: white; border-radius: 6px;">• {problema}</div>')
+        # Crea PDF temporaneo
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
+            HTML(string=html_completo).write_pdf(tmp_file.name)
+            
+            # Leggi il file PDF
+            with open(tmp_file.name, 'rb') as f:
+                pdf_data = f.read()
+            
+            # Pulizia
+            os.unlink(tmp_file.name)
+            
+        return BytesIO(pdf_data)
         
-        if analisi_impatto:
-            report.append('<p style="margin-top: 15px;"><strong>Impatto sulla variabilità cardiaca:</strong></p>')
-            for impatto in analisi_impatto:
-                report.append(f'<div style="margin: 8px 0; padding: 8px 12px; background: white; border-radius: 6px;">• {impatto}</div>')
-        
-        report.append('</div>')
-    
-    # RACCOMANDAZIONI
-    report.append('<div style="background: #d4edda; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745; margin-bottom: 20px;">')
-    report.append('<h3 style="color: #155724; margin-top: 0;">💡 Raccomandazioni Personalizzate</h3>')
-    
-    report.append('<div style="display: grid; gap: 15px;">')
-    if rmssd_avg < 30:
-        report.append('''
-        <div style="background: white; padding: 15px; border-radius: 8px;">
-            <h4 style="color: #e74c3c; margin: 0 0 8px 0;">🔴 Priorità Alta</h4>
-            <ul style="margin: 0; color: #2c3e50;">
-                <li>Ridurre immediatamente il carico di allenamento</li>
-                <li>Garantire 7-8 ore di sonno continuativo</li>
-                <li>Praticare respirazione diaframmatica 2x al giorno</li>
-            </ul>
-        </div>
-        ''')
-    
-    report.append('''
-    <div style="background: white; padding: 15px; border-radius: 8px;">
-        <h4 style="color: #f39c12; margin: 0 0 8px 0;">🟡 Priorità Media</h4>
-        <ul style="margin: 0; color: #2c3e50;">
-            <li>Bilanciare attività e recupero (48h dopo sforzi intensi)</li>
-            <li>Mantenere idratazione adeguata (2L acqua/giorno)</li>
-            <li>Inserire attività rigenerative (yoga, camminate)</li>
-        </ul>
-    </div>
-    ''')
-    
-    report.append('''
-    <div style="background: white; padding: 15px; border-radius: 8px;">
-        <h4 style="color: #27ae60; margin: 0 0 8px 0;">🟢 Mantenimento</h4>
-        <ul style="margin: 0; color: #2c3e50;">
-            <li>Monitoraggio continuo della variabilità cardiaca</li>
-            <li>Registrazione correlazione attività-HRV</li>
-            <li>Valutazioni periodiche con professionista</li>
-        </ul>
-    </div>
-    ''')
-    report.append('</div>')
-    report.append('</div>')
-    
-    # FOOTER
-    report.append('<div style="background: #2c3e50; color: white; padding: 20px; border-radius: 10px; text-align: center; margin-top: 25px;">')
-    report.append(f'<p style="margin: 0; opacity: 0.8;">Report generato il {datetime.now().strftime("%d/%m/%Y alle %H:%M")}</p>')
-    report.append('<p style="margin: 5px 0 0 0; opacity: 0.6; font-size: 14px;">Per uso informativo - Consultare professionista sanitario per interpretazione clinica</p>')
-    report.append('</div>')
-    
-    return "\n".join(report)
+    except ImportError:
+        # Se weasyprint non è disponibile, usa il fallback
+        return crea_pdf_semplice(report_html)
 
-def crea_pdf_moderno(report_html, filename="report_hrv.pdf"):
-    """Crea un PDF moderno ed elegante"""
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
-    
-    styles = getSampleStyleSheet()
-    
-    # Stili personalizzati
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        textColor=colors.HexColor('#2c3e50'),
-        spaceAfter=12,
-        alignment=1
-    )
-    
-    heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=14,
-        textColor=colors.HexColor('#3498db'),
-        spaceAfter=6
-    )
-    
-    normal_style = ParagraphStyle(
-        'CustomNormal',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.HexColor('#2c3e50'),
-        spaceAfter=6
-    )
-    
-    story = []
-    
-    # Titolo
-    story.append(Paragraph("ANALISI HRV COMPLETA", title_style))
-    story.append(Spacer(1, 12))
-    
-    # Converti HTML semplice in contenuto PDF
-    lines = report_html.split('\n')
-    for line in lines:
-        if '<h1' in line:
-            # Estrai testo tra > e <
-            text = line.split('>')[1].split('<')[0] if '>' in line and '<' in line else line
-            story.append(Paragraph(text, title_style))
-        elif '<h3' in line:
-            text = line.split('>')[1].split('<')[0] if '>' in line and '<' in line else line
-            story.append(Paragraph(text, heading_style))
-        elif '<p>' in line:
-            text = line.replace('<p>', '').replace('</p>', '').replace('<strong>', '<b>').replace('</strong>', '</b>')
-            story.append(Paragraph(text, normal_style))
-        elif line.strip() and not line.startswith('<'):
-            story.append(Paragraph(line, normal_style))
+def crea_pdf_semplice(report_html):
+    """Fallback per creare un PDF base se weasyprint non è disponibile"""
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import inch
         
-        story.append(Spacer(1, 6))
-    
-    doc.build(story)
-    
-    buffer.seek(0)
-    return buffer
+        buffer = BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+        
+        # Titolo elegante
+        c.setFillColorRGB(0.2, 0.4, 0.6)  # Blu scuro
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(1*inch, height-1*inch, "Report Analisi HRV")
+        
+        c.setFillColorRGB(0.5, 0.5, 0.5)  # Grigio
+        c.setFont("Helvetica", 10)
+        c.drawString(1*inch, height-1.3*inch, f"Generato il: {datetime.now().strftime('%d/%m/%Y alle %H:%M')}")
+        
+        # Linea divisoria
+        c.setStrokeColorRGB(0.8, 0.8, 0.8)
+        c.line(1*inch, height-1.5*inch, width-1*inch, height-1.5*inch)
+        
+        # Estrai testo semplice dall'HTML (rimuovi tag HTML)
+        lines = []
+        for line in report_html.split('\n'):
+            clean_line = line
+            # Rimuovi tag HTML comuni
+            clean_line = clean_line.replace('<div class="header">', '').replace('</div>', '')
+            clean_line = clean_line.replace('<h1>', '').replace('</h1>', '')
+            clean_line = clean_line.replace('<h2>', '').replace('</h2>', '')
+            clean_line = clean_line.replace('<h3>', '').replace('</h3>', '')
+            clean_line = clean_line.replace('<p>', '').replace('</p>', '')
+            clean_line = clean_line.replace('<strong>', '').replace('</strong>', '')
+            clean_line = clean_line.replace('<ul>', '').replace('</ul>', '')
+            clean_line = clean_line.replace('<li>', '• ').replace('</li>', '')
+            
+            if clean_line.strip() and len(clean_line.strip()) > 1:
+                lines.append(clean_line.strip())
+        
+        # Scrivi contenuto con formattazione
+        y_position = height - 1.8*inch
+        c.setFillColorRGB(0.2, 0.2, 0.2)  # Nero
+        c.setFont("Helvetica", 10)
+        
+        for i, line in enumerate(lines[:40]):  # Limita a 40 righe
+            if y_position < 1*inch:  # Nuova pagina se necessario
+                c.showPage()
+                y_position = height - 1*inch
+                c.setFont("Helvetica", 10)
+            
+            # Formattazione speciale per titoli
+            if any(keyword in line for keyword in ['ANALISI HRV', 'Informazioni Paziente', 'Metriche Principali', 'Valutazione', 'Raccomandazioni']):
+                c.setFont("Helvetica-Bold", 12)
+                c.setFillColorRGB(0.2, 0.4, 0.6)  # Blu
+            else:
+                c.setFont("Helvetica", 10)
+                c.setFillColorRGB(0.2, 0.2, 0.2)  # Nero
+            
+            c.drawString(1*inch, y_position, line[:90])  # Limita lunghezza
+            y_position -= 0.25*inch
+            
+            # Spaziatura extra dopo i titoli
+            if any(keyword in line for keyword in ['ANALISI HRV', 'Informazioni Paziente', 'Metriche Principali', 'Valutazione', 'Raccomandazioni']):
+                y_position -= 0.1*inch
+        
+        c.save()
+        buffer.seek(0)
+        return buffer
+        
+    except Exception as e:
+        # Ultimo fallback: PDF molto semplice
+        buffer = BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        c.drawString(100, 750, "REPORT ANALISI HRV")
+        c.drawString(100, 730, "=" * 50)
+        c.drawString(100, 700, "Per visualizzare il report completo,")
+        c.drawString(100, 680, "scaricare la versione testo.")
+        c.drawString(100, 650, f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        c.save()
+        buffer.seek(0)
+        return buffer
 
 # =============================================================================
 # FUNZIONE PRINCIPALE
@@ -3439,11 +3436,11 @@ def main():
                         st.write(f"• {impatto}")
   
                 # =============================================================================
-                # REPORT MODERNO E ELEGANTE
+                # ESPORTAZIONE REPORT
                 # =============================================================================
-                st.subheader("📄 Report Completo")
+                st.subheader("📄 Esporta Report")
                 
-                with st.expander("📋 Visualizza Report di Analisi", expanded=False):
+                with st.expander("📋 Visualizza e Scarica Report Completo", expanded=False):
                     # Genera il report
                     report_completo = genera_report_completo(
                         st.session_state.user_profile,
@@ -3454,37 +3451,56 @@ def main():
                         analisi_impatto
                     )
                     
-                    # Mostra il report
-                    st.markdown(report_completo, unsafe_allow_html=True)
+                    # Mostra il report con stile elegante
+                    st.markdown("""
+                    <style>
+                    .report-container {
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        padding: 25px;
+                        border-radius: 15px;
+                        border-left: 5px solid #3498db;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                        margin-bottom: 20px;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
                     
-                    # Pulsanti esportazione
+                    st.markdown('<div class="report-container">', unsafe_allow_html=True)
+                    st.markdown(report_completo, unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Pulsanti esportazione moderni
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        if st.button("📥 Scarica PDF", use_container_width=True, type="primary"):
-                            try:
-                                pdf_buffer = crea_pdf_moderno(report_completo)
-                                timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-                                
-                                st.download_button(
-                                    label="⬇️ Scarica Report PDF",
-                                    data=pdf_buffer.getvalue(),
-                                    file_name=f"report_hrv_{timestamp}.pdf",
-                                    mime="application/pdf",
-                                    use_container_width=True
-                                )
-                            except Exception as e:
-                                st.error(f"Errore nella generazione PDF: {e}")
+                        if st.button("📥 Genera PDF Elegante", use_container_width=True, type="primary"):
+                            with st.spinner("Creando PDF professionale..."):
+                                try:
+                                    pdf_buffer = crea_pdf_moderno(report_completo)
+                                    timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+                                    
+                                    st.download_button(
+                                        label="⬇️ Scarica Report PDF",
+                                        data=pdf_buffer.getvalue(),
+                                        file_name=f"report_hrv_{timestamp}.pdf",
+                                        mime="application/pdf",
+                                        use_container_width=True
+                                    )
+                                except Exception as e:
+                                    st.error("❌ Impossibile generare PDF")
+                                    st.info("💡 Prova a scaricare la versione testo qui sotto")
                     
                     with col2:
                         timestamp = datetime.now().strftime('%Y%m%d_%H%M')
                         st.download_button(
-                            label="📝 Scarica Testo",
+                            label="📝 Scarica Versione Testo",
                             data=report_completo,
                             file_name=f"report_hrv_{timestamp}.txt",
                             mime="text/plain",
                             use_container_width=True
                         )
+                    
+                    st.info("💡 **Suggerimento:** Il PDF contiene una versione ottimizzata per la stampa con grafica elegante")
              
                 # =============================================================================
                 # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA
