@@ -2702,180 +2702,123 @@ def main():
                     except Exception as e:
                         st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
             
-            # GRAFICO DETTAGLIATO IBI CON ZOOM E FILTRO
-            st.subheader("📈 Grafico Dettagliato IBI con Zoom")
+            # GRAFICO DETTAGLIATO IBI OTTIMIZZATO (PERFORMANCE)
+            st.subheader("📈 Grafico Battito Cardiaco con Attività")
             
             if len(rr_intervals) > 0:
-                # Filtra gli IBI per rimuovere picchi anomali (versione migliorata)
+                # FILTRO AGGRESSIVO + CAMPIONAMENTO per performance
                 clean_rr = filter_rr_outliers(rr_intervals)
                 
-                # Crea timeline per gli IBI filtrati
-                time_points = np.cumsum(clean_rr) / 1000 / 60  # Converti in minuti
-                heart_rate = [60000 / rr for rr in clean_rr]  # Battiti al minuto
+                # Se ci sono troppi dati, campiona per il grafico principale
+                max_points = 2000  # Numero massimo di punti per performance
+                if len(clean_rr) > max_points:
+                    sampling_step = len(clean_rr) // max_points
+                    sampled_rr = clean_rr[::sampling_step]
+                    st.info(f"📊 Grafico ottimizzato: campionato 1 ogni {sampling_step} IBI per performance")
+                else:
+                    sampled_rr = clean_rr
+                
+                # Calcola timeline e battiti per i dati campionati
+                time_points = np.cumsum(sampled_rr) / 1000 / 60  # Minuti
+                heart_rate = [60000 / rr for rr in sampled_rr]  # BPM
                 
                 # Calcola rolling average per smoothing
-                window_size = min(30, len(clean_rr) // 10)  # Adatta la finestra
+                window_size = min(10, len(sampled_rr) // 50)
                 if window_size > 1:
                     hr_smooth = pd.Series(heart_rate).rolling(window=window_size, center=True).mean().tolist()
                 else:
                     hr_smooth = heart_rate
                 
-                # Crea il grafico principale
+                # GRAFICO PRINCIPALE SEMPLIFICATO
                 fig_main = go.Figure()
                 
-                # Linea smoothed
+                # Solo linea smoothed (NON i punti originali)
                 fig_main.add_trace(go.Scatter(
                     x=time_points,
                     y=hr_smooth,
                     mode='lines',
-                    name='Battito Cardiaco (smoothed)',
-                    line=dict(color='#e74c3c', width=2),
+                    name='Battito Cardiaco',
+                    line=dict(color='#e74c3c', width=1.5),
                     hovertemplate='<b>%{x:.1f} min</b><br>Battito: %{y:.1f} bpm<extra></extra>'
                 ))
                 
-                # Punti originali (trasparenti per hover)
-                fig_main.add_trace(go.Scatter(
-                    x=time_points,
-                    y=heart_rate,
-                    mode='markers',
-                    name='Battiti Originali',
-                    marker=dict(
-                        color='#3498db',
-                        size=3,
-                        opacity=0.3
-                    ),
-                    hovertemplate='<b>%{x:.1f} min</b><br>Battito: %{y:.1f} bpm<extra></extra>',
-                    showlegend=False
-                ))
+                # Aggiungi SOLO le attività principali (non tutte)
+                main_activities = [a for a in st.session_state.activities if a['duration'] > 30]  # Solo attività >30min
                 
-                # Aggiungi linee verticali per le attività
-                current_time = start_time
-                activity_lines = []
+                for activity in main_activities[-5:]:  # Solo ultime 5 attività
+                    try:
+                        activity_start = activity['start_time']
+                        activity_end = activity_start + timedelta(minutes=activity['duration'])
+                        
+                        # Calcola i minuti dall'inizio
+                        start_minutes = (activity_start - start_time).total_seconds() / 60
+                        end_minutes = (activity_end - start_time).total_seconds() / 60
+                        
+                        # Solo linea verticale (NO area, NO annotazione complessa)
+                        if 0 <= start_minutes <= time_points[-1]:
+                            fig_main.add_vline(
+                                x=start_minutes,
+                                line_dash="dash",
+                                line_color=activity['color'],
+                                line_width=2,
+                                opacity=0.7
+                            )
+                    except:
+                        continue
                 
-                for activity in st.session_state.activities:
-                    activity_start = activity['start_time']
-                    activity_end = activity_start + timedelta(minutes=activity['duration'])
-                    
-                    # Calcola i minuti dall'inizio della registrazione
-                    start_minutes = (activity_start - start_time).total_seconds() / 60
-                    end_minutes = (activity_end - start_time).total_seconds() / 60
-                    
-                    # Linea di inizio attività
-                    fig_main.add_vline(
-                        x=start_minutes,
-                        line_dash="solid",
-                        line_color=activity['color'],
-                        line_width=3,
-                        opacity=0.8
-                    )
-                    
-                    # Area dell'attività
-                    fig_main.add_vrect(
-                        x0=start_minutes,
-                        x1=end_minutes,
-                        fillcolor=activity['color'],
-                        opacity=0.2,
-                        line_width=0,
-                        annotation_text=activity['name'],
-                        annotation_position="top left"
-                    )
-                    
-                    # Etichetta attività
-                    fig_main.add_annotation(
-                        x=start_minutes,
-                        y=max(heart_rate) * 0.95,
-                        text=activity['name'],
-                        showarrow=True,
-                        arrowhead=2,
-                        arrowsize=1,
-                        arrowwidth=2,
-                        arrowcolor=activity['color'],
-                        bgcolor="white",
-                        bordercolor=activity['color'],
-                        borderwidth=1,
-                        borderpad=4,
-                        font=dict(size=10, color=activity['color'])
-                    )
-                
-                # Layout del grafico principale
+                # Layout SEMPLIFICATO
                 fig_main.update_layout(
-                    title="Battito Cardiaco Dettagliato con Attività",
-                    xaxis_title="Tempo dalla registrazione (minuti)",
+                    title="Battito Cardiaco - Vista Ottimizzata",
+                    xaxis_title="Tempo (minuti)",
                     yaxis_title="Battito Cardiaco (bpm)",
-                    hovermode='closest',
-                    height=500,
-                    showlegend=True,
-                    xaxis=dict(
-                        rangeslider=dict(visible=True, thickness=0.05),
-                        type="linear"
-                    )
+                    hovermode='x unified',
+                    height=400,
+                    showlegend=True
                 )
+                
+                # DISABILITA rangeslider (consuma troppe risorse)
+                fig_main.update_layout(xaxis=dict(rangeslider=dict(visible=False)))
                 
                 st.plotly_chart(fig_main, use_container_width=True)
                 
-                # GRAFICO ZOOM SU 5 MINUTI (sezione espandibile)
-                with st.expander("🔍 Zoom su 5 Minuti Casuali", expanded=False):
-                    if len(clean_rr) > 300:  # Almeno 5 minuti di dati
-                        # Seleziona un punto casuale per lo zoom (evita i bordi)
-                        zoom_start = np.random.randint(100, len(clean_rr) - 200)
-                        zoom_end = zoom_start + 300  # 5 minuti circa
+                # ZOOM 5 MINUTI (solo su sottoinsieme)
+                with st.expander("🔍 Dettaglio 5 Minuti Casuali", expanded=False):
+                    if len(clean_rr) > 300:
+                        # Prendi un sottoinsieme piccolo per lo zoom
+                        zoom_size = min(500, len(clean_rr) // 10)
+                        zoom_start = np.random.randint(0, len(clean_rr) - zoom_size)
+                        zoom_end = zoom_start + min(300, zoom_size)
                         
-                        # Crea grafico zoom
-                        fig_zoom = go.Figure()
-                        
-                        # Sezione zoomata
-                        zoom_time = time_points[zoom_start:zoom_end]
-                        zoom_hr = heart_rate[zoom_start:zoom_end]
                         zoom_rr = clean_rr[zoom_start:zoom_end]
+                        zoom_time = np.cumsum(zoom_rr) / 1000 / 60
+                        zoom_hr = [60000 / rr for rr in zoom_rr]
                         
-                        # Battiti
+                        fig_zoom = go.Figure()
                         fig_zoom.add_trace(go.Scatter(
                             x=zoom_time,
                             y=zoom_hr,
                             mode='lines+markers',
-                            name='Battito Cardiaco',
-                            line=dict(color='#e74c3c', width=3),
-                            marker=dict(size=6, color='#c0392b'),
-                            hovertemplate='<b>%{x:.1f} min</b><br>Battito: %{y:.1f} bpm<br>IBI: %{customdata} ms<extra></extra>',
-                            customdata=zoom_rr
+                            name='Battito',
+                            line=dict(color='#3498db', width=2),
+                            marker=dict(size=4)
                         ))
                         
-                        # Calcola variabilità nella finestra
-                        if len(zoom_rr) > 10:
-                            rmssd_zoom = np.sqrt(np.mean(np.square(np.diff(zoom_rr))))
-                            sdnn_zoom = np.std(zoom_rr)
-                            
-                            fig_zoom.add_annotation(
-                                x=zoom_time[len(zoom_time)//2],
-                                y=max(zoom_hr) * 0.9,
-                                text=f"RMSSD: {rmssd_zoom:.1f} ms<br>SDNN: {sdnn_zoom:.1f} ms",
-                                showarrow=False,
-                                bgcolor="white",
-                                bordercolor="black",
-                                borderwidth=1
-                            )
-                        
                         fig_zoom.update_layout(
-                            title=f"Zoom 5 Minuti (da {zoom_time[0]:.1f} a {zoom_time[-1]:.1f} minuti)",
-                            xaxis_title="Tempo (minuti)",
-                            yaxis_title="Battito Cardiaco (bpm)",
-                            height=400,
+                            title=f"Dettaglio {len(zoom_rr)} battiti",
+                            height=300,
                             showlegend=False
                         )
                         
                         st.plotly_chart(fig_zoom, use_container_width=True)
-                    else:
-                        st.info("Dati insufficienti per lo zoom 5 minuti")
                 
-                # STATISTICHE FILTRAGGIO
-                st.info(f"""
-                **📊 Statistiche Filtraggio:**
-                - IBI totali: {len(rr_intervals)}
-                - IBI dopo filtraggio: {len(clean_rr)} ({len(clean_rr)/len(rr_intervals)*100:.1f}%)
-                - IBI rimossi: {len(rr_intervals) - len(clean_rr)}
-                - Battito medio: {np.mean(heart_rate):.1f} bpm
-                - Variabilità (SDNN): {np.std(clean_rr):.1f} ms
-                """)
+                # STATISTICHE RAPIDE
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("IBI Totali", len(rr_intervals))
+                with col2:
+                    st.metric("IBI Dopo Filtro", len(clean_rr))
+                with col3:
+                    st.metric("Battito Medio", f"{np.mean(heart_rate):.1f} bpm")
             
             # ANALISI IMPATTO ATTIVITÀ
             st.header("🎯 Analisi Impatto Attività sull'HRV")
