@@ -2367,18 +2367,6 @@ def main():
                 if sleep_metrics:
                     avg_metrics.update(sleep_metrics)
                     st.success(f"😴 SONNO ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
-                
-                # Propaga le metriche sonno specifiche per ogni notte alle daily_metrics
-                for sleep_activity in sleep_activities:
-                    sleep_date = sleep_activity['start_time'].date().isoformat()
-                    
-                    if sleep_date in daily_metrics:
-                        # Calcola metriche sonno specifiche per questa notte
-                        sleep_metrics_specific = calculate_real_sleep_metrics(sleep_activity, timeline)
-                        
-                        if sleep_metrics_specific:
-                            # Aggiungi le metriche sonno specifiche a questo giorno
-                            daily_metrics[sleep_date].update(sleep_metrics_specific)
             else:
                 st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel pannello laterale")
                 sleep_metrics = {}
@@ -2394,61 +2382,20 @@ def main():
                     avg_metrics.update(sleep_metrics_alt)
                     st.success(f"😴 SONNO ANALIZZATO (metodo alternativo): {sleep_metrics_alt.get('sleep_duration', 0):.1f} ore")
 
-            # DEBUG: verifica perché le metriche sonno non appaiono
-            st.subheader("🔍 DEBUG Visualizzazione Metriche Sonno")
-            
-            has_sleep_metrics = has_valid_sleep_metrics(avg_metrics)
-            st.write(f"📊 has_valid_sleep_metrics restituisce: {has_sleep_metrics}")
-            st.write(f"📋 Tutte le metriche in avg_metrics: {list(avg_metrics.keys())}")
-            
-            sleep_keys = ['sleep_duration', 'sleep_efficiency', 'sleep_hr', 'sleep_light', 'sleep_deep', 'sleep_rem', 'sleep_awake']
-            for key in sleep_keys:
-                if key in avg_metrics:
-                    st.write(f"✅ {key}: {avg_metrics[key]}")
-                else:
-                    st.write(f"❌ {key}: NON presente")
-
-            # DEBUG: verifica le daily_metrics
-            st.subheader("🔍 DEBUG Daily Metrics")
-            st.write(f"📅 Giorni nelle daily_metrics: {list(daily_metrics.keys())}")
-            
-            for day_date, day_metrics in daily_metrics.items():
-                has_sleep = has_valid_sleep_metrics(day_metrics)
-                st.write(f"📊 {day_date}: has_sleep_metrics = {has_sleep}")
-                if has_sleep:
-                    st.write(f"   💤 Metriche sonno: { {k: v for k, v in day_metrics.items() if k.startswith('sleep_')} }")
-
             # PROPAGA le metriche sonno alle daily_metrics corrispondenti
-            if has_sleep_metrics and sleep_activities:
-                st.subheader("🔄 Propagazione Metriche Sonno")
-                
+            sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
+            
+            if sleep_activities:
                 for sleep_activity in sleep_activities:
                     sleep_date = sleep_activity['start_time'].date().isoformat()
-                    st.write(f"📅 Cercando di associare sonno al giorno: {sleep_date}")
                     
                     if sleep_date in daily_metrics:
-                        st.success(f"✅ Giorno {sleep_date} trovato in daily_metrics - CALCOLO metriche sonno specifiche")
-                        
                         # CALCOLA METRICHE SONNO SPECIFICHE per questa notte
                         sleep_metrics_specific = calculate_real_sleep_metrics(sleep_activity, timeline)
                         
                         if sleep_metrics_specific:
-                            st.write(f"📊 Metriche sonno specifiche per {sleep_date}: {sleep_metrics_specific}")
                             # Aggiungi le metriche sonno SPECIFICHE a questo giorno
                             daily_metrics[sleep_date].update(sleep_metrics_specific)
-                        else:
-                            st.warning(f"⚠️ Impossibile calcolare metriche sonno per {sleep_date}")
-                    else:
-                        st.warning(f"⚠️ Giorno {sleep_date} NON trovato in daily_metrics")
-
-            # DEBUG FINALE: verifica che le metriche sonno siano diverse per ogni giorno
-            st.subheader("🔍 DEBUG Finale - Verifica Metriche Sonno per Giorno")
-            for day_date, day_metrics in daily_metrics.items():
-                if has_valid_sleep_metrics(day_metrics):
-                    st.success(f"✅ {day_date} - HA metriche sonno:")
-                    st.write(f"   💤 Durata: {day_metrics.get('sleep_duration', 0):.1f}h")
-                    st.write(f"   📈 Efficienza: {day_metrics.get('sleep_efficiency', 0):.1f}%")
-                    st.write(f"   💓 HR: {day_metrics.get('sleep_hr', 0):.1f}bpm")	
             
             # PRIMA RIGA: DOMINIO TEMPO E COERENZA
             col1, col2, col3, col4, col5 = st.columns(5)
