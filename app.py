@@ -20,12 +20,6 @@ from email.mime.text import MIMEText
 import secrets
 import time
 import json
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib import colors
-from reportlab.pdfgen import canvas
 
 # =============================================================================
 # SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
@@ -2426,14 +2420,13 @@ def analizza_impatto_attivita_su_hrv(activities, time_points, sdnn_values, rmssd
 # =============================================================================
 
 def crea_pdf_moderno(report_html):
-    """Crea un PDF moderno ed elegante dal report HTML"""
+    """Crea un PDF semplice senza dipendenze esterne"""
     try:
-        # Prova con weasyprint (più probabile su Streamlit Cloud)
+        # Prova weasyprint prima (più comune su Streamlit Cloud)
         from weasyprint import HTML
         import tempfile
         import os
         
-        # Crea HTML completo con stili eleganti
         html_completo = f"""
         <!DOCTYPE html>
         <html>
@@ -2441,69 +2434,27 @@ def crea_pdf_moderno(report_html):
             <meta charset="UTF-8">
             <style>
                 body {{
-                    font-family: 'Arial', sans-serif;
-                    margin: 30px;
+                    font-family: Arial, sans-serif;
+                    margin: 40px;
                     color: #2c3e50;
                     line-height: 1.6;
-                    background: #f8f9fa;
-                }}
-                .container {{
-                    max-width: 800px;
-                    margin: 0 auto;
-                    background: white;
-                    padding: 30px;
-                    border-radius: 15px;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
                 }}
                 .header {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: #3498db;
                     color: white;
                     padding: 30px;
-                    border-radius: 12px;
+                    border-radius: 10px;
                     margin-bottom: 25px;
                     text-align: center;
                 }}
                 .section {{
-                    margin-bottom: 25px;
+                    margin-bottom: 20px;
                     padding: 20px;
-                    border-radius: 10px;
-                }}
-                .metric-grid {{
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 15px;
-                    margin: 20px 0;
-                }}
-                .metric-card {{
-                    background: white;
-                    padding: 20px;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-                    text-align: center;
-                    border: 1px solid #e9ecef;
-                }}
-                .recommendation {{
                     background: #f8f9fa;
-                    padding: 20px;
-                    border-radius: 10px;
-                    margin: 15px 0;
-                    border-left: 4px solid #3498db;
+                    border-radius: 8px;
                 }}
-                h1 {{ 
-                    color: white; 
-                    margin: 0;
-                    font-size: 28px;
-                }}
-                h2 {{ 
-                    color: #3498db; 
-                    border-bottom: 2px solid #3498db; 
-                    padding-bottom: 10px;
-                    margin-top: 0;
-                }}
-                h3 {{ 
-                    color: #2c3e50; 
-                    margin-bottom: 10px;
-                }}
+                h1 {{ color: white; margin: 0; }}
+                h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; }}
                 .footer {{
                     text-align: center;
                     margin-top: 30px;
@@ -2512,128 +2463,86 @@ def crea_pdf_moderno(report_html):
                     color: white;
                     border-radius: 8px;
                 }}
-                .good {{
-                    background: #d4edda;
-                    border-left: 4px solid #28a745;
-                }}
-                .warning {{
-                    background: #fff3cd;
-                    border-left: 4px solid #ffc107;
-                }}
-                .excellent {{
-                    background: #d1ecf1;
-                    border-left: 4px solid #17a2b8;
-                }}
             </style>
         </head>
         <body>
-            <div class="container">
-                {report_html}
-            </div>
+            {report_html}
         </body>
         </html>
         """
         
-        # Crea PDF temporaneo
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
             HTML(string=html_completo).write_pdf(tmp_file.name)
             
-            # Leggi il file PDF
             with open(tmp_file.name, 'rb') as f:
                 pdf_data = f.read()
             
-            # Pulizia
             os.unlink(tmp_file.name)
             
         return BytesIO(pdf_data)
         
     except ImportError:
-        # Se weasyprint non è disponibile, usa il fallback
-        return crea_pdf_semplice(report_html)
+        # Se weasyprint non c'è, crea un PDF base con fpdf
+        return crea_pdf_semplice_fallback(report_html)
 
-def crea_pdf_semplice(report_html):
-    """Fallback per creare un PDF base se weasyprint non è disponibile"""
+def crea_pdf_semplice_fallback(report_html):
+    """Crea un PDF base senza dipendenze esterne"""
     try:
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import inch
+        # Prova fpdf (più leggero)
+        from fpdf import FPDF
+        import tempfile
+        import os
         
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
+        # Crea PDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
         
-        # Titolo elegante
-        c.setFillColorRGB(0.2, 0.4, 0.6)  # Blu scuro
-        c.setFont("Helvetica-Bold", 20)
-        c.drawString(1*inch, height-1*inch, "Report Analisi HRV")
+        # Titolo
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(200, 10, txt="Report Analisi HRV", ln=True, align='C')
+        pdf.ln(10)
         
-        c.setFillColorRGB(0.5, 0.5, 0.5)  # Grigio
-        c.setFont("Helvetica", 10)
-        c.drawString(1*inch, height-1.3*inch, f"Generato il: {datetime.now().strftime('%d/%m/%Y alle %H:%M')}")
+        # Data
+        pdf.set_font("Arial", size=10)
+        pdf.cell(200, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
+        pdf.ln(15)
         
-        # Linea divisoria
-        c.setStrokeColorRGB(0.8, 0.8, 0.8)
-        c.line(1*inch, height-1.5*inch, width-1*inch, height-1.5*inch)
-        
-        # Estrai testo semplice dall'HTML (rimuovi tag HTML)
+        # Processa il contenuto HTML semplificato
         lines = []
         for line in report_html.split('\n'):
             clean_line = line
-            # Rimuovi tag HTML comuni
-            clean_line = clean_line.replace('<div class="header">', '').replace('</div>', '')
-            clean_line = clean_line.replace('<h1>', '').replace('</h1>', '')
-            clean_line = clean_line.replace('<h2>', '').replace('</h2>', '')
-            clean_line = clean_line.replace('<h3>', '').replace('</h3>', '')
-            clean_line = clean_line.replace('<p>', '').replace('</p>', '')
-            clean_line = clean_line.replace('<strong>', '').replace('</strong>', '')
-            clean_line = clean_line.replace('<ul>', '').replace('</ul>', '')
-            clean_line = clean_line.replace('<li>', '• ').replace('</li>', '')
-            
-            if clean_line.strip() and len(clean_line.strip()) > 1:
-                lines.append(clean_line.strip())
+            # Rimuovi tag HTML
+            tags_to_remove = ['<div', '</div>', '<h1>', '</h1>', '<h2>', '</h2>', '<h3>', '</h3>', '<p>', '</p>', '<strong>', '</strong>', '<ul>', '</ul>', '<li>', '</li>']
+            for tag in tags_to_remove:
+                clean_line = clean_line.replace(tag, '')
+            clean_line = clean_line.strip()
+            if clean_line and len(clean_line) > 2:
+                lines.append(clean_line)
         
-        # Scrivi contenuto con formattazione
-        y_position = height - 1.8*inch
-        c.setFillColorRGB(0.2, 0.2, 0.2)  # Nero
-        c.setFont("Helvetica", 10)
+        # Aggiungi contenuto
+        pdf.set_font("Arial", size=10)
+        for line in lines[:50]:  # Limita a 50 righe
+            if pdf.get_y() > 250:  # Nuova pagina se necessario
+                pdf.add_page()
+            pdf.multi_cell(0, 8, txt=line[:80])  # Limita lunghezza
+            pdf.ln(5)
         
-        for i, line in enumerate(lines[:40]):  # Limita a 40 righe
-            if y_position < 1*inch:  # Nuova pagina se necessario
-                c.showPage()
-                y_position = height - 1*inch
-                c.setFont("Helvetica", 10)
+        # Salva in buffer
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
+            pdf.output(tmp_file.name)
             
-            # Formattazione speciale per titoli
-            if any(keyword in line for keyword in ['ANALISI HRV', 'Informazioni Paziente', 'Metriche Principali', 'Valutazione', 'Raccomandazioni']):
-                c.setFont("Helvetica-Bold", 12)
-                c.setFillColorRGB(0.2, 0.4, 0.6)  # Blu
-            else:
-                c.setFont("Helvetica", 10)
-                c.setFillColorRGB(0.2, 0.2, 0.2)  # Nero
+            with open(tmp_file.name, 'rb') as f:
+                pdf_data = f.read()
             
-            c.drawString(1*inch, y_position, line[:90])  # Limita lunghezza
-            y_position -= 0.25*inch
+            os.unlink(tmp_file.name)
             
-            # Spaziatura extra dopo i titoli
-            if any(keyword in line for keyword in ['ANALISI HRV', 'Informazioni Paziente', 'Metriche Principali', 'Valutazione', 'Raccomandazioni']):
-                y_position -= 0.1*inch
+        return BytesIO(pdf_data)
         
-        c.save()
-        buffer.seek(0)
-        return buffer
-        
-    except Exception as e:
-        # Ultimo fallback: PDF molto semplice
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
-        c.drawString(100, 750, "REPORT ANALISI HRV")
-        c.drawString(100, 730, "=" * 50)
-        c.drawString(100, 700, "Per visualizzare il report completo,")
-        c.drawString(100, 680, "scaricare la versione testo.")
-        c.drawString(100, 650, f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-        c.save()
-        buffer.seek(0)
-        return buffer
+    except ImportError:
+        # Se nessuna libreria PDF è disponibile, ritorna un PDF vuoto
+        st.warning("⚠️ Librerie PDF non disponibili. Aggiungi 'fpdf' o 'weasyprint' ai requirements")
+        return BytesIO(b"PDF non disponibile")
 
 # =============================================================================
 # FUNZIONE PRINCIPALE
