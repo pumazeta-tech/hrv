@@ -3056,6 +3056,10 @@ def main():
                         selected_indices.append(i)
                 
                 if selected_indices:
+                    selected_sdnn = [sdnn_values[i] for i in selected_indices]
+                    selected_rmssd = [rmssd_values[i] for i in selected_indices]
+                    selected_hr = [hr_values[i] for i in selected_indices]
+                    
                     # CONFRONTO TEMPORALE A 3 FASI
                     st.subheader("⏰ Confronto Temporale: Prima-Durante-Dopo")
                     
@@ -3086,76 +3090,177 @@ def main():
                             hide_index=True
                         )
                         
-                        # Aggiungi interpretazione COMPLETA
-                        st.subheader("💡 Interpretazione Risultati")
+                        # 1. VALUTAZIONE SINTETICA DEL PERIODO SELEZIONATO
+                        st.subheader("🎯 Valutazione Periodo Selezionato")
                         
-                        if len(comparison_data) == 3:
-                            selezione_data = comparison_data[1]  # Secondo elemento è "Selezione"
-                            prima_data = comparison_data[0]     # Primo elemento è "1h Prima"
-                            dopo_data = comparison_data[2]      # Terzo elemento è "1h Dopo"
+                        selezione_data = comparison_data[1]  # Secondo elemento è "Selezione"
+                        
+                        try:
+                            sdnn_selezione = float(selezione_data['SDNN (ms)']) if selezione_data['SDNN (ms)'] != 'N/D' else None
+                            rmssd_selezione = float(selezione_data['RMSSD (ms)']) if selezione_data['RMSSD (ms)'] != 'N/D' else None
+                            hr_selezione = float(selezione_data['HR (bpm)']) if selezione_data['HR (bpm)'] != 'N/D' else None
                             
-                            # Interpretazione SDNN
-                            if selezione_data['SDNN (ms)'] != 'N/D' and prima_data['SDNN (ms)'] != 'N/D':
-                                try:
-                                    sdnn_selezione = float(selezione_data['SDNN (ms)'])
-                                    sdnn_prima = float(prima_data['SDNN (ms)'])
-                                    
-                                    if sdnn_selezione > sdnn_prima:
-                                        st.success("📈 **SDNN in miglioramento** durante il periodo selezionato")
-                                    elif sdnn_selezione < sdnn_prima:
-                                        st.warning("📉 **SDNN in calo** durante il periodo selezionato")
-                                    else:
-                                        st.info("➡️ **SDNN stabile** durante il periodo selezionato")
-                                except:
-                                    pass
+                            if sdnn_selezione and rmssd_selezione and hr_selezione:
+                                if sdnn_selezione > 50 and rmssd_selezione > 30 and hr_selezione < 75:
+                                    st.success("🌟 **Stato di benessere ottimale** - buon equilibrio autonomico")
+                                elif sdnn_selezione < 30 or rmssd_selezione < 20:
+                                    st.warning("⚠️ **Possibile stato di stress** - ridotta variabilità cardiaca")
+                                else:
+                                    st.info("💪 **Stato fisiologico nella norma**")
+                        except:
+                            pass
+                        
+                        # 2. VALUTAZIONE GENERALE DETTAGLIATA DELL'INTERA REGISTRAZIONE
+                        st.subheader("📊 Valutazione Completa Registrazione")
+                        
+                        # Calcola medie generali di tutta la registrazione
+                        avg_sdnn_totale = np.mean(sdnn_values)
+                        avg_rmssd_totale = np.mean(rmssd_values)
+                        avg_hr_totale = np.mean(hr_values)
+                        
+                        # ANALISI DETTAGLIATA GENERALE
+                        problemi_riscontrati = []
+                        punti_di_forza = []
+                        consigli_pratici = []
+                        
+                        # Valutazione SDNN (Variabilità Totale)
+                        if avg_sdnn_totale > 60:
+                            punti_di_forza.append("**Alta variabilità cardiaca** (SDNN > 60 ms) - ottima resilienza cardiovascolare")
+                        elif avg_sdnn_totale > 40:
+                            punti_di_forza.append("**Variabilità cardiaca nella norma** (SDNN 40-60 ms) - buona salute cardiaca")
+                        elif avg_sdnn_totale > 25:
+                            problemi_riscontrati.append("**Variabilità cardiaca ridotta** (SDNN 25-40 ms) - possibile affaticamento")
+                            consigli_pratici.append("💤 **Priorità al recupero**: aumenta le ore di sonno e riduci gli allenamenti intensi")
+                            consigli_pratici.append("🌿 **Integrazione**: considera Magnesio 400mg serale per migliorare il recupero")
+                        else:
+                            problemi_riscontrati.append("**Variabilità cardiaca molto bassa** (SDNN < 25 ms) - stato di stress/fatica elevato")
+                            consigli_pratici.append("🛑 **Recupero urgente**: sospendi allenamenti intensi per 2-3 giorni")
+                            consigli_pratici.append("🧘 **Tecniche rilassamento**: pratica respirazione diaframmatica 10 minuti 2x al giorno")
+                            consigli_pratici.append("🍎 **Alimentazione**: aumenta cibi anti-infiammatori (salmone, frutti di bosco, spinaci)")
+                        
+                        # Valutazione RMSSD (Attività Parasimpatica)
+                        if avg_rmssd_totale > 50:
+                            punti_di_forza.append("**Eccellente attività parasimpatica** (RMSSD > 50 ms) - ottima capacità di recupero")
+                        elif avg_rmssd_totale > 35:
+                            punti_di_forza.append("**Buona attività parasimpatica** (RMSSD 35-50 ms) - recupero adeguato")
+                        elif avg_rmssd_totale > 25:
+                            problemi_riscontrati.append("**Attività parasimpatica ridotta** (RMSSD 25-35 ms) - recupero insufficiente")
+                            consigli_pratici.append("😴 **Qualità sonno**: crea routine serale (niente schermi 1h prima di dormire)")
+                            consigli_pratici.append("🌅 **Attività rigenerative**: yoga, meditazione o camminate nella natura")
+                            consigli_pratici.append("💧 **Idratazione**: bevi almeno 2L di acqua al giorno")
+                        else:
+                            problemi_riscontrati.append("**Attività parasimpatica molto bassa** (RMSSD < 25 ms) - sistema nervoso sovraccarico")
+                            consigli_pratici.append("🔄 **Bilanciamento attività**: inserisci 2 giorni di recupero per ogni allenamento intenso")
+                            consigli_pratici.append("🌱 **Integratori**: Ashwagandha 500mg al giorno per 3 settimane per ridurre lo stress")
+                            consigli_pratici.append("📵 **Digital detox**: riduci l'uso di dispositivi elettronici la sera")
+                        
+                        # Valutazione Frequenza Cardiaca
+                        if avg_hr_totale < 65:
+                            punti_di_forza.append("**Frequenza cardiaca ottimale** (< 65 bpm) - buon stato di forma")
+                        elif avg_hr_totale < 75:
+                            punti_di_forza.append("**Frequenza cardiaca nella norma** (65-75 bpm) - condizione normale")
+                        elif avg_hr_totale < 85:
+                            problemi_riscontrati.append("**Frequenza cardiaca elevata** (75-85 bpm) - possibile stress o disidratazione")
+                            consigli_pratici.append("☕ **Riduci eccitanti**: limita caffè, tè e energy drinks dopo le 15:00")
+                            consigli_pratici.append("🌬️ **Respirazione**: pratica respirazione 4-7-8 (4s inspiro, 7s pausa, 8s espiro)")
+                        else:
+                            problemi_riscontrati.append("**Frequenza cardiaca molto elevata** (> 85 bpm) - stress significativo o affaticamento")
+                            consigli_pratici.append("🏥 **Consulta medico**: se persistente, valuta con professionista sanitario")
+                            consigli_pratici.append("🌿 **Tisane rilassanti**: camomilla, passiflora o valeriana prima di dormire")
+                        
+                        # VALUTAZIONE FINALE GENERALE
+                        st.subheader("💡 Diagnosi Completa")
+                        
+                        if not problemi_riscontrati:
+                            st.success("## 🌟 STATO OTTIMALE DI SALUTE")
+                            st.info("**Tutti i parametri sono nella norma o superiori!** Il tuo sistema cardiovascolare mostra ottima resilienza.")
+                        elif len(problemi_riscontrati) == 1:
+                            st.warning("## ⚠️ STATO DISCRETO CON ALCUNE ATTENZIONI")
+                            st.info("**La maggior parte dei parametri è buona**, ma c'è un aspetto da migliorare.")
+                        else:
+                            st.error("## 🔴 STATO DI AFFATICAMENTO O STRESS")
+                            st.info("**Più parametri indicano uno squilibrio**. È importante intervenire con strategie di recupero.")
+                        
+                        # VISUALIZZAZIONE PUNTI DI FORZA E PROBLEMI
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            if punti_di_forza:
+                                st.success("### ✅ Punti di Forza")
+                                for punto in punti_di_forza:
+                                    st.write(f"• {punto}")
+                        
+                        with col2:
+                            if problemi_riscontrati:
+                                st.error("### ❌ Problematiche Rilevate")
+                                for problema in problemi_riscontrati:
+                                    st.write(f"• {problema}")
+                        
+                        # CONSIGLI PRATICI PERSONALIZZATI
+                        if consigli_pratici:
+                            st.success("### 🎯 Piano d'Azione Personalizzato")
                             
-                            # Interpretazione RMSSD
-                            if selezione_data['RMSSD (ms)'] != 'N/D' and prima_data['RMSSD (ms)'] != 'N/D':
-                                try:
-                                    rmssd_selezione = float(selezione_data['RMSSD (ms)'])
-                                    rmssd_prima = float(prima_data['RMSSD (ms)'])
-                                    
-                                    if rmssd_selezione > rmssd_prima:
-                                        st.success("😌 **RMSSD in miglioramento** - aumento attività parasimpatica")
-                                    elif rmssd_selezione < rmssd_prima:
-                                        st.warning("😰 **RMSSD in calo** - riduzione attività parasimpatica")
-                                    else:
-                                        st.info("😐 **RMSSD stabile** - attività parasimpatica costante")
-                                except:
-                                    pass
+                            # Raggruppa consigli per categoria
+                            consigli_sonno = [c for c in consigli_pratici if '💤' in c or '😴' in c]
+                            consigli_alimentazione = [c for c in consigli_pratici if '🍎' in c or '💧' in c or '☕' in c]
+                            consigli_attivita = [c for c in consigli_pratici if '🧘' in c or '🌅' in c or '🔄' in c]
+                            consigli_integratori = [c for c in consigli_pratici if '🌿' in c or '💊' in c]
+                            consigli_altro = [c for c in consigli_pratici if c not in consigli_sonno + consigli_alimentazione + consigli_attivita + consigli_integratori]
                             
-                            # Interpretazione Frequenza Cardiaca
-                            if selezione_data['HR (bpm)'] != 'N/D' and prima_data['HR (bpm)'] != 'N/D':
-                                try:
-                                    hr_selezione = float(selezione_data['HR (bpm)'])
-                                    hr_prima = float(prima_data['HR (bpm)'])
-                                    
-                                    if hr_selezione < hr_prima:
-                                        st.success("❤️ **Frequenza cardiaca ridotta** - stato di rilassamento")
-                                    elif hr_selezione > hr_prima:
-                                        st.warning("💔 **Frequenza cardiaca aumentata** - possibile stress o attività")
-                                    else:
-                                        st.info("💓 **Frequenza cardiaca stabile**")
-                                except:
-                                    pass
+                            if consigli_sonno:
+                                with st.expander("😴 **Migliora il Sonno e il Recupero**", expanded=True):
+                                    for consiglio in consigli_sonno:
+                                        st.write(f"• {consiglio}")
                             
-                            # Interpretazione combinata finale
-                            st.subheader("🎯 Sintesi Complessiva")
+                            if consigli_alimentazione:
+                                with st.expander("🍎 **Ottimizza l'Alimentazione**", expanded=True):
+                                    for consiglio in consigli_alimentazione:
+                                        st.write(f"• {consiglio}")
                             
-                            try:
-                                sdnn_selezione = float(selezione_data['SDNN (ms)']) if selezione_data['SDNN (ms)'] != 'N/D' else None
-                                rmssd_selezione = float(selezione_data['RMSSD (ms)']) if selezione_data['RMSSD (ms)'] != 'N/D' else None
-                                hr_selezione = float(selezione_data['HR (bpm)']) if selezione_data['HR (bpm)'] != 'N/D' else None
-                                
-                                if sdnn_selezione and rmssd_selezione and hr_selezione:
-                                    if sdnn_selezione > 50 and rmssd_selezione > 30 and hr_selezione < 75:
-                                        st.success("🌟 **Stato di benessere ottimale** - buon equilibrio autonomico")
-                                    elif sdnn_selezione < 30 or rmssd_selezione < 20:
-                                        st.warning("⚠️ **Possibile stato di stress** - ridotta variabilità cardiaca")
-                                    else:
-                                        st.info("💪 **Stato fisiologico nella norma**")
-                            except:
-                                pass
+                            if consigli_attivita:
+                                with st.expander("🏃‍♂️ **Bilanciamento Attività Fisica**", expanded=True):
+                                    for consiglio in consigli_attivita:
+                                        st.write(f"• {consiglio}")
+                            
+                            if consigli_integratori:
+                                with st.expander("💊 **Integrazione Supportiva**", expanded=True):
+                                    for consiglio in consigli_integratori:
+                                        st.write(f"• {consiglio}")
+                            
+                            if consigli_altro:
+                                with st.expander("🔧 **Altri Consigli Pratici**", expanded=True):
+                                    for consiglio in consigli_altro:
+                                        st.write(f"• {consiglio}")
+                            
+                            # TIMELINE RACCOMANDAZIONI
+                            st.info("""
+                            **⏰ Timeline raccomandata:**
+                            - **Immediato** (oggi): Inizia con idratazione e tecniche respirazione
+                            - **Breve termine** (3-7 giorni): Implementa modifiche alimentari e routine sonno  
+                            - **Medio termine** (1-3 settimane): Valuta integratori e bilanciamento attività
+                            """)
+                        
+                        # RACCOMANDAZIONI BASATE SUL DATABASE ATTIVITÀ
+                        st.subheader("🏋️‍♂️ Attività Consigliate")
+                        
+                        if problemi_riscontrati:
+                            st.write("**Per il recupero:**")
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.info("**Yoga**\n- Migliora RMSSD\n- Riduce stress\n- 30-60 minuti")
+                            with col2:
+                                st.info("**Meditazione**\n- Aumenta coerenza cardiaca\n- 10-30 minuti\n- Mattina/sera")
+                            with col3:
+                                st.info("**Camminata**\n- Leggera rigenerazione\n- 30-60 minuti\n- Frequenza quotidiana")
+                        else:
+                            st.write("**Per mantenimento:**")
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.success("**Nuoto**\n- Full body\n- Basso impatto\n- 30-60 minuti")
+                            with col2:
+                                st.success("**Ciclismo**\n- Cardio moderato\n- Resistenza\n- 45-120 minuti")
+                            with col3:
+                                st.success("**Corsa leggera**\n- Cardio\n- Umore e metabolismo\n- 30-45 minuti")
                 else:
                     st.warning("⚠️ Nessun dato trovato nel periodo selezionato")
 
