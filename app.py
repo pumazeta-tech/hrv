@@ -3056,24 +3056,6 @@ def main():
                         selected_indices.append(i)
                 
                 if selected_indices:
-                    selected_sdnn = [sdnn_values[i] for i in selected_indices]
-                    selected_rmssd = [rmssd_values[i] for i in selected_indices]
-                    selected_hr = [hr_values[i] for i in selected_indices]
-                    
-                    # STATISTICHE AGGIORNATE PER LA SELEZIONE
-                    st.subheader("📊 Statistiche Area Selezionata")
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        st.metric("SDNN Medio", f"{np.mean(selected_sdnn):.1f} ms")
-                    with col2:
-                        st.metric("RMSSD Medio", f"{np.mean(selected_rmssd):.1f} ms")
-                    with col3:
-                        st.metric("Battito Medio", f"{np.mean(selected_hr):.1f} bpm")
-                    with col4:
-                        st.metric("Finestre Analizzate", len(selected_indices))
-                    
                     # CONFRONTO TEMPORALE A 3 FASI
                     st.subheader("⏰ Confronto Temporale: Prima-Durante-Dopo")
                     
@@ -3104,7 +3086,7 @@ def main():
                             hide_index=True
                         )
                         
-                        # Aggiungi interpretazione
+                        # Aggiungi interpretazione COMPLETA
                         st.subheader("💡 Interpretazione Risultati")
                         
                         if len(comparison_data) == 3:
@@ -3112,6 +3094,7 @@ def main():
                             prima_data = comparison_data[0]     # Primo elemento è "1h Prima"
                             dopo_data = comparison_data[2]      # Terzo elemento è "1h Dopo"
                             
+                            # Interpretazione SDNN
                             if selezione_data['SDNN (ms)'] != 'N/D' and prima_data['SDNN (ms)'] != 'N/D':
                                 try:
                                     sdnn_selezione = float(selezione_data['SDNN (ms)'])
@@ -3125,6 +3108,54 @@ def main():
                                         st.info("➡️ **SDNN stabile** durante il periodo selezionato")
                                 except:
                                     pass
+                            
+                            # Interpretazione RMSSD
+                            if selezione_data['RMSSD (ms)'] != 'N/D' and prima_data['RMSSD (ms)'] != 'N/D':
+                                try:
+                                    rmssd_selezione = float(selezione_data['RMSSD (ms)'])
+                                    rmssd_prima = float(prima_data['RMSSD (ms)'])
+                                    
+                                    if rmssd_selezione > rmssd_prima:
+                                        st.success("😌 **RMSSD in miglioramento** - aumento attività parasimpatica")
+                                    elif rmssd_selezione < rmssd_prima:
+                                        st.warning("😰 **RMSSD in calo** - riduzione attività parasimpatica")
+                                    else:
+                                        st.info("😐 **RMSSD stabile** - attività parasimpatica costante")
+                                except:
+                                    pass
+                            
+                            # Interpretazione Frequenza Cardiaca
+                            if selezione_data['HR (bpm)'] != 'N/D' and prima_data['HR (bpm)'] != 'N/D':
+                                try:
+                                    hr_selezione = float(selezione_data['HR (bpm)'])
+                                    hr_prima = float(prima_data['HR (bpm)'])
+                                    
+                                    if hr_selezione < hr_prima:
+                                        st.success("❤️ **Frequenza cardiaca ridotta** - stato di rilassamento")
+                                    elif hr_selezione > hr_prima:
+                                        st.warning("💔 **Frequenza cardiaca aumentata** - possibile stress o attività")
+                                    else:
+                                        st.info("💓 **Frequenza cardiaca stabile**")
+                                except:
+                                    pass
+                            
+                            # Interpretazione combinata finale
+                            st.subheader("🎯 Sintesi Complessiva")
+                            
+                            try:
+                                sdnn_selezione = float(selezione_data['SDNN (ms)']) if selezione_data['SDNN (ms)'] != 'N/D' else None
+                                rmssd_selezione = float(selezione_data['RMSSD (ms)']) if selezione_data['RMSSD (ms)'] != 'N/D' else None
+                                hr_selezione = float(selezione_data['HR (bpm)']) if selezione_data['HR (bpm)'] != 'N/D' else None
+                                
+                                if sdnn_selezione and rmssd_selezione and hr_selezione:
+                                    if sdnn_selezione > 50 and rmssd_selezione > 30 and hr_selezione < 75:
+                                        st.success("🌟 **Stato di benessere ottimale** - buon equilibrio autonomico")
+                                    elif sdnn_selezione < 30 or rmssd_selezione < 20:
+                                        st.warning("⚠️ **Possibile stato di stress** - ridotta variabilità cardiaca")
+                                    else:
+                                        st.info("💪 **Stato fisiologico nella norma**")
+                            except:
+                                pass
                 else:
                     st.warning("⚠️ Nessun dato trovato nel periodo selezionato")
 
