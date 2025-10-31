@@ -2505,8 +2505,8 @@ if uploaded_file is not None:
             user_profile['gender']
         )
         
-        avg_metrics = {}  # ← QUESTA RIGA DEVE AVERE LA STESSA INDENTAZIONE DELLE ALTRE NEL try
-        
+        avg_metrics = {}
+
         try:
             calculated_metrics = calculate_professional_hrv_metrics(
                 rr_intervals, user_profile['age'], user_profile['gender'], start_time, timeline['end_time']
@@ -2523,65 +2523,52 @@ if uploaded_file is not None:
         sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
         
         if sleep_activities:
-                # Analizza l'ULTIMA attività sonno per le metriche complessive
-                latest_sleep = sleep_activities[-1]
-                sleep_metrics = get_sleep_metrics_from_activities(
-                    st.session_state.activities, daily_metrics, timeline
-                )
+            # Analizza l'ULTIMA attività sonno per le metriche complessive
+            latest_sleep = sleep_activities[-1]
+            sleep_metrics = get_sleep_metrics_from_activities(
+                st.session_state.activities, daily_metrics, timeline
+            )
+            
+            if sleep_metrics:
+                avg_metrics.update(sleep_metrics)
+                st.success(f"😴 SONNO ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
+            
+            # Propaga le metriche sonno specifiche per ogni notte alle daily_metrics
+            for sleep_activity in sleep_activities:
+                sleep_date = sleep_activity['start_time'].date().isoformat()
                 
-                if sleep_metrics:
-                    avg_metrics.update(sleep_metrics)
-                    st.success(f"😴 SONNO ANALIZZATO: {sleep_metrics.get('sleep_duration', 0):.1f} ore")
+                if sleep_date in daily_metrics:
+                    # Calcola metriche sonno specifiche per questa notte
+                    sleep_metrics_specific = calculate_real_sleep_metrics(sleep_activity, timeline)
+                    
+                    if sleep_metrics_specific:
+                        # Aggiungi le metriche sonno specifiche a questo giorno
+                        daily_metrics[sleep_date].update(sleep_metrics_specific)
         else:
             st.info("💡 Per vedere l'analisi del sonno, registra un'attività 'Sonno' nel pannello laterale")
-            sleep_metrics = {}
 
-            # SOLUZIONE ALTERNATIVA: analisi sonno forzata
-            if not sleep_metrics and sleep_activities:
-                st.warning("🔄 Tentativo analisi sonno alternativa...")
-                
-                latest_sleep = sleep_activities[-1]
-                sleep_metrics_alt = calculate_real_sleep_metrics(latest_sleep, timeline)
-                
-                if sleep_metrics_alt:
-                    avg_metrics.update(sleep_metrics_alt)
-                    st.success(f"😴 SONNO ANALIZZATO (metodo alternativo): {sleep_metrics_alt.get('sleep_duration', 0):.1f} ore")
+        # SOLUZIONE ALTERNATIVA: analisi sonno forzata
+        if sleep_activities and not any(key.startswith('sleep_') for key in avg_metrics.keys()):
+            st.warning("🔄 Tentativo analisi sonno alternativa...")
+            
+            latest_sleep = sleep_activities[-1]
+            sleep_metrics_alt = calculate_real_sleep_metrics(latest_sleep, timeline)
+            
+            if sleep_metrics_alt:
+                avg_metrics.update(sleep_metrics_alt)
+                st.success(f"😴 SONNO ANALIZZATO (metodo alternativo): {sleep_metrics_alt.get('sleep_duration', 0):.1f} ore")
 
-            # PROPAGA le metriche sonno alle daily_metrics corrispondenti
-            sleep_activities = [a for a in st.session_state.activities if a['type'] == 'Sonno']
-            
-            if sleep_activities:
-                for sleep_activity in sleep_activities:
-                    sleep_date = sleep_activity['start_time'].date().isoformat()
-                    
-                    if sleep_date in daily_metrics:
-                        # CALCOLA METRICHE SONNO SPECIFICHE per questa notte
-                        sleep_metrics_specific = calculate_real_sleep_metrics(sleep_activity, timeline)
-                        
-                        if sleep_metrics_specific:
-                            # Aggiungi le metriche sonno SPECIFICHE a questo giorno
-                            daily_metrics[sleep_date].update(sleep_metrics_specific)
-            
-            # PRIMA RIGA: DOMINIO TEMPO E COERENZA
-            col1, col2, col3, col4, col5 = st.columns(5)
-            
-            with col1:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">💓 {avg_metrics['hr_mean']:.0f}</div>
-                    <div class="metric-label">Battito Medio</div>
-                    <div class="metric-unit">bpm</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">📊 {avg_metrics['sdnn']:.0f}</div>
-                    <div class="metric-label">SDNN</div>
-                    <div class="metric-unit">ms</div>
-                </div>
-                """, unsafe_allow_html=True)
+        # PRIMA RIGA: DOMINIO TEMPO E COERENZA
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            st.markdown(f"""
+            <div class="compact-metric-card">
+                <div class="metric-value">💓 {avg_metrics['hr_mean']:.0f}</div>
+                <div class="metric-label">Battito Medio</div>
+                <div class="metric-unit">bpm</div>
+            </div>
+            """, unsafe_allow_html=True)
             
             with col3:
                 st.markdown(f"""
