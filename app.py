@@ -2229,6 +2229,57 @@ def calculate_segment_analysis(time_points, sdnn_values, rmssd_values, hr_values
     return comparison_data
 
 # =============================================================================
+# AGGIUNTA CIBI MANCANTI AL DATABASE
+# =============================================================================
+
+NUTRITION_DB.update({
+    "pasta": {
+        "category": "carboidrato", "subcategory": "cereale raffinato", "inflammatory_score": 3,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -2,
+        "calories_per_100g": 131, "typical_portion": 80, "protein_g": 5, "carbs_g": 25, "fiber_g": 1, "fat_g": 1,
+        "micronutrients": ["Ferro", "Vitamina B"], "allergens": ["glutine"],
+        "best_time": "pre-allenamento", "sleep_impact": "negativo se serale", "hrv_impact": "negativo",
+        "tags": ["energia rapida", "infiammatorio"]
+    },
+    
+    "patate fritte": {
+        "category": "carboidrato", "subcategory": "vegetale fritto", "inflammatory_score": 5,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -4,
+        "calories_per_100g": 312, "typical_portion": 150, "protein_g": 3.4, "carbs_g": 41, "fiber_g": 3.8, "fat_g": 15,
+        "micronutrients": ["Grassi trans", "Acrilamide"], "allergens": [],
+        "best_time": "da evitare", "sleep_impact": "molto negativo", "hrv_impact": "molto negativo",
+        "tags": ["fritto", "infiammatorio", "grassi cattivi"]
+    },
+    
+    "pane": {
+        "category": "carboidrato", "subcategory": "cereale raffinato", "inflammatory_score": 2,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -1,
+        "calories_per_100g": 265, "typical_portion": 50, "protein_g": 9, "carbs_g": 49, "fiber_g": 2.7, "fat_g": 3.2,
+        "micronutrients": ["Ferro", "Vitamina B"], "allergens": ["glutine"],
+        "best_time": "colazione/pranzo", "sleep_impact": "negativo", "hrv_impact": "negativo",
+        "tags": ["glutine", "carboidrato semplice"]
+    },
+    
+    "gelato": {
+        "category": "dolce", "subcategory": "gelato", "inflammatory_score": 4,
+        "glycemic_index": "alto", "glycemic_load": "alto", "recovery_impact": -3,
+        "calories_per_100g": 207, "typical_portion": 100, "protein_g": 3.5, "carbs_g": 24, "fiber_g": 0, "fat_g": 11,
+        "micronutrients": ["Zuccheri semplici", "Grassi saturi"], "allergens": ["lattosio"],
+        "best_time": "occasionale", "sleep_impact": "negativo", "hrv_impact": "negativo",
+        "tags": ["zucchero", "grassi saturi", "infiammatorio"]
+    },
+    
+    "caffe": {
+        "category": "eccitante", "subcategory": "caffeina", "inflammatory_score": 2,
+        "glycemic_index": "basso", "glycemic_load": "basso", "recovery_impact": -2,
+        "calories_per_100g": 1, "typical_portion": 30, "protein_g": 0.1, "carbs_g": 0, "fiber_g": 0, "fat_g": 0,
+        "caffeina": "80mg", "micronutrients": ["Antiossidanti"], "allergens": [],
+        "best_time": "mattina", "sleep_impact": "molto negativo se serale", "hrv_impact": "negativo",
+        "tags": ["eccitante", "caffeina", "insonnia"]
+    }
+})
+
+# =============================================================================
 # FUNZIONE PER ANALIZZARE LE ATTIVITÀ
 # =============================================================================
 
@@ -2272,15 +2323,10 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
                 intensita = attivita['intensity'].lower()
                 
                 if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']):
-                    if avg_rmssd < 50:  # Soglia più sensibile
+                    if avg_rmssd < 45:  # Soglia più sensibile
                         orario = attivita_time.strftime('%H:%M')
                         problema = f"🏃‍♂️ **Allenamento intenso alle {orario}**: {attivita['name']} - RMSSD troppo basso ({avg_rmssd:.1f} ms) per questa intensità"
                         attivita_problematiche.append(problema)
-                
-                elif any(p in intensita for p in ['leggera', 'leggero', 'facile']):
-                    if avg_rmssd > 40:
-                        orario = attivita_time.strftime('%H:%M')
-                        attivita_problematiche.append(f"🎯 **Allenamento ben bilanciato alle {orario}**: {attivita['name']} - Intensità appropriata")
             
             # ANALISI SONNO
             elif attivita['type'] == "Sonno":
@@ -2289,9 +2335,6 @@ def analizza_attivita_registrazione(activities, timeline, avg_rmssd):
                     data_sonno = attivita_time.strftime('%d/%m')
                     problema = f"😴 **Sonno insufficiente il {data_sonno}**: solo {durata_sonno:.1f} ore (minimo raccomandato: 7 ore)"
                     attivita_problematiche.append(problema)
-                elif durata_sonno > 9:
-                    data_sonno = attivita_time.strftime('%d/%m')
-                    attivita_problematiche.append(f"💤 **Sonno lungo il {data_sonno}**: {durata_sonno:.1f} ore - ottimo recupero!")
     
     return attivita_problematiche
 
@@ -3075,23 +3118,15 @@ def main():
                     st.metric("Battito Medio", f"{avg_hr_totale:.1f} bpm")
 
                 # Analizza attività per tutta la registrazione
-                attivita_problematiche = analizza_attivita_registrazione(st.session_state.activities, timeline, avg_rmssd_totale)                     
+                attivita_problematiche = analizza_attivita_registrazione(st.session_state.activities, timeline, avg_rmssd_totale)
                 
-                # DEBUG: Mostra informazioni sulle attività
-                st.write("### 🔍 Debug Attività")
-                st.write(f"**Attività totali:** {len(st.session_state.activities)}")
-                st.write(f"**Periodo registrazione:** {timeline['start_time']} - {timeline['end_time']}")
-                st.write(f"**RMSSD medio:** {avg_rmssd_totale:.1f} ms")
-                
-                for i, attivita in enumerate(st.session_state.activities):
-                    with st.expander(f"Attività {i}: {attivita['type']} - {attivita['name']}", expanded=False):
-                        st.write(f"**Ora:** {attivita['start_time']}")
-                        st.write(f"**Intensità:** {attivita.get('intensity', 'N/A')}")
-                        st.write(f"**Cibi:** {attivita.get('food_items', 'N/A')}")
-                        
-                        # Controlla se l'attività è nel periodo della registrazione
-                        if timeline['start_time'] <= attivita['start_time'] <= timeline['end_time']:
-                            st.success("✅ Nel periodo registrazione")
+                # Mostra problemi attività immediatamente
+                if attivita_problematiche:
+                    st.error("### ⚠️ Attività Problematiche Rilevate")
+                    for problema in attivita_problematiche:
+                        st.write(f"• {problema}")
+                else:
+                    st.success("### ✅ Nessuna attività problematica rilevata")
                             
                             # ANALISI ALIMENTAZIONE
                             if attivita['type'] == "Alimentazione":
@@ -3152,7 +3187,7 @@ def main():
                 
                 # Mostra problemi attività immediatamente
                 if attivita_problematiche:
-                    st.error("### ⚠️ Attività Problematiche Rilevate")
+                    st.error("### ⚠️ Attività Problematiche Rilevate")	
                     for problema in attivita_problematiche:
                         st.write(f"• {problema}")
                 else:
