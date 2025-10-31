@@ -22,44 +22,6 @@ import time
 import json
 
 # =============================================================================
-# BIBLIOGRAFIA SCIENTIFICA - RIFERIMENTI HRV
-# =============================================================================
-"""
-PRINCIPALI RIFERIMENTI BIBLIOGRAFICI:
-
-1. HEART RATE VARIABILITY STANDARDS (Task Force, 1996)
-   - Task Force of the European Society of Cardiology. "Heart rate variability: 
-     standards of measurement, physiological interpretation, and clinical use."
-     Circulation, 1996.
-
-2. HRV AND AGING (Umetani et al., 1998)
-   - Umetani K, Singer DH, McCraty R, Atkinson M. "Twenty-four hour time domain 
-     heart rate variability and heart rate: relations to age and gender over nine decades."
-     J Am Coll Cardiol, 1998.
-
-3. SLEEP HRV ANALYSIS (Boudreau et al., 2012)  
-   - Boudreau P, Yeh WH, Dumont GA, Boivin DB. "Circadian variation of heart rate variability 
-     across sleep stages."
-     Sleep, 2012.
-
-4. PHYSICAL ACTIVITY AND HRV (Sandercock et al., 2005)
-   - Sandercock GR, Bromley PD, Brodie DA. "Effects of exercise on heart rate variability: 
-     inferences from meta-analysis."
-     Med Sci Sports Exerc, 2005.
-
-5. NUTRITIONAL IMPACT ON HRV (Young & Benton, 2018)
-   - Young HA, Benton D. "Heart-rate variability: a biomarker to study the influence 
-     of nutrition on physiological and psychological health?"
-     Behav Pharmacol, 2018.
-
-METODOLOGIA: 
-- SDNN/RMSSD: Standard time-domain metrics (Task Force, 1996)
-- Age/gender adjustments: Based on population studies (Umetani et al., 1998)  
-- Sleep stage estimation: HRV patterns during sleep (Boudreau et al., 2012)
-- Activity impact: Meta-analysis correlations (Sandercock et al., 2005)
-"""
-
-# =============================================================================
 # SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
 # =============================================================================
 
@@ -468,8 +430,6 @@ def professional_hrv_preprocessing(rr_intervals):
     RIFERIMENTI:
     Task Force, 1996 - Artefact handling guidelines
     """
-    """Pulisce i dati HRV come fanno i dottori"""
-    print("🧹 Sto pulendo i dati...")
     
     # Trova i battiti strani
     battiti_strani = []
@@ -498,7 +458,6 @@ def professional_hrv_preprocessing(rr_intervals):
              "Buona" if percentuale_pulita > 90 else \
              "Accettabile" if percentuale_pulita > 80 else "Scadente"
     
-    print(f"✅ Puliti {len(battiti_strani)} battiti strani - Qualità: {qualita}")
     
     return dati_puliti, qualita, len(battiti_strani)
 
@@ -720,16 +679,11 @@ def calculate_real_sleep_metrics(sleep_activity, timeline):
     """
     """Calcola metriche sonno REALI dagli IBI - VERSIONE MIGLIORATA"""
     
-    print(f"🎯 CALCOLO SONNO REALE per: {sleep_activity['name']}")
-    
     # Estrai IBI del sonno con timeline corretta
     sleep_ibis = extract_sleep_ibis_corrected(sleep_activity, timeline)
     
     if not sleep_ibis or len(sleep_ibis) < 300:  # Almeno 5 minuti di dati
-        print(f"❌ IBI insufficienti: {len(sleep_ibis) if sleep_ibis else 0}")
         return calculate_dynamic_sleep_metrics(sleep_activity)
-    
-    print(f"✅ Analizzando {len(sleep_ibis)} IBI reali del sonno")
     
     # CALCOLI REALI dagli IBI
     sleep_hr_values = [60000 / rr for rr in sleep_ibis if rr > 0]
@@ -809,15 +763,12 @@ def extract_sleep_ibis_corrected(sleep_activity, timeline):
     sleep_start = sleep_activity['start_time']
     sleep_end = sleep_start + timedelta(minutes=sleep_activity['duration'])
     
-    print(f"🔍 Cercando IBI sonno: {sleep_start} -> {sleep_end}")
-    print(f"   Timeline giorni: {list(timeline['days_data'].keys())}")
     
     sleep_ibis = []
     current_time = timeline['start_time']
     
     # Scansiona tutti gli IBI nella timeline
     for day_date, day_ibis in timeline['days_data'].items():
-        print(f"   Scannerizzo giorno {day_date} ({len(day_ibis)} IBI)")
         day_found = 0
         
         for rr in day_ibis:
@@ -831,13 +782,11 @@ def extract_sleep_ibis_corrected(sleep_activity, timeline):
             if current_time > sleep_end:
                 break
         
-        print(f"     Trovati {day_found} IBI in questo giorno")
         
         # Ottimizzazione: esci se abbiamo superato la fine del sonno
         if current_time > sleep_end:
             break
     
-    print(f"   TOTALE IBI trovati: {len(sleep_ibis)}")
     
     return sleep_ibis
 
@@ -917,22 +866,16 @@ def calculate_moving_rmssd(ibis, window_size=300):
 def get_sleep_metrics_from_activities(activities, daily_metrics, timeline):
     """Raccoglie le metriche del sonno REALI dalle attività di sonno registrate"""
     
-    print(f"🎯 Cercando attività sonno...")
     sleep_activities = [a for a in activities if a['type'] == 'Sonno']
-    print(f"   Attività sonno trovate: {len(sleep_activities)}")
     
     if not sleep_activities:
-        print(f"   ❌ Nessuna attività 'Sonno' trovata!")
         return {}
     
     # Prendi l'ultima attività sonno
     latest_sleep = sleep_activities[-1]
-    print(f"   🔍 Analizzando sonno: {latest_sleep['name']}")
     
     # Calcola metriche REALI
     sleep_metrics = calculate_real_sleep_metrics(latest_sleep, timeline)
-    
-    print(f"   📊 Metriche sonno calcolate: {sleep_metrics}")
     
     return sleep_metrics
 
@@ -2440,10 +2383,11 @@ def main():
     with st.expander("🔬 Metodologia di Analisi", expanded=False):
         st.markdown("""
         **METODOLOGIA DI ANALISI HRV:**
-
+ 
         **Metriche Dominio del Tempo:**
         - **SDNN**: Deviazione standard degli intervalli NN (variabilità totale)
         - **RMSSD**: Radice quadrata della media delle differenze successive (variabilità parasimpatica)
+        - SDNN/RMSSD: Standard time-domain metrics (Task Force, 1996)
 
         **Metriche Dominio della Frequenza:**
         - **LF (0.04-0.15 Hz)**: Componente a bassa frequenza (simpatica/parasimpatica)
@@ -2453,11 +2397,15 @@ def main():
         **Analisi del Sonno:**
         - Classificazione fasi sonno basata su pattern RMSSD
         - Efficienza calcolata dalla stabilità dell'HR
+        - Sleep stage estimation: HRV patterns during sleep (Boudreau et al., 2012)
 
         **Pre-processing Dati:**
         - Filtraggio outlier: Interquartile Range (IQR) con bounds 400-1800 ms
         - Correzione artefatti: Sostituzione con media valori adiacenti
         - Grading qualità: Basato su % battiti corretti
+
+        - Age/gender adjustments: Based on population studies (Umetani et al., 1998)  
+        - Activity impact: Meta-analysis correlations (Sandercock et al., 2005)
         """)
 
         
@@ -2755,10 +2703,113 @@ def main():
                 st.subheader("☀️ Registrazione Diurna")
                 st.info("Questa registrazione non include ore notturne. Nessuna analisi del sonno disponibile.")
             
-            # [RESTA DEL CODICE... continua con METRICHE DETTAGLIATE PER GIORNO, GRAFICI, ecc.]
+            # METRICHE DETTAGLIATE PER GIORNO
+            with st.expander("📅 Metriche Dettagliate per Giorno", expanded=True):
+                if not daily_metrics:
+                    st.info("Non ci sono abbastanza dati per un'analisi giornaliera")
+                else:
+                    try:
+                        st.subheader("🧮 Metriche HRV e Analisi Spettrale")
+                        
+                        hrv_table_data = []
+                        
+                        for day_date, day_metrics in daily_metrics.items():
+                            day_dt = datetime.fromisoformat(day_date)
+                            row = {
+                                'Data': day_dt.strftime('%d/%m/%Y'),
+                                'Battito (bpm)': f"{day_metrics.get('hr_mean', 0):.1f}",
+                                'SDNN (ms)': f"{day_metrics.get('sdnn', 0):.1f}",
+                                'RMSSD (ms)': f"{day_metrics.get('rmssd', 0):.1f}",
+                                'Coerenza (%)': f"{day_metrics.get('coherence', 0):.1f}",
+                                'Potenza Totale': f"{day_metrics.get('total_power', 0):.0f}",
+                                'LF (ms²)': f"{day_metrics.get('lf', 0):.0f}",
+                                'HF (ms²)': f"{day_metrics.get('hf', 0):.0f}",
+                                'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}",
+                                'VLF (ms²)': f"{day_metrics.get('vlf', 0):.0f}"
+                            }
+                            hrv_table_data.append(row)
+                        
+                        hrv_df = pd.DataFrame(hrv_table_data)
+                        
+                        st.dataframe(
+                            hrv_df,
+                            use_container_width=True,
+                            hide_index=True,
+                            height=min(300, 50 + len(hrv_df) * 35)
+                        )
 
-        except Exception as e:
-            st.error(f"❌ Errore durante l'elaborazione del file: {str(e)}")
+                        # CORREZIONE: Mostra metriche sonno solo se presenti in almeno un giorno
+                        has_any_sleep_data = any(
+                            any(key.startswith('sleep_') for key in day_metrics.keys())
+                            for day_metrics in daily_metrics.values()
+                        )
+
+                        if has_any_sleep_data:
+                            st.subheader("😴 Metriche Sonno")
+
+                            sleep_table_data = []
+
+                            for day_date, day_metrics in daily_metrics.items():
+                                day_dt = datetime.fromisoformat(day_date)
+                                
+                                has_sleep_data = any(key.startswith('sleep_') for key in day_metrics.keys())
+                                
+                                if has_sleep_data:
+                                    row = {
+                                        'Data': day_dt.strftime('%d/%m/%Y'),
+                                        'Durata Totale (h)': f"{day_metrics.get('sleep_duration', 0):.1f}",
+                                        'Efficienza (%)': f"{day_metrics.get('sleep_efficiency', 0):.1f}",
+                                        'HR Riposo (bpm)': f"{day_metrics.get('sleep_hr', 0):.1f}",
+                                        'Sonno Leggero (h)': f"{day_metrics.get('sleep_light', 0):.1f}",
+                                        'Sonno Profondo (h)': f"{day_metrics.get('sleep_deep', 0):.1f}",
+                                        'Sonno REM (h)': f"{day_metrics.get('sleep_rem', 0):.1f}",
+                                        'Risvegli (h)': f"{day_metrics.get('sleep_awake', 0):.1f}"
+                                    }
+                                    sleep_table_data.append(row)
+
+                            if sleep_table_data:
+                                sleep_df = pd.DataFrame(sleep_table_data)
+                                
+                                st.dataframe(
+                                    sleep_df,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=min(300, 50 + len(sleep_df) * 35)
+                                )
+                            else:
+                                st.info("😴 Nessuna analisi del sonno disponibile per questa registrazione")
+                        else:
+                            st.info("😴 Nessuna analisi del sonno disponibile - registrazione diurna")                       
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            hrv_csv = hrv_df.to_csv(index=False, sep=';')
+                            st.download_button(
+                                label="📥 Scarica Metriche HRV",
+                                data=hrv_csv,
+                                file_name=f"hrv_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True,
+                                key=f"download_hrv_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                            )
+                        
+                        with col2:
+                            if has_any_sleep_data and sleep_table_data:
+                                sleep_csv = sleep_df.to_csv(index=False, sep=';')
+                                st.download_button(
+                                    label="📥 Scarica Metriche Sonno",
+                                    data=sleep_csv,
+                                    file_name=f"sonno_metriche_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                    mime="text/csv",
+                                    use_container_width=True,
+                                    key=f"download_sonno_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                )
+                            else:
+                                st.empty()
+                                
+                    except Exception as e:
+                        st.error(f"Errore nella visualizzazione delle metriche dettagliate: {e}")
     
     else:
         display_analysis_history()
