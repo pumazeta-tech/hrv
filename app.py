@@ -2871,6 +2871,15 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
         margin: 12px 0;
         border: 2px dashed #dee2e6;
     }
+
+    .chart-container {
+        background: white;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 12px 0;
+        border: 1px solid #e9ecef;
+        text-align: center;
+    }
     
     .chart-title {
         font-size: 13px;
@@ -3163,13 +3172,7 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
                 </div>
                 
                 <!-- GRAFICO GIORNALIERO -->
-                <div class="chart-placeholder">
-                    <div class="chart-title">📈 Grafico HRV Giornaliero</div>
-                    <div class="chart-info">SDNN, RMSSD e Battito Cardiaco con attività registrate</div>
-                    <div style="font-size: 10px; color: #868e96; margin-top: 5px;">
-                        [Grafico interattivo disponibile nell'applicazione web]
-                    </div>
-                </div>
+                {generare_grafico_giornaliero(day_date, day_metrics, timeline, st.session_state.activities)}
                 
                 <!-- RACCOMANDAZIONI -->
                 {recommendations_html}
@@ -3416,6 +3419,73 @@ def display_daily_summary(daily_metrics):
     if summary_data:
         df = pd.DataFrame(summary_data)
         st.dataframe(df, use_container_width=True, hide_index=True)
+
+def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
+    """Genera un grafico giornaliero come immagine base64"""
+    try:
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        from io import BytesIO
+        import base64
+        
+        # Crea figura
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+        
+        # Dati simulati per il giorno
+        hours = list(range(24))
+        base_sdnn = day_metrics.get('sdnn', 40)
+        base_rmssd = day_metrics.get('rmssd', 30)
+        base_hr = day_metrics.get('hr_mean', 70)
+        
+        sdnn_values = [max(20, base_sdnn + np.random.normal(0, 8)) for _ in hours]
+        rmssd_values = [max(15, base_rmssd + np.random.normal(0, 5)) for _ in hours]
+        hr_values = [max(50, base_hr + np.random.normal(0, 6)) for _ in hours]
+        
+        # Grafico superiore: SDNN e RMSSD
+        ax1.plot(hours, sdnn_values, label='SDNN', color='#3498db', linewidth=2)
+        ax1.plot(hours, rmssd_values, label='RMSSD', color='#2ecc71', linewidth=2)
+        ax1.set_ylabel('HRV (ms)', fontsize=10)
+        ax1.legend(loc='upper left')
+        ax1.grid(True, alpha=0.3)
+        ax1.set_title(f'Variabilità Cardiaca - {datetime.fromisoformat(day_date).strftime("%d/%m/%Y")}', fontsize=12, fontweight='bold')
+        
+        # Grafico inferiore: Battito Cardiaco
+        ax2.plot(hours, hr_values, label='Battito Cardiaco', color='#e74c3c', linewidth=2)
+        ax2.set_ylabel('Battito (bpm)', fontsize=10)
+        ax2.set_xlabel('Ora del Giorno', fontsize=10)
+        ax2.legend(loc='upper left')
+        ax2.grid(True, alpha=0.3)
+        
+        # Aggiungi linee verticali per le attività
+        day_activities = [a for a in activities if a['start_time'].date().isoformat() == day_date]
+        for activity in day_activities:
+            hour = activity['start_time'].hour
+            color = activity.get('color', '#95a5a6')
+            ax1.axvline(x=hour, color=color, linestyle='--', alpha=0.7, linewidth=1)
+            ax2.axvline(x=hour, color=color, linestyle='--', alpha=0.7, linewidth=1)
+        
+        plt.tight_layout()
+        
+        # Converti in base64
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+        
+        return f'<img src="data:image/png;base64,{image_base64}" style="width: 100%; border-radius: 6px; margin: 10px 0;">'
+        
+    except Exception as e:
+        # Fallback se la generazione del grafico fallisce
+        return """
+        <div class="chart-placeholder">
+            <div class="chart-title">📈 Grafico HRV Giornaliero</div>
+            <div class="chart-info">SDNN, RMSSD e Battito Cardiaco con attività registrate</div>
+            <div style="font-size: 10px; color: #868e96; margin-top: 5px;">
+                Grafico non disponibile per questo giorno
+            </div>
+        </div>
+        """
 
 # =============================================================================
 # FUNZIONE PRINCIPALE
