@@ -2697,8 +2697,8 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
 # FUNZIONI PER CREARE PDF
 # =============================================================================
 
-def crea_pdf_professionale(report_html):
-    """Crea un PDF professionale usando FPDF (più affidabile)"""
+def crea_pdf_professionale(user_profile, timeline, avg_metrics, daily_metrics):
+    """Crea un PDF professionale semplificato"""
     try:
         pdf = FPDF()
         pdf.add_page()
@@ -2713,39 +2713,69 @@ def crea_pdf_professionale(report_html):
         pdf.cell(0, 10, f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 1, 'C')
         pdf.ln(10)
         
-        # Processa il contenuto HTML in modo semplice
-        lines = report_html.split('\n')
-        in_body = False
-        content_lines = []
-        
-        for line in lines:
-            if '<body>' in line:
-                in_body = True
-                continue
-            if '</body>' in line:
-                break
-            if in_body and line.strip() and not line.strip().startswith('<'):
-                # Pulisci il testo dai tag HTML
-                clean_line = re.sub('<[^<]+?>', '', line).strip()
-                if clean_line and len(clean_line) > 2:
-                    content_lines.append(clean_line)
-        
-        # Aggiungi contenuto al PDF
+        # Informazioni paziente
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, 'INFORMAZIONI PAZIENTE', 0, 1)
         pdf.set_font('Arial', '', 10)
-        for line in content_lines[:40]:  # Limita a 40 righe
-            if pdf.get_y() > 250:  # Nuova pagina se necessario
-                pdf.add_page()
-            try:
-                # Encoding corretto per caratteri italiani
-                line_encoded = line.encode('latin-1', 'replace').decode('latin-1')
-                pdf.multi_cell(0, 8, line_encoded)
-                pdf.ln(2)
-            except:
-                # Fallback per caratteri problematici
-                pdf.multi_cell(0, 8, line[:50])
-                pdf.ln(2)
+        pdf.cell(0, 8, f"Nome: {user_profile['name']} {user_profile['surname']}", 0, 1)
+        pdf.cell(0, 8, f"Età: {user_profile['age']} anni", 0, 1)
+        pdf.cell(0, 8, f"Sesso: {user_profile['gender']}", 0, 1)
+        pdf.ln(5)
         
-        # Ritorna il PDF come BytesIO
+        # Dati registrazione
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, 'DATI REGISTRAZIONE', 0, 1)
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(0, 8, f"Inizio: {timeline['start_time'].strftime('%d/%m/%Y %H:%M')}", 0, 1)
+        pdf.cell(0, 8, f"Fine: {timeline['end_time'].strftime('%d/%m/%Y %H:%M')}", 0, 1)
+        pdf.cell(0, 8, f"Durata: {timeline['total_duration_hours']:.1f} ore", 0, 1)
+        pdf.ln(5)
+        
+        # Metriche principali
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, 'METRICHE HRV PRINCIPALI', 0, 1)
+        pdf.set_font('Arial', '', 10)
+        
+        metrics = [
+            ('Battito cardiaco', f"{avg_metrics.get('hr_mean', 0):.1f}", 'bpm'),
+            ('SDNN', f"{avg_metrics.get('sdnn', 0):.1f}", 'ms'),
+            ('RMSSD', f"{avg_metrics.get('rmssd', 0):.1f}", 'ms'),
+            ('Coerenza', f"{avg_metrics.get('coherence', 0):.1f}", '%'),
+            ('Potenza totale', f"{avg_metrics.get('total_power', 0):.0f}", 'ms²'),
+            ('LF/HF', f"{avg_metrics.get('lf_hf_ratio', 0):.2f}", 'ratio')
+        ]
+        
+        for label, value, unit in metrics:
+            pdf.cell(0, 8, f"{label}: {value} {unit}", 0, 1)
+        
+        # Tabella metriche giornaliere se presenti
+        if daily_metrics and len(daily_metrics) > 1:
+            pdf.ln(5)
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 10, 'METRICHE GIORNALIERE', 0, 1)
+            pdf.set_font('Arial', '', 8)
+            
+            # Intestazione
+            pdf.cell(40, 8, 'Data', 1)
+            pdf.cell(25, 8, 'Battito', 1)
+            pdf.cell(25, 8, 'SDNN', 1)
+            pdf.cell(25, 8, 'RMSSD', 1)
+            pdf.cell(25, 8, 'Coerenza', 1)
+            pdf.cell(30, 8, 'LF/HF', 1)
+            pdf.ln()
+            
+            # Dati
+            for day_date, day_metrics in sorted(daily_metrics.items()):
+                day_dt = datetime.fromisoformat(day_date)
+                pdf.cell(40, 8, day_dt.strftime('%d/%m/%Y'), 1)
+                pdf.cell(25, 8, f"{day_metrics.get('hr_mean', 0):.1f}", 1)
+                pdf.cell(25, 8, f"{day_metrics.get('sdnn', 0):.1f}", 1)
+                pdf.cell(25, 8, f"{day_metrics.get('rmssd', 0):.1f}", 1)
+                pdf.cell(25, 8, f"{day_metrics.get('coherence', 0):.1f}", 1)
+                pdf.cell(30, 8, f"{day_metrics.get('lf_hf_ratio', 0):.2f}", 1)
+                pdf.ln()
+        
+        # Ritorna il PDF
         pdf_output = BytesIO()
         pdf_output.write(pdf.output(dest='S').encode('latin-1'))
         pdf_output.seek(0)
@@ -2753,15 +2783,8 @@ def crea_pdf_professionale(report_html):
         
     except Exception as e:
         st.error(f"Errore nella creazione del PDF: {str(e)}")
-        # Fallback: PDF vuoto con messaggio
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, 'Errore nella generazione del report', 0, 1, 'C')
-        pdf_output = BytesIO()
-        pdf_output.write(pdf.output(dest='S').encode('latin-1'))
-        pdf_output.seek(0)
-        return pdf_output
+        # Fallback semplice
+        return None
 
 def display_compact_metrics(avg_metrics):
     """Mostra le metriche in layout compatto e professionale"""
@@ -2807,48 +2830,125 @@ def display_compact_metrics(avg_metrics):
     """, unsafe_allow_html=True)
     
     # Prima riga: metriche principali
-    metriche_principali = [
-        ('💓', 'Battito', f"{avg_metrics.get('hr_mean', 0):.0f}", 'bpm'),
-        ('📊', 'SDNN', f"{avg_metrics.get('sdnn', 0):.0f}", 'ms'),
-        ('🔄', 'RMSSD', f"{avg_metrics.get('rmssd', 0):.0f}", 'ms'),
-        ('🎯', 'Coerenza', f"{avg_metrics.get('coherence', 0):.0f}", '%'),
-        ('⚡', 'Potenza', f"{avg_metrics.get('total_power', 0):.0f}", 'ms²')
-    ]
+    col1, col2, col3, col4, col5 = st.columns(5)
     
-    html_principali = '<div class="compact-grid">'
-    for icon, label, value, unit in metriche_principali:
-        html_principali += f"""
+    with col1:
+        st.markdown(f"""
         <div class="compact-card">
-            <div class="compact-value">{value}</div>
-            <div class="compact-label">{label}</div>
-            <div class="compact-unit">{unit}</div>
+            <div class="compact-value">{avg_metrics.get('hr_mean', 0):.0f}</div>
+            <div class="compact-label">Battito</div>
+            <div class="compact-unit">bpm</div>
         </div>
-        """
-    html_principali += '</div>'
+        """, unsafe_allow_html=True)
     
-    st.markdown(html_principali, unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('sdnn', 0):.0f}</div>
+            <div class="compact-label">SDNN</div>
+            <div class="compact-unit">ms</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('rmssd', 0):.0f}</div>
+            <div class="compact-label">RMSSD</div>
+            <div class="compact-unit">ms</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('coherence', 0):.0f}</div>
+            <div class="compact-label">Coerenza</div>
+            <div class="compact-unit">%</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col5:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('total_power', 0):.0f}</div>
+            <div class="compact-label">Potenza</div>
+            <div class="compact-unit">ms²</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Seconda riga: metriche secondarie
-    metriche_secondarie = [
-        ('📉', 'LF', f"{avg_metrics.get('lf', 0):.0f}", 'ms²'),
-        ('📈', 'HF', f"{avg_metrics.get('hf', 0):.0f}", 'ms²'),
-        ('⚖️', 'LF/HF', f"{avg_metrics.get('lf_hf_ratio', 0):.2f}", 'ratio'),
-        ('🌊', 'VLF', f"{avg_metrics.get('vlf', 0):.0f}", 'ms²'),
-        ('🔬', 'Qualità', avg_metrics.get('qualita_segnale', 'N/A'), '')
-    ]
+    col1, col2, col3, col4, col5 = st.columns(5)
     
-    html_secondarie = '<div class="compact-grid">'
-    for icon, label, value, unit in metriche_secondarie:
-        html_secondarie += f"""
+    with col1:
+        st.markdown(f"""
         <div class="compact-card">
-            <div class="compact-value">{value}</div>
-            <div class="compact-label">{label}</div>
-            <div class="compact-unit">{unit}</div>
+            <div class="compact-value">{avg_metrics.get('lf', 0):.0f}</div>
+            <div class="compact-label">LF</div>
+            <div class="compact-unit">ms²</div>
         </div>
-        """
-    html_secondarie += '</div>'
+        """, unsafe_allow_html=True)
     
-    st.markdown(html_secondarie, unsafe_allow_html=True)        
+    with col2:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('hf', 0):.0f}</div>
+            <div class="compact-label">HF</div>
+            <div class="compact-unit">ms²</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('lf_hf_ratio', 0):.2f}</div>
+            <div class="compact-label">LF/HF</div>
+            <div class="compact-unit">ratio</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('vlf', 0):.0f}</div>
+            <div class="compact-label">VLF</div>
+            <div class="compact-unit">ms²</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col5:
+        st.markdown(f"""
+        <div class="compact-card">
+            <div class="compact-value">{avg_metrics.get('qualita_segnale', 'N/A')}</div>
+            <div class="compact-label">Qualità</div>
+            <div class="compact-unit"></div>
+        </div>
+        """, unsafe_allow_html=True)      
+
+def display_daily_summary(daily_metrics):
+    """Mostra un riepilogo compatto delle metriche giornaliere"""
+    if not daily_metrics or len(daily_metrics) <= 1:
+        return
+    
+    st.subheader("📅 Riepilogo Giornaliero")
+    
+    # Crea tabella riepilogativa
+    summary_data = []
+    for day_date, day_metrics in sorted(daily_metrics.items()):
+        day_dt = datetime.fromisoformat(day_date)
+        
+        summary_data.append({
+            'Data': day_dt.strftime('%d/%m/%Y'),
+            'Battito': f"{day_metrics.get('hr_mean', 0):.1f}",
+            'SDNN': f"{day_metrics.get('sdnn', 0):.1f}",
+            'RMSSD': f"{day_metrics.get('rmssd', 0):.1f}",
+            'Coerenza': f"{day_metrics.get('coherence', 0):.1f}%",
+            'LF/HF': f"{day_metrics.get('lf_hf_ratio', 0):.2f}"
+        })
+    
+    if summary_data:
+        df = pd.DataFrame(summary_data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
 # =============================================================================
 # FUNZIONE PRINCIPALE
@@ -3176,6 +3276,9 @@ def main():
                 if sleep_metrics_alt:
                     avg_metrics.update(sleep_metrics_alt)
                     st.success(f"😴 SONNO ANALIZZATO (metodo alternativo): {sleep_metrics_alt.get('sleep_duration', 0):.1f} ore")
+
+            # RIEPILOGO GIORNALIERO
+            display_daily_summary(daily_metrics)
 
             # METRICHE IN LAYOUT COMPATTO E PROFESSIONALE
             display_compact_metrics(avg_metrics)
@@ -3567,15 +3670,23 @@ def main():
                     if st.button("📄 Genera PDF Professionale", use_container_width=True, type="primary"):
                         with st.spinner("Creando PDF..."):
                             try:
-                                pdf_buffer = crea_pdf_professionale(report_completo)
-                                
-                                st.download_button(
-                                    label="⬇️ Scarica Report PDF",
-                                    data=pdf_buffer.getvalue(),
-                                    file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                                    mime="application/pdf",
-                                    use_container_width=True
+                                pdf_buffer = crea_pdf_professionale(
+                                    st.session_state.user_profile,
+                                    timeline, 
+                                    avg_metrics,
+                                    daily_metrics
                                 )
+                                
+                                if pdf_buffer:
+                                    st.download_button(
+                                        label="⬇️ Scarica Report PDF",
+                                        data=pdf_buffer.getvalue(),
+                                        file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                        mime="application/pdf",
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.error("Impossibile generare il PDF")
                             except Exception as e:
                                 st.error(f"Errore nella generazione PDF: {str(e)}")
                 
