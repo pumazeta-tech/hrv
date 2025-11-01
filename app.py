@@ -3079,26 +3079,63 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
                 </div>
                 """
             
-            # RACCOMANDAZIONI SPECIFICHE
+            # RACCOMANDAZIONI SPECIFICHE - PUNTI DI FORZA E DEBOLEZZA
             recommendations = []
             warnings = []
+            weaknesses = []
             
-            # Analisi HRV
+            # Analisi HRV - PUNTI DI FORZA
+            if day_metrics.get('rmssd', 0) > 50:
+                recommendations.append("RMSSD ottimale - eccellente capacità di recupero")
+            elif day_metrics.get('rmssd', 0) > 35:
+                recommendations.append("RMSSD buono - buona rigenerazione")
+                
+            if day_metrics.get('sdnn', 0) > 60:
+                recommendations.append("Variabilità cardiaca eccellente")
+            elif day_metrics.get('sdnn', 0) > 45:
+                recommendations.append("Variabilità cardiaca buona")
+                
+            if day_metrics.get('hr_mean', 0) < 65:
+                recommendations.append("Battito cardiaco ottimale a riposo")
+            elif day_metrics.get('hr_mean', 0) < 72:
+                recommendations.append("Battito cardiaco nella norma")
+                
+            if 0.8 < day_metrics.get('lf_hf_ratio', 0) < 1.5:
+                recommendations.append("Bilancio simpatico-vagale ottimale")
+                
+            if day_metrics.get('coherence', 0) > 70:
+                recommendations.append("Alta coerenza cardiaca - eccellente equilibrio autonomico")
+            elif day_metrics.get('coherence', 0) > 55:
+                recommendations.append("Buona coerenza cardiaca")
+            
+            # Analisi HRV - PUNTI DI DEBOLEZZA
             if day_metrics.get('rmssd', 0) < 25:
-                warnings.append("RMSSD basso - prioritizza attività rigenerative")
-            elif day_metrics.get('rmssd', 0) > 50:
-                recommendations.append("RMSSD ottimale - buona capacità di recupero")
+                weaknesses.append("RMSSD molto basso - recupero insufficiente")
+            elif day_metrics.get('rmssd', 0) < 35:
+                weaknesses.append("RMSSD basso - capacità di recupero ridotta")
                 
             if day_metrics.get('sdnn', 0) < 30:
-                warnings.append("SDNN basso - possibile stato di stress")
-            elif day_metrics.get('sdnn', 0) > 60:
-                recommendations.append("Variabilità cardiaca eccellente")
+                weaknesses.append("SDNN molto basso - possibile affaticamento cronico")
+            elif day_metrics.get('sdnn', 0) < 40:
+                weaknesses.append("SDNN basso - variabilità cardiaca ridotta")
                 
             if day_metrics.get('hr_mean', 0) > 80:
-                warnings.append("Battito cardiaco elevato - tecniche di rilassamento consigliate")
+                weaknesses.append("Battito cardiaco elevato - possibile stress o disidratazione")
+            elif day_metrics.get('hr_mean', 0) > 75:
+                weaknesses.append("Battito cardiaco alto - monitorare lo stress")
                 
             if day_metrics.get('lf_hf_ratio', 0) > 3.0:
-                warnings.append("Rapporto LF/HF elevato - possibile dominanza simpatica")
+                weaknesses.append("Rapporto LF/HF elevato - dominanza simpatica eccessiva")
+            elif day_metrics.get('lf_hf_ratio', 0) > 2.0:
+                weaknesses.append("Rapporto LF/HF alto - possibile stato di allerta")
+                
+            if day_metrics.get('lf_hf_ratio', 0) < 0.5:
+                weaknesses.append("Rapporto LF/HF molto basso - possibile astenia")
+                
+            if day_metrics.get('coherence', 0) < 40:
+                weaknesses.append("Coerenza cardiaca bassa - equilibrio autonomico compromesso")
+            elif day_metrics.get('coherence', 0) < 50:
+                weaknesses.append("Coerenza cardiaca ridotta")
                 
             # Analisi Sonno (se disponibile)
             if has_valid_sleep_metrics(day_metrics):
@@ -3118,25 +3155,26 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
                 if day_metrics.get('sleep_deep', 0) < 1.0:
                     warnings.append("Sonno profondo insufficiente - crea ambiente più buio e silenzioso")
             
-            # Costruisci sezione raccomandazioni
+            # Costruisci sezione raccomandazioni con PUNTI DI FORZA E DEBOLEZZA
             recommendations_html = ""
-            if warnings:
+            
+            if weaknesses:
                 recommendations_html += f"""
                 <div class="warning-box">
-                    <strong>⚠️ Punti di Attenzione:</strong><br>
-                    {''.join([f"• {w}<br>" for w in warnings])}
+                    <strong>🔴 Punti di Debolezza:</strong><br>
+                    {''.join([f"• {w}<br>" for w in weaknesses])}
                 </div>
                 """
             
             if recommendations:
                 recommendations_html += f"""
                 <div class="recommendation-box">
-                    <strong>💡 Punti di Forza:</strong><br>
+                    <strong>🟢 Punti di Forza:</strong><br>
                     {''.join([f"• {r}<br>" for r in recommendations])}
                 </div>
                 """
             
-            if not warnings and not recommendations:
+            if not weaknesses and not recommendations:
                 recommendations_html = """
                 <div class="recommendation-box">
                     <strong>📊 Profilo nella norma</strong><br>
@@ -3580,16 +3618,23 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
             if activity_start.date() == day_start.date():
                 ax1.axvline(x=activity_start_hour, color=color, linestyle='--', alpha=0.8, linewidth=1.5)
             
-            # Etichetta attività (solo se non troppo lunga)
-            duration_hours = activity_end_hour - activity_start_hour
-            if duration_hours > 0.3:  # Solo per attività più lunghe di 18 minuti
-                label_x = activity_start_hour + duration_hours/2
-                if start_hour <= label_x <= end_hour:
-                    ax1.text(label_x, ax1.get_ylim()[1] * 0.95, 
-                            activity['name'], 
-                            ha='center', va='top', fontsize=8, 
-                            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
-                            rotation=90)
+                    # Etichetta attività (solo se non troppo lunga)
+                    duration_hours = activity_end_hour - activity_start_hour
+                    if duration_hours > 0.3:  # Solo per attività più lunghe di 18 minuti
+                        label_x = activity_start_hour + duration_hours/2
+                        if start_hour <= label_x <= end_hour:
+                            # Determina se usare testo bianco o nero in base al colore di sfondo
+                            # Per colori scuri (Sonno, Allenamento) usa testo bianco
+                            if activity['type'] in ["Sonno", "Allenamento", "Stress"]:
+                                text_color = 'white'
+                            else:
+                                text_color = 'black'
+                            
+                            ax1.text(label_x, ax1.get_ylim()[1] * 0.95, 
+                                    activity['name'], 
+                                    ha='center', va='top', fontsize=8, color=text_color,
+                                    bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.8),
+                                    rotation=90)
         
         # Aggiungi legenda attività
         from matplotlib.patches import Patch
@@ -4352,49 +4397,26 @@ def main():
                 st.markdown("### Anteprima Report")
                 st.components.v1.html(report_completo, height=800, scrolling=True)
                 
-                # Pulsanti esportazione
-                col1, col2, col3 = st.columns(3)
+                # Pulsanti esportazione - SOLO HTML
+                col1, col2 = st.columns(2)
                 
                 with col1:
-                    if st.button("📄 Genera PDF Professionale", use_container_width=True, type="primary"):
-                        with st.spinner("Creando PDF..."):
-                            try:
-                                pdf_buffer = crea_pdf_professionale(
-                                    st.session_state.user_profile,
-                                    timeline, 
-                                    avg_metrics,
-                                    daily_metrics
-                                )
-                                
-                                if pdf_buffer:
-                                    st.download_button(
-                                        label="⬇️ Scarica Report PDF",
-                                        data=pdf_buffer.getvalue(),
-                                        file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                                        mime="application/pdf",
-                                        use_container_width=True
-                                    )
-                                else:
-                                    st.error("Impossibile generare il PDF")
-                            except Exception as e:
-                                st.error(f"Errore nella generazione PDF: {str(e)}")
-                
-                with col2:
                     # Download HTML
                     st.download_button(
-                        label="🌐 Scarica Versione Web",
+                        label="🌐 Scarica Report HTML",
                         data=report_completo,
-                        file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                        file_name=f"report_hrv_{user_profile['name']}_{user_profile['surname']}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
                         mime="text/html",
-                        use_container_width=True
+                        use_container_width=True,
+                        type="primary"
                     )
                 
-                with col3:
+                with col2:
                     # Download Testo
                     st.download_button(
                         label="📝 Scarica Versione Testo",
                         data=report_completo,
-                        file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                        file_name=f"report_hrv_{user_profile['name']}_{user_profile['surname']}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
                         mime="text/plain",
                         use_container_width=True
                     )
