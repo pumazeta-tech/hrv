@@ -20,6 +20,9 @@ from email.mime.text import MIMEText
 import secrets
 import time
 import json
+from fpdf import FPDF
+import base64
+from io import BytesIO
 
 # =============================================================================
 # SISTEMA DI AUTENTICAZIONE CON GOOGLE SHEETS
@@ -2420,278 +2423,432 @@ def analizza_impatto_attivita_su_hrv(activities, time_points, sdnn_values, rmssd
 # =============================================================================
 
 def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, attivita_problematiche, analisi_impatto):
-    """Genera un report completo in formato HTML"""
+    """Genera un report professionale in HTML elegante"""
     
-    # Informazioni paziente
-    report = f"""
-<div class="header">
-    <h1>📊 REPORT ANALISI HRV COMPLETO</h1>
-    <p>Generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}</p>
-</div>
-
-<div class="section">
-    <h2>👤 INFORMAZIONI PAZIENTE</h2>
-    <p><strong>Nome:</strong> {user_profile['name']} {user_profile['surname']}</p>
-    <p><strong>Data di nascita:</strong> {user_profile['birth_date'].strftime('%d/%m/%Y')}</p>
-    <p><strong>Età:</strong> {user_profile['age']} anni</p>
-    <p><strong>Sesso:</strong> {user_profile['gender']}</p>
-</div>
-
-<div class="section">
-    <h2>📅 PERIODO REGISTRAZIONE</h2>
-    <p><strong>Inizio:</strong> {timeline['start_time'].strftime('%d/%m/%Y %H:%M:%S')}</p>
-    <p><strong>Fine:</strong> {timeline['end_time'].strftime('%d/%m/%Y %H:%M:%S')}</p>
-    <p><strong>Durata totale:</strong> {timeline['total_duration_hours']:.1f} ore</p>
-</div>
-
-<div class="section">
-    <h2>❤️ METRICHE HRV PRINCIPALI</h2>
+    # Stile CSS moderno e professionale
+    css = """
+    <style>
+    .report-container {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+    }
+    .header {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .section {
+        margin-bottom: 25px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+    }
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin: 15px 0;
+    }
+    .metric-card {
+        background: white;
+        padding: 15px;
+        border-radius: 6px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid #e9ecef;
+    }
+    .metric-value {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 4px;
+    }
+    .metric-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .metric-unit {
+        font-size: 0.7rem;
+        color: #95a5a6;
+        margin-top: 2px;
+    }
+    .warning-section {
+        background: #fff3cd;
+        border-left-color: #ffc107;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 10px 0;
+    }
+    .success-section {
+        background: #d1edff;
+        border-left-color: #3498db;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 10px 0;
+    }
+    .footer {
+        text-align: center;
+        margin-top: 30px;
+        padding: 20px;
+        background: #2c3e50;
+        color: white;
+        border-radius: 6px;
+        font-size: 0.8rem;
+    }
+    .color-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .dot-blue { background: #3498db; }
+    .dot-green { background: #2ecc71; }
+    .dot-red { background: #e74c3c; }
+    .dot-orange { background: #f39c12; }
+    </style>
+    """
+    
+    # Informazioni paziente con layout compatto
+    patient_info = f"""
     <div class="metric-grid">
         <div class="metric-card">
-            <h3>💓 Battito Medio</h3>
-            <p class="metric-value">{avg_metrics.get('hr_mean', 0):.1f} bpm</p>
+            <div class="metric-label">Paziente</div>
+            <div class="metric-value">{user_profile['name']} {user_profile['surname']}</div>
         </div>
         <div class="metric-card">
-            <h3>📊 SDNN</h3>
-            <p class="metric-value">{avg_metrics.get('sdnn', 0):.1f} ms</p>
+            <div class="metric-label">Età</div>
+            <div class="metric-value">{user_profile['age']} anni</div>
         </div>
         <div class="metric-card">
-            <h3>🔄 RMSSD</h3>
-            <p class="metric-value">{avg_metrics.get('rmssd', 0):.1f} ms</p>
-        </div>
-        <div class="metric-card">
-            <h3>🎯 Coerenza</h3>
-            <p class="metric-value">{avg_metrics.get('coherence', 0):.1f}%</p>
-        </div>
-        <div class="metric-card">
-            <h3>⚡ Potenza Totale</h3>
-            <p class="metric-value">{avg_metrics.get('total_power', 0):.0f} ms²</p>
-        </div>
-        <div class="metric-card">
-            <h3>⚖️ LF/HF</h3>
-            <p class="metric-value">{avg_metrics.get('lf_hf_ratio', 0):.2f}</p>
+            <div class="metric-label">Sesso</div>
+            <div class="metric-value">{user_profile['gender']}</div>
         </div>
     </div>
-</div>
-"""
-
-    # Aggiungi sezione sonno se disponibile
+    """
+    
+    # Metriche HRV principali - COMPATTE
+    hrv_metrics = ""
+    if avg_metrics:
+        hrv_metrics = f"""
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-label">Battito Cardiaco</div>
+                <div class="metric-value">{avg_metrics.get('hr_mean', 0):.0f}</div>
+                <div class="metric-unit">bpm</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">SDNN</div>
+                <div class="metric-value">{avg_metrics.get('sdnn', 0):.0f}</div>
+                <div class="metric-unit">ms</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">RMSSD</div>
+                <div class="metric-value">{avg_metrics.get('rmssd', 0):.0f}</div>
+                <div class="metric-unit">ms</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Coerenza</div>
+                <div class="metric-value">{avg_metrics.get('coherence', 0):.0f}</div>
+                <div class="metric-unit">%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Potenza Totale</div>
+                <div class="metric-value">{avg_metrics.get('total_power', 0):.0f}</div>
+                <div class="metric-unit">ms²</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Rapporto LF/HF</div>
+                <div class="metric-value">{avg_metrics.get('lf_hf_ratio', 0):.2f}</div>
+                <div class="metric-unit">ratio</div>
+            </div>
+        </div>
+        """
+    
+    # Metriche Sonno se disponibili
+    sleep_metrics = ""
     if has_valid_sleep_metrics(avg_metrics):
-        report += f"""
-<div class="section">
-    <h2>😴 ANALISI DEL SONNO</h2>
-    <div class="metric-grid">
-        <div class="metric-card">
-            <h3>🛌 Durata Sonno</h3>
-            <p class="metric-value">{avg_metrics.get('sleep_duration', 0):.1f} ore</p>
+        sleep_metrics = f"""
+        <div class="section">
+            <h3><span class="color-dot dot-blue"></span>Analisi del Sonno</h3>
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Durata Sonno</div>
+                    <div class="metric-value">{avg_metrics.get('sleep_duration', 0):.1f}</div>
+                    <div class="metric-unit">ore</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Efficienza</div>
+                    <div class="metric-value">{avg_metrics.get('sleep_efficiency', 0):.0f}</div>
+                    <div class="metric-unit">%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Battito Riposo</div>
+                    <div class="metric-value">{avg_metrics.get('sleep_hr', 0):.0f}</div>
+                    <div class="metric-unit">bpm</div>
+                </div>
+            </div>
         </div>
-        <div class="metric-card">
-            <h3>📊 Efficienza</h3>
-            <p class="metric-value">{avg_metrics.get('sleep_efficiency', 0):.1f}%</p>
-        </div>
-        <div class="metric-card">
-            <h3>💓 HR Sonno</h3>
-            <p class="metric-value">{avg_metrics.get('sleep_hr', 0):.1f} bpm</p>
-        </div>
-    </div>
-    <div class="recommendation">
-        <h3>📈 Distribuzione Fasi Sonno</h3>
-        <p><strong>Sonno Leggero:</strong> {avg_metrics.get('sleep_light', 0):.1f} ore</p>
-        <p><strong>Sonno Profondo:</strong> {avg_metrics.get('sleep_deep', 0):.1f} ore</p>
-        <p><strong>Sonno REM:</strong> {avg_metrics.get('sleep_rem', 0):.1f} ore</p>
-        <p><strong>Risvegli:</strong> {avg_metrics.get('sleep_awake', 0):.1f} ore</p>
-    </div>
-</div>
-"""
-
-    # Aggiungi attività problematiche se presenti
+        """
+    
+    # Attività problematiche
+    problematic_activities = ""
     if attivita_problematiche:
-        report += """
-<div class="section">
-    <h2>⚠️ ATTIVITÀ PROBLEMATICHE RILEVATE</h2>
-    <div class="recommendation warning">
-        <ul>
-"""
+        problematic_activities = """
+        <div class="warning-section">
+            <h4><span class="color-dot dot-orange"></span>Attività da Rivalutare</h4>
+            <ul>
+        """
         for problema in attivita_problematiche:
-            # Rimuovi il markup per il report testuale
-            problema_clean = problema.replace('**', '').replace('🍽️', '🍽').replace('🏃‍♂️', '🏃').replace('😴', '😴')
-            report += f"<li>{problema_clean}</li>\n"
-        report += """
-        </ul>
-    </div>
-</div>
-"""
-
-    # Aggiungi analisi impatto se presente
-    if analisi_impatto:
-        report += """
-<div class="section">
-    <h2>📊 ANALISI IMPATTO ATTIVITÀ SU HRV</h2>
-    <div class="recommendation excellent">
+            # Pulisci il testo dalle emoji
+            clean_problema = problema.replace('**', '').replace('🍽️', '').replace('🏃‍♂️', '').replace('😴', '')
+            problematic_activities += f"<li>{clean_problema}</li>"
+        problematic_activities += "</ul></div>"
+    
+    # Raccomandazioni
+    recommendations = """
+    <div class="success-section">
+        <h4><span class="color-dot dot-green"></span>Raccomandazioni</h4>
         <ul>
-"""
-        for impatto in analisi_impatto:
-            impatto_clean = impatto.replace('**', '').replace('📉', '↓').replace('📈', '↑').replace('💚', '✓').replace('🍽️', '🍽').replace('💤', '😴')
-            report += f"<li>{impatto_clean}</li>\n"
-        report += """
+            <li>Mantenere una routine di sonno regolare (7-9 ore per notte)</li>
+            <li>Praticare tecniche di respirazione quotidiane</li>
+            <li>Bilanciare attività fisica intensa con adeguato recupero</li>
+            <li>Consumare alimenti ricchi di antiossidanti e omega-3</li>
+            <li>Limitare cibi infiammatori e zuccheri raffinati</li>
+            <li>Gestire lo stress attraverso meditazione o mindfulness</li>
         </ul>
     </div>
-</div>
-"""
-
-    # Raccomandazioni generali
-    report += """
-<div class="section">
-    <h2>💡 RACCOMANDAZIONI GENERALE</h2>
-    <div class="recommendation">
-        <h3>🎯 Per migliorare la tua variabilità cardiaca:</h3>
-        <ul>
-            <li>Mantieni una routine di sonno regolare (7-9 ore per notte)</li>
-            <li>Pratica tecniche di respirazione e rilassamento quotidiane</li>
-            <li>Bilancia attività fisica intensa con adeguato recupero</li>
-            <li>Mantieni un'alimentazione ricca di antiossidanti e omega-3</li>
-            <li>Riduci il consumo di cibi infiammatori e zuccheri raffinati</li>
-            <li>Gestisci lo stress attraverso meditazione o mindfulness</li>
-        </ul>
-    </div>
-</div>
-
-<div class="footer">
-    <p>Report generato automaticamente da HRV Analytics ULTIMATE</p>
-    <p>I dati forniti hanno scopo informativo e non sostituiscono il parere medico</p>
-</div>
-"""
-
+    """
+    
+    # Report completo
+    report = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Report Analisi HRV - {user_profile['name']} {user_profile['surname']}</title>
+        {css}
+    </head>
+    <body>
+        <div class="report-container">
+            <div class="header">
+                <h1>Report Analisi HRV</h1>
+                <p>Generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}</p>
+            </div>
+            
+            <div class="section">
+                <h3><span class="color-dot dot-blue"></span>Informazioni Paziente</h3>
+                {patient_info}
+                <p><strong>Data di nascita:</strong> {user_profile['birth_date'].strftime('%d/%m/%Y')}</p>
+            </div>
+            
+            <div class="section">
+                <h3><span class="color-dot dot-blue"></span>Dati Registrazione</h3>
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Inizio</div>
+                        <div class="metric-value">{timeline['start_time'].strftime('%d/%m/%Y')}</div>
+                        <div class="metric-unit">{timeline['start_time'].strftime('%H:%M')}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Fine</div>
+                        <div class="metric-value">{timeline['end_time'].strftime('%d/%m/%Y')}</div>
+                        <div class="metric-unit">{timeline['end_time'].strftime('%H:%M')}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Durata</div>
+                        <div class="metric-value">{timeline['total_duration_hours']:.1f}</div>
+                        <div class="metric-unit">ore</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3><span class="color-dot dot-blue"></span>Metriche HRV Principali</h3>
+                {hrv_metrics}
+            </div>
+            
+            {sleep_metrics}
+            {problematic_activities}
+            {recommendations}
+            
+            <div class="footer">
+                <p>Report generato automaticamente da HRV Analytics</p>
+                <p>I dati forniti hanno scopo informativo e non sostituiscono il parere medico</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
     return report
 
 # =============================================================================
 # FUNZIONI PER CREARE PDF
 # =============================================================================
 
-def crea_pdf_moderno(report_html):
-    """Crea un PDF semplice senza dipendenze esterne"""
+def crea_pdf_professionale(report_html):
+    """Crea un PDF professionale usando FPDF (più affidabile)"""
     try:
-        # Prova weasyprint prima (più comune su Streamlit Cloud)
-        from weasyprint import HTML
-        import tempfile
-        import os
-        
-        html_completo = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 40px;
-                    color: #2c3e50;
-                    line-height: 1.6;
-                }}
-                .header {{
-                    background: #3498db;
-                    color: white;
-                    padding: 30px;
-                    border-radius: 10px;
-                    margin-bottom: 25px;
-                    text-align: center;
-                }}
-                .section {{
-                    margin-bottom: 20px;
-                    padding: 20px;
-                    background: #f8f9fa;
-                    border-radius: 8px;
-                }}
-                h1 {{ color: white; margin: 0; }}
-                h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; }}
-                .footer {{
-                    text-align: center;
-                    margin-top: 30px;
-                    padding: 20px;
-                    background: #2c3e50;
-                    color: white;
-                    border-radius: 8px;
-                }}
-            </style>
-        </head>
-        <body>
-            {report_html}
-        </body>
-        </html>
-        """
-        
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
-            HTML(string=html_completo).write_pdf(tmp_file.name)
-            
-            with open(tmp_file.name, 'rb') as f:
-                pdf_data = f.read()
-            
-            os.unlink(tmp_file.name)
-            
-        return BytesIO(pdf_data)
-        
-    except ImportError:
-        # Se weasyprint non c'è, crea un PDF base con fpdf
-        return crea_pdf_semplice_fallback(report_html)
-
-def crea_pdf_semplice_fallback(report_html):
-    """Crea un PDF base senza dipendenze esterne"""
-    try:
-        # Prova fpdf (più leggero)
-        from fpdf import FPDF
-        import tempfile
-        import os
-        
-        # Crea PDF
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("Arial", size=12)
         
         # Titolo
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(200, 10, txt="Report Analisi HRV", ln=True, align='C')
-        pdf.ln(10)
+        pdf.set_font('Arial', 'B', 16)
+        pdf.cell(0, 10, 'REPORT ANALISI HRV', 0, 1, 'C')
+        pdf.ln(5)
         
         # Data
-        pdf.set_font("Arial", size=10)
-        pdf.cell(200, 10, txt=f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
-        pdf.ln(15)
+        pdf.set_font('Arial', 'I', 10)
+        pdf.cell(0, 10, f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 1, 'C')
+        pdf.ln(10)
         
-        # Processa il contenuto HTML semplificato
-        lines = []
-        for line in report_html.split('\n'):
-            clean_line = line
-            # Rimuovi tag HTML
-            tags_to_remove = ['<div', '</div>', '<h1>', '</h1>', '<h2>', '</h2>', '<h3>', '</h3>', '<p>', '</p>', '<strong>', '</strong>', '<ul>', '</ul>', '<li>', '</li>']
-            for tag in tags_to_remove:
-                clean_line = clean_line.replace(tag, '')
-            clean_line = clean_line.strip()
-            if clean_line and len(clean_line) > 2:
-                lines.append(clean_line)
+        # Processa il contenuto HTML in modo semplice
+        lines = report_html.split('\n')
+        in_body = False
+        content_lines = []
         
-        # Aggiungi contenuto
-        pdf.set_font("Arial", size=10)
-        for line in lines[:50]:  # Limita a 50 righe
+        for line in lines:
+            if '<body>' in line:
+                in_body = True
+                continue
+            if '</body>' in line:
+                break
+            if in_body and line.strip() and not line.strip().startswith('<'):
+                # Pulisci il testo dai tag HTML
+                clean_line = re.sub('<[^<]+?>', '', line).strip()
+                if clean_line and len(clean_line) > 2:
+                    content_lines.append(clean_line)
+        
+        # Aggiungi contenuto al PDF
+        pdf.set_font('Arial', '', 10)
+        for line in content_lines[:40]:  # Limita a 40 righe
             if pdf.get_y() > 250:  # Nuova pagina se necessario
                 pdf.add_page()
-            pdf.multi_cell(0, 8, txt=line[:80])  # Limita lunghezza
-            pdf.ln(5)
+            try:
+                # Encoding corretto per caratteri italiani
+                line_encoded = line.encode('latin-1', 'replace').decode('latin-1')
+                pdf.multi_cell(0, 8, line_encoded)
+                pdf.ln(2)
+            except:
+                # Fallback per caratteri problematici
+                pdf.multi_cell(0, 8, line[:50])
+                pdf.ln(2)
         
-        # Salva in buffer
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
-            pdf.output(tmp_file.name)
-            
-            with open(tmp_file.name, 'rb') as f:
-                pdf_data = f.read()
-            
-            os.unlink(tmp_file.name)
-            
-        return BytesIO(pdf_data)
+        # Ritorna il PDF come BytesIO
+        pdf_output = BytesIO()
+        pdf_output.write(pdf.output(dest='S').encode('latin-1'))
+        pdf_output.seek(0)
+        return pdf_output
         
-    except ImportError:
-        # Se nessuna libreria PDF è disponibile, ritorna un PDF vuoto
-        st.warning("⚠️ Librerie PDF non disponibili. Aggiungi 'fpdf' o 'weasyprint' ai requirements")
-        return BytesIO(b"PDF non disponibile")
+    except Exception as e:
+        st.error(f"Errore nella creazione del PDF: {str(e)}")
+        # Fallback: PDF vuoto con messaggio
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, 'Errore nella generazione del report', 0, 1, 'C')
+        pdf_output = BytesIO()
+        pdf_output.write(pdf.output(dest='S').encode('latin-1'))
+        pdf_output.seek(0)
+        return pdf_output
+
+def display_compact_metrics(avg_metrics):
+    """Mostra le metriche in layout compatto e professionale"""
+    
+    # CSS per metriche compatte
+    st.markdown("""
+    <style>
+    .compact-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        margin: 10px 0;
+    }
+    .compact-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 12px 8px;
+        border-radius: 8px;
+        color: white;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border: none;
+        min-height: 60px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .compact-value {
+        font-size: 1.1rem;
+        font-weight: bold;
+        margin-bottom: 2px;
+    }
+    .compact-label {
+        font-size: 0.7rem;
+        opacity: 0.9;
+        line-height: 1.1;
+    }
+    .compact-unit {
+        font-size: 0.6rem;
+        opacity: 0.7;
+        margin-top: 1px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Prima riga: metriche principali
+    metriche_principali = [
+        ('💓', 'Battito', f"{avg_metrics.get('hr_mean', 0):.0f}", 'bpm'),
+        ('📊', 'SDNN', f"{avg_metrics.get('sdnn', 0):.0f}", 'ms'),
+        ('🔄', 'RMSSD', f"{avg_metrics.get('rmssd', 0):.0f}", 'ms'),
+        ('🎯', 'Coerenza', f"{avg_metrics.get('coherence', 0):.0f}", '%'),
+        ('⚡', 'Potenza', f"{avg_metrics.get('total_power', 0):.0f}", 'ms²')
+    ]
+    
+    html_principali = '<div class="compact-grid">'
+    for icon, label, value, unit in metriche_principali:
+        html_principali += f"""
+        <div class="compact-card">
+            <div class="compact-value">{value}</div>
+            <div class="compact-label">{label}</div>
+            <div class="compact-unit">{unit}</div>
+        </div>
+        """
+    html_principali += '</div>'
+    
+    st.markdown(html_principali, unsafe_allow_html=True)
+    
+    # Seconda riga: metriche secondarie
+    metriche_secondarie = [
+        ('📉', 'LF', f"{avg_metrics.get('lf', 0):.0f}", 'ms²'),
+        ('📈', 'HF', f"{avg_metrics.get('hf', 0):.0f}", 'ms²'),
+        ('⚖️', 'LF/HF', f"{avg_metrics.get('lf_hf_ratio', 0):.2f}", 'ratio'),
+        ('🌊', 'VLF', f"{avg_metrics.get('vlf', 0):.0f}", 'ms²'),
+        ('🔬', 'Qualità', avg_metrics.get('qualita_segnale', 'N/A'), '')
+    ]
+    
+    html_secondarie = '<div class="compact-grid">'
+    for icon, label, value, unit in metriche_secondarie:
+        html_secondarie += f"""
+        <div class="compact-card">
+            <div class="compact-value">{value}</div>
+            <div class="compact-label">{label}</div>
+            <div class="compact-unit">{unit}</div>
+        </div>
+        """
+    html_secondarie += '</div>'
+    
+    st.markdown(html_secondarie, unsafe_allow_html=True)        
 
 # =============================================================================
 # FUNZIONE PRINCIPALE
@@ -3020,83 +3177,8 @@ def main():
                     avg_metrics.update(sleep_metrics_alt)
                     st.success(f"😴 SONNO ANALIZZATO (metodo alternativo): {sleep_metrics_alt.get('sleep_duration', 0):.1f} ore")
 
-            # PRIMA RIGA: DOMINIO TEMPO E COERENZA
-            col1, col2, col3, col4, col5 = st.columns(5)
-            
-            with col1:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">💓 {avg_metrics['hr_mean']:.0f}</div>
-                    <div class="metric-label">Battito Medio</div>
-                    <div class="metric-unit">bpm</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">📊 {avg_metrics['sdnn']:.0f}</div>
-                    <div class="metric-label">SDNN</div>
-                    <div class="metric-unit">ms</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col3:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">🔄 {avg_metrics['rmssd']:.0f}</div>
-                    <div class="metric-label">RMSSD</div>
-                    <div class="metric-unit">ms</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col4:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">🎯 {avg_metrics['coherence']:.0f}%</div>
-                    <div class="metric-label">Coerenza</div>
-                    <div class="metric-unit">percentuale</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col5:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">⚡ {avg_metrics['total_power']:.0f}</div>
-                    <div class="metric-label">Potenza Totale</div>
-                    <div class="metric-unit">ms²</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # SECONDA RIGA: ANALISI SPETTRALE E SONNO
-            col1, col2, col3, col4, col5 = st.columns(5)
-            
-            with col1:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">📉 {avg_metrics['lf']:.0f}</div>
-                    <div class="metric-label">LF</div>
-                    <div class="metric-unit">ms²</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col2:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">📈 {avg_metrics['hf']:.0f}</div>
-                    <div class="metric-label">HF</div>
-                    <div class="metric-unit">ms²</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col3:
-                st.markdown(f"""
-                <div class="compact-metric-card">
-                    <div class="metric-value">⚖️ {avg_metrics['lf_hf_ratio']:.2f}</div>
-                    <div class="metric-label">Rapporto LF/HF</div>
-                    <div class="metric-unit">ratio</div>
-                </div>
-                """, unsafe_allow_html=True)
+            # METRICHE IN LAYOUT COMPATTO E PROFESSIONALE
+            display_compact_metrics(avg_metrics)
 
             # 🔬 REPORT QUALITÀ REGISTRAZIONE
             st.subheader("🔬 Qualità della Registrazione")
@@ -3493,72 +3575,64 @@ def main():
                     for impatto in analisi_impatto:
                         st.write(f"• {impatto}")
   
-                # =============================================================================
-                # ESPORTAZIONE REPORT
-                # =============================================================================
-                st.subheader("📄 Esporta Report")
+            # =============================================================================
+            # ESPORTAZIONE REPORT - VERSIONE PROFESSIONALE
+            # =============================================================================
+            st.subheader("Esportazione Report")
+            
+            with st.expander("📋 Genera Report Professionale", expanded=False):
+                # Genera il report
+                report_completo = genera_report_completo(
+                    st.session_state.user_profile,
+                    timeline,
+                    daily_metrics,
+                    avg_metrics,
+                    attivita_problematiche,
+                    analisi_impatto
+                )
                 
-                with st.expander("📋 Visualizza e Scarica Report Completo", expanded=False):
-                    # Genera il report
-                    report_completo = genera_report_completo(
-                        st.session_state.user_profile,
-                        timeline,
-                        daily_metrics,
-                        avg_metrics,
-                        attivita_problematiche,
-                        analisi_impatto
+                # Anteprima del report
+                st.markdown("### Anteprima Report")
+                st.components.v1.html(report_completo, height=800, scrolling=True)
+                
+                # Pulsanti esportazione
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("📄 Genera PDF Professionale", use_container_width=True, type="primary"):
+                        with st.spinner("Creando PDF..."):
+                            try:
+                                pdf_buffer = crea_pdf_professionale(report_completo)
+                                
+                                st.download_button(
+                                    label="⬇️ Scarica Report PDF",
+                                    data=pdf_buffer.getvalue(),
+                                    file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                    mime="application/pdf",
+                                    use_container_width=True
+                                )
+                            except Exception as e:
+                                st.error(f"Errore nella generazione PDF: {str(e)}")
+                
+                with col2:
+                    # Download HTML
+                    st.download_button(
+                        label="🌐 Scarica Versione Web",
+                        data=report_completo,
+                        file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                        mime="text/html",
+                        use_container_width=True
                     )
-                    
-                    # Mostra il report con stile elegante
-                    st.markdown("""
-                    <style>
-                    .report-container {
-                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                        padding: 25px;
-                        border-radius: 15px;
-                        border-left: 5px solid #3498db;
-                        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-                        margin-bottom: 20px;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-                    
-                    st.markdown('<div class="report-container">', unsafe_allow_html=True)
-                    st.markdown(report_completo, unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Pulsanti esportazione moderni
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        if st.button("📥 Genera PDF Elegante", use_container_width=True, type="primary"):
-                            with st.spinner("Creando PDF professionale..."):
-                                try:
-                                    pdf_buffer = crea_pdf_moderno(report_completo)
-                                    timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-                                    
-                                    st.download_button(
-                                        label="⬇️ Scarica Report PDF",
-                                        data=pdf_buffer.getvalue(),
-                                        file_name=f"report_hrv_{timestamp}.pdf",
-                                        mime="application/pdf",
-                                        use_container_width=True
-                                    )
-                                except Exception as e:
-                                    st.error("❌ Impossibile generare PDF")
-                                    st.info("💡 Prova a scaricare la versione testo qui sotto")
-                    
-                    with col2:
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-                        st.download_button(
-                            label="📝 Scarica Versione Testo",
-                            data=report_completo,
-                            file_name=f"report_hrv_{timestamp}.txt",
-                            mime="text/plain",
-                            use_container_width=True
-                        )
-                    
-                    st.info("💡 **Suggerimento:** Il PDF contiene una versione ottimizzata per la stampa con grafica elegante")
+                
+                with col3:
+                    # Download Testo
+                    st.download_button(
+                        label="📝 Scarica Versione Testo",
+                        data=report_completo,
+                        file_name=f"report_hrv_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
              
                 # =============================================================================
                 # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA
