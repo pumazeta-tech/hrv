@@ -3428,24 +3428,21 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         import base64
         
         # Determina l'orario effettivo della registrazione per questo giorno
-        day_start = None
-        day_end = None
+        day_dt = datetime.fromisoformat(day_date)
         
-        # Cerca nei dati della timeline l'orario reale
-        if day_date in timeline.get('days_data', {}):
-            # Calcola l'orario di inizio e fine per questo giorno
-            current_time = timeline['start_time']
-            for rr in timeline['days_data'][day_date]:
-                if current_time.date().isoformat() == day_date:
-                    if day_start is None:
-                        day_start = current_time
-                    day_end = current_time + timedelta(milliseconds=rr)
-                current_time += timedelta(milliseconds=rr)
-        
-        # Se non trovato, usa orari predefiniti
-        if day_start is None:
-            day_start = datetime.fromisoformat(day_date)
-            day_end = day_start + timedelta(hours=24)
+        # PER IL GIORNO 12: usa l'orario di FINE della registrazione globale
+        if day_date == timeline['end_time'].date().isoformat():
+            # Ultimo giorno - finisce quando finisce la registrazione
+            day_start = day_dt  # Inizio del giorno
+            day_end = timeline['end_time']  # Fine reale della registrazione
+        elif day_date == timeline['start_time'].date().isoformat():
+            # Primo giorno - inizia quando inizia la registrazione
+            day_start = timeline['start_time']  # Inizio reale della registrazione
+            day_end = day_dt + timedelta(hours=24)  # Fine del giorno
+        else:
+            # Giorni intermedi - giorno completo
+            day_start = day_dt
+            day_end = day_dt + timedelta(hours=24)
         
         # Crea figura con due assi y
         fig, ax1 = plt.subplots(figsize=(12, 6))
@@ -3529,13 +3526,23 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         
         plt.title(title, fontsize=13, fontweight='bold', pad=20)
         
-        # Legenda unificata
+        # Legenda unificada
         lines = line1 + line2 + line3
         labels = [l.get_label() for l in lines]
         ax1.legend(lines, labels, loc='upper left', frameon=True, fancybox=True, shadow=True)
         
-        # Aggiungi aree colorate per le attività del giorno
-        day_activities = [a for a in activities if a['start_time'].date().isoformat() == day_date]
+        # Aggiungi aree colorate per le attività - CORREZIONE PER ATTIVITÀ MULTI-GIORNO
+        day_activities = []
+        for activity in activities:
+            activity_start = activity['start_time']
+            activity_end = activity_start + timedelta(minutes=activity['duration'])
+            
+            # Verifica se l'attività si sovrappone a questo giorno
+            # Un'attività si sovrappone se:
+            # - Inizia prima della fine del giorno E
+            # - Finisce dopo l'inizio del giorno
+            if activity_start < day_end and activity_end > day_start:
+                day_activities.append(activity)
         
         # Colori per i tipi di attività
         activity_colors = {
@@ -3549,29 +3556,40 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         
         for activity in day_activities:
             activity_start = activity['start_time']
-            activity_hour = activity_start.hour + activity_start.minute/60
-            duration_hours = activity['duration'] / 60  # converti minuti in ore
-            activity_end_hour = activity_hour + duration_hours
+            activity_end = activity_start + timedelta(minutes=activity['duration'])
             
-            # Solo se l'attività è nell'intervallo del grafico
-            if activity_hour <= end_hour and activity_end_hour >= start_hour:
-                color = activity_colors.get(activity['type'], "#95a5a6")
-                
-                # Area semitrasparente per l'attività
-                ax1.axvspan(activity_hour, activity_end_hour, alpha=0.2, color=color, label=f'_nolegend_')
-                
-                # Linea verticale all'inizio dell'attività
-                ax1.axvline(x=activity_hour, color=color, linestyle='--', alpha=0.8, linewidth=1.5)
-                
-                # Etichetta attività (solo se non troppo lunga)
-                if duration_hours > 0.3:  # Solo per attività più lunghe di 18 minuti
-                    label_x = activity_hour + duration_hours/2
-                    if start_hour <= label_x <= end_hour:
-                        ax1.text(label_x, ax1.get_ylim()[1] * 0.95, 
-                                activity['name'], 
-                                ha='center', va='top', fontsize=8, 
-                                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
-                                rotation=90)
+            # Calcola l'orario nel sistema di coordinate del grafico
+            # Se l'attività inizia prima di questo giorno, usa l'inizio del giorno
+            activity_start_hour = max(start_hour, activity_start.hour + activity_start.minute/60)
+            
+            # Se l'attività finisce dopo questo giorno, usa la fine del giorno
+            activity_end_hour = min(end_hour, activity_end.hour + activity_end.minute/60)
+            
+            # Se l'attività è in un giorno diverso, aggiusta l'orario
+            if activity_start.date() < day_start.date():
+                activity_start_hour = start_hour
+            if activity_end.date() > day_end.date():
+                activity_end_hour = end_hour
+            
+            color = activity_colors.get(activity['type'], "#95a5a6")
+            
+            # Area semitrasparente per l'attività
+            ax1.axvspan(activity_start_hour, activity_end_hour, alpha=0.2, color=color, label=f'_nolegend_')
+            
+            # Linea verticale all'inizio dell'attività (solo se in questo giorno)
+            if activity_start.date() == day_start.date():
+                ax1.axvline(x=activity_start_hour, color=color, linestyle='--', alpha=0.8, linewidth=1.5)
+            
+            # Etichetta attività (solo se non troppo lunga)
+            duration_hours = activity_end_hour - activity_start_hour
+            if duration_hours > 0.3:  # Solo per attività più lunghe di 18 minuti
+                label_x = activity_start_hour + duration_hours/2
+                if start_hour <= label_x <= end_hour:
+                    ax1.text(label_x, ax1.get_ylim()[1] * 0.95, 
+                            activity['name'], 
+                            ha='center', va='top', fontsize=8, 
+                            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                            rotation=90)
         
         # Aggiungi legenda attività
         from matplotlib.patches import Patch
