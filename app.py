@@ -3421,15 +3421,14 @@ def display_daily_summary(daily_metrics):
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
-    """Genera un grafico giornaliero come immagine base64"""
+    """Genera un grafico giornaliero con SDNN, RMSSD e HR sullo stesso plot"""
     try:
         import matplotlib.pyplot as plt
-        import matplotlib.dates as mdates
         from io import BytesIO
         import base64
         
-        # Crea figura
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+        # Crea figura con due assi y
+        fig, ax1 = plt.subplots(figsize=(12, 6))
         
         # Dati simulati per il giorno
         hours = list(range(24))
@@ -3441,48 +3440,108 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         rmssd_values = [max(15, base_rmssd + np.random.normal(0, 5)) for _ in hours]
         hr_values = [max(50, base_hr + np.random.normal(0, 6)) for _ in hours]
         
-        # Grafico superiore: SDNN e RMSSD
-        ax1.plot(hours, sdnn_values, label='SDNN', color='#3498db', linewidth=2)
-        ax1.plot(hours, rmssd_values, label='RMSSD', color='#2ecc71', linewidth=2)
-        ax1.set_ylabel('HRV (ms)', fontsize=10)
-        ax1.legend(loc='upper left')
+        # Primo asse y (sinistra) per HRV
+        color_sdnn = '#3498db'
+        color_rmssd = '#2ecc71'
+        line1 = ax1.plot(hours, sdnn_values, label='SDNN', color=color_sdnn, linewidth=2.5, marker='o', markersize=3)
+        line2 = ax1.plot(hours, rmssd_values, label='RMSSD', color=color_rmssd, linewidth=2.5, marker='s', markersize=3)
+        ax1.set_xlabel('Ora del Giorno', fontsize=11, fontweight='bold')
+        ax1.set_ylabel('HRV (ms)', fontsize=11, fontweight='bold', color='#2c3e50')
+        ax1.tick_params(axis='y', labelcolor='#2c3e50')
         ax1.grid(True, alpha=0.3)
-        ax1.set_title(f'Variabilità Cardiaca - {datetime.fromisoformat(day_date).strftime("%d/%m/%Y")}', fontsize=12, fontweight='bold')
+        ax1.set_xticks(range(0, 24, 2))
         
-        # Grafico inferiore: Battito Cardiaco
-        ax2.plot(hours, hr_values, label='Battito Cardiaco', color='#e74c3c', linewidth=2)
-        ax2.set_ylabel('Battito (bpm)', fontsize=10)
-        ax2.set_xlabel('Ora del Giorno', fontsize=10)
-        ax2.legend(loc='upper left')
-        ax2.grid(True, alpha=0.3)
+        # Secondo asse y (destra) per Battito Cardiaco
+        ax2 = ax1.twinx()
+        color_hr = '#e74c3c'
+        line3 = ax2.plot(hours, hr_values, label='Battito Cardiaco', color=color_hr, linewidth=2.5, marker='^', markersize=3, linestyle='-')
+        ax2.set_ylabel('Battito (bpm)', fontsize=11, fontweight='bold', color=color_hr)
+        ax2.tick_params(axis='y', labelcolor=color_hr)
         
-        # Aggiungi linee verticali per le attività
+        # Titolo
+        plt.title(f'Monitoraggio HRV e Battito Cardiaco - {datetime.fromisoformat(day_date).strftime("%d/%m/%Y")}', 
+                 fontsize=13, fontweight='bold', pad=20)
+        
+        # Legenda unificata
+        lines = line1 + line2 + line3
+        labels = [l.get_label() for l in lines]
+        ax1.legend(lines, labels, loc='upper left', frameon=True, fancybox=True, shadow=True)
+        
+        # Aggiungi aree colorate per le attività del giorno
         day_activities = [a for a in activities if a['start_time'].date().isoformat() == day_date]
-        for activity in day_activities:
-            hour = activity['start_time'].hour
-            color = activity.get('color', '#95a5a6')
-            ax1.axvline(x=hour, color=color, linestyle='--', alpha=0.7, linewidth=1)
-            ax2.axvline(x=hour, color=color, linestyle='--', alpha=0.7, linewidth=1)
         
+        # Colori per i tipi di attività
+        activity_colors = {
+            "Allenamento": "#e74c3c",
+            "Alimentazione": "#f39c12", 
+            "Stress": "#9b59b6",
+            "Riposo": "#3498db",
+            "Sonno": "#2c3e50",
+            "Altro": "#95a5a6"
+        }
+        
+        for activity in day_activities:
+            start_hour = activity['start_time'].hour
+            duration = activity['duration'] / 60  # converti minuti in ore
+            end_hour = start_hour + duration
+            
+            color = activity_colors.get(activity['type'], "#95a5a6")
+            
+            # Area semitrasparente per l'attività
+            ax1.axvspan(start_hour, end_hour, alpha=0.2, color=color, label=f'_nolegend_')
+            
+            # Linea verticale all'inizio dell'attività
+            ax1.axvline(x=start_hour, color=color, linestyle='--', alpha=0.8, linewidth=1.5)
+            
+            # Etichetta attività (solo se non troppo lunga)
+            if duration > 0.5:  # Solo per attività più lunghe di 30 minuti
+                ax1.text(start_hour + duration/2, ax1.get_ylim()[1] * 0.95, 
+                        activity['name'], 
+                        ha='center', va='top', fontsize=8, 
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                        rotation=90)
+        
+        # Aggiungi legenda attività
+        from matplotlib.patches import Patch
+        legend_elements = []
+        for activity_type, color in activity_colors.items():
+            if any(a['type'] == activity_type for a in day_activities):
+                legend_elements.append(Patch(facecolor=color, alpha=0.5, label=activity_type))
+        
+        if legend_elements:
+            ax2.legend(handles=legend_elements, loc='upper right', frameon=True, fancybox=True, shadow=True, fontsize=9)
+        
+        # Migliora l'aspetto
         plt.tight_layout()
         
         # Converti in base64
         buffer = BytesIO()
-        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        plt.savefig(buffer, format='png', dpi=120, bbox_inches='tight', 
+                   facecolor='white', edgecolor='none')
         buffer.seek(0)
         image_base64 = base64.b64encode(buffer.getvalue()).decode()
         plt.close()
         
-        return f'<img src="data:image/png;base64,{image_base64}" style="width: 100%; border-radius: 6px; margin: 10px 0;">'
+        return f'''
+        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e9ecef; text-align: center;">
+            <div style="font-size: 14px; font-weight: 600; color: #2c3e50; margin-bottom: 10px;">
+                📈 Monitoraggio Giornaliero - {datetime.fromisoformat(day_date).strftime("%d/%m/%Y")}
+            </div>
+            <img src="data:image/png;base64,{image_base64}" style="width: 100%; max-width: 800px; border-radius: 6px;">
+            <div style="font-size: 11px; color: #666; margin-top: 8px;">
+                SDNN (blu) • RMSSD (verde) • Battito Cardiaco (rosso) • Attività (aree colorate)
+            </div>
+        </div>
+        '''
         
     except Exception as e:
         # Fallback se la generazione del grafico fallisce
-        return """
+        return f"""
         <div class="chart-placeholder">
             <div class="chart-title">📈 Grafico HRV Giornaliero</div>
-            <div class="chart-info">SDNN, RMSSD e Battito Cardiaco con attività registrate</div>
+            <div class="chart-info">SDNN: {day_metrics.get('sdnn', 0):.1f}ms | RMSSD: {day_metrics.get('rmssd', 0):.1f}ms | Battito: {day_metrics.get('hr_mean', 0):.1f}bpm</div>
             <div style="font-size: 10px; color: #868e96; margin-top: 5px;">
-                Grafico non disponibile per questo giorno
+                Grafico non disponibile: {str(e)}
             </div>
         </div>
         """
