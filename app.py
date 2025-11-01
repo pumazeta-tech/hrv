@@ -2697,8 +2697,7 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
 # FUNZIONI PER CREARE PDF
 # =============================================================================
 
-def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, attivita_problematiche, analisi_impatto):
-    """Genera un report professionale in HTML elegante con analisi giornaliera completa"""
+def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, attivita_problematiche, analisi_impatto, activities):
     
     # Stile CSS moderno e professionale - COMPATTO
     css = """
@@ -4484,7 +4483,7 @@ def main():
                     avg_metrics,
                     attivita_problematiche,
                     analisi_impatto,
-                    st.session_state.activities  # AGGIUNGI QUESTO
+                    st.session_state.activities  # 7° parametro aggiunto
                 )
                 
                 # Anteprima del report
