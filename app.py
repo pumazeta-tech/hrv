@@ -2984,83 +2984,80 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
     
 @media print {
     @page {
-        margin: 0.3cm !important;
+        margin: 0.2cm !important;
         size: A4;
     }
     body {
-        font-size: 10px !important;
+        font-size: 9px !important;
         margin: 0 !important;
-        padding: 5px !important;
-        line-height: 1.2 !important;
+        padding: 2px !important;
+        line-height: 1.1 !important;
     }
     .report-container {
-        padding: 5mm !important;
+        padding: 2mm !important;
         max-width: 100% !important;
     }
     .header-section {
-        padding: 10px 15px !important;
-        margin-bottom: 10px !important;
+        padding: 5px 10px !important;
+        margin-bottom: 5px !important;
     }
     .header-title {
-        font-size: 16px !important;
+        font-size: 14px !important;
+        margin-bottom: 2px !important;
     }
     .header-subtitle {
-        font-size: 10px !important;
+        font-size: 8px !important;
+        margin-bottom: 2px !important;
     }
     .compact-section {
-        padding: 8px 10px !important;
-        margin-bottom: 8px !important;
+        padding: 5px 8px !important;
+        margin-bottom: 5px !important;
     }
     .daily-section {
-        padding: 10px !important;
-        margin: 10px 0 !important;
+        padding: 6px !important;
+        margin: 6px 0 !important;
         page-break-inside: avoid;
     }
     .metric-grid-compact {
-        gap: 5px !important;
-        margin: 8px 0 !important;
+        gap: 3px !important;
+        margin: 5px 0 !important;
     }
     .metric-card-compact {
-        padding: 6px 4px !important;
+        padding: 4px 2px !important;
     }
     .metric-value-compact {
-        font-size: 12px !important;
-    }
-    .metric-label-compact {
-        font-size: 9px !important;
-    }
-    .daily-header {
-        font-size: 14px !important;
-        margin-bottom: 8px !important;
-    }
-    .metrics-grid {
-        gap: 10px !important;
-        margin: 8px 0 !important;
-    }
-    .metrics-column {
-        padding: 8px !important;
-    }
-    .metric-row {
-        padding: 3px 0 !important;
-    }
-    .metric-name, .metric-value {
         font-size: 10px !important;
     }
+    .metric-label-compact {
+        font-size: 7px !important;
+    }
+    .daily-header {
+        font-size: 11px !important;
+        margin-bottom: 4px !important;
+        padding-bottom: 2px !important;
+    }
+    .metrics-grid {
+        gap: 6px !important;
+        margin: 4px 0 !important;
+    }
+    .metrics-column {
+        padding: 4px !important;
+    }
+    .metric-row {
+        padding: 1px 0 !important;
+    }
+    .metric-name, .metric-value {
+        font-size: 8px !important;
+    }
     .section-title {
-        font-size: 12px !important;
-        margin-bottom: 8px !important;
+        font-size: 10px !important;
+        margin-bottom: 4px !important;
     }
-    .bibliography {
-        padding: 10px !important;
-        font-size: 9px !important;
+    .daily-section:first-child {
+        margin-top: 2px !important;
     }
-    .footer {
-        padding: 10px !important;
-        font-size: 9px !important;
-        margin-top: 15px !important;
-    }
-    .daily-section {
-        page-break-inside: avoid;
+    .report-container > *:nth-child(2) {
+        margin-top: 0 !important;
     }
 }
     </style>
