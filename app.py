@@ -2943,6 +2943,29 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
         border-radius: 50%;
         margin-right: 6px;
     }
+
+    .side-by-side-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin: 12px 0;
+    }
+    
+    .weakness-column {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border-left: 4px solid #f39c12;
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 11px;
+    }
+    
+    .strength-column {
+        background: linear-gradient(135deg, #e8f4fd 0%, #d1edff 100%);
+        border-left: 4px solid #3498db;
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 11px;
+    }
     
     .dot-blue { background: #3498db; }
     .dot-green { background: #27ae60; }
@@ -3154,27 +3177,97 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
                     
                 if day_metrics.get('sleep_deep', 0) < 1.0:
                     warnings.append("Sonno profondo insufficiente - crea ambiente più buio e silenzioso")
+
+            # Analisi attività del giorno per punti di debolezza
+            day_activities_list = [a for a in activities if a['start_time'].date().isoformat() == day_date]
             
-            # Costruisci sezione raccomandazioni con PUNTI DI FORZA E DEBOLEZZA
+            for activity in day_activities_list:
+                # Analisi ALIMENTAZIONE
+                if activity['type'] == "Alimentazione":
+                    food_items = activity.get('food_items', '').lower()
+                    inflammatory_score = 0
+                    cibi_problematici = []
+                    
+                    for food in food_items.split(','):
+                        food = food.strip()
+                        if food in NUTRITION_DB:
+                            food_data = NUTRITION_DB[food]
+                            score = food_data.get('inflammatory_score', 0)
+                            inflammatory_score += score
+                            if score > 2:
+                                cibi_problematici.append(food)
+                    
+                    if inflammatory_score > 3:
+                        orario = activity['start_time'].strftime('%H:%M')
+                        weaknesses.append(f"Cena infiammatoria alle {orario}: {', '.join(cibi_problematici)}")
+                    elif inflammatory_score < -2:
+                        recommendations.append(f"Pasto salutare alle {activity['start_time'].strftime('%H:%M')}")
+                
+                # Analisi ALLENAMENTI
+                elif activity['type'] == "Allenamento":
+                    nome_attivita = activity['name'].lower()
+                    intensita = activity['intensity'].lower()
+                    
+                    if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']):
+                        if day_metrics.get('rmssd', 0) < 35:
+                            weaknesses.append(f"Allenamento intenso ({activity['name']}) con RMSSD basso")
+                        elif day_metrics.get('rmssd', 0) > 50:
+                            recommendations.append(f"Buona risposta all'allenamento {activity['name']}")
+                
+                # Analisi SONNO (se non già analizzato dalle metriche)
+                elif activity['type'] == "Sonno":
+                    durata_sonno = activity['duration'] / 60
+                    if durata_sonno < 6 and not has_valid_sleep_metrics(day_metrics):
+                        weaknesses.append(f"Sonno troppo breve: {durata_sonno:.1f}h (registrato)")
+                    elif durata_sonno >= 7.5 and not has_valid_sleep_metrics(day_metrics):
+                        recommendations.append(f"Buona durata sonno: {durata_sonno:.1f}h (registrato)")
+                
+                # Analisi STRESS
+                elif activity['type'] == "Stress":
+                    weaknesses.append(f"Episodio di stress: {activity['name']}")
+            
+            # Costruisci sezione raccomandazioni AFFIANCATA
             recommendations_html = ""
             
-            if weaknesses:
-                recommendations_html += f"""
-                <div class="warning-box">
-                    <strong>🔴 Punti di Debolezza:</strong><br>
-                    {''.join([f"• {w}<br>" for w in weaknesses])}
-                </div>
+            if weaknesses or recommendations:
+                recommendations_html = """
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 12px 0;">
                 """
-            
-            if recommendations:
-                recommendations_html += f"""
-                <div class="recommendation-box">
-                    <strong>🟢 Punti di Forza:</strong><br>
-                    {''.join([f"• {r}<br>" for r in recommendations])}
-                </div>
-                """
-            
-            if not weaknesses and not recommendations:
+                
+                # Colonna sinistra - Punti di Debolezza
+                if weaknesses:
+                    recommendations_html += f"""
+                    <div class="warning-box" style="margin: 0;">
+                        <strong>🔴 Punti di Debolezza:</strong><br>
+                        {''.join([f"• {w}<br>" for w in weaknesses])}
+                    </div>
+                    """
+                else:
+                    recommendations_html += """
+                    <div class="recommendation-box" style="margin: 0; opacity: 0.7;">
+                        <strong>✅ Nessun punto critico</strong><br>
+                        Situazione ottimale
+                    </div>
+                    """
+                
+                # Colonna destra - Punti di Forza
+                if recommendations:
+                    recommendations_html += f"""
+                    <div class="recommendation-box" style="margin: 0;">
+                        <strong>🟢 Punti di Forza:</strong><br>
+                        {''.join([f"• {r}<br>" for r in recommendations])}
+                    </div>
+                    """
+                else:
+                    recommendations_html += """
+                    <div class="warning-box" style="margin: 0; opacity: 0.7;">
+                        <strong>📊 Nessun punto di forza</strong><br>
+                        Monitorare attentamente
+                    </div>
+                    """
+                
+                recommendations_html += "</div>"
+            else:
                 recommendations_html = """
                 <div class="recommendation-box">
                     <strong>📊 Profilo nella norma</strong><br>
