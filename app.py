@@ -2982,221 +2982,485 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
         font-size: 10px;
     }
     
-    /* STILI PER LA STAMPA - AGGIUNTI PER RIDURRE SPAZI BIANCHI */
-    @media print {
-        @page {
-            margin: 0.3cm !important;
-            size: A4;
-        }
-        body {
-            font-size: 10px !important;
-            margin: 0 !important;
-            padding: 5px !important;
-            line-height: 1.2 !important;
-        }
-        .report-container {
-            padding: 5mm !important;
-            max-width: 100% !important;
-        }
-        .header-section {
-            padding: 10px 15px !important;
-            margin-bottom: 10px !important;
-        }
-        .header-title {
-            font-size: 16px !important;
-        }
-        .compact-section {
-            padding: 8px 10px !important;
-            margin-bottom: 8px !important;
-        }
-        .daily-section {
-            padding: 10px !important;
-            margin: 10px 0 !important;
-            page-break-inside: avoid;
-        }
-        .metric-grid-compact {
-            gap: 5px !important;
-            margin: 8px 0 !important;
-        }
-        .metric-card-compact {
-            padding: 6px 4px !important;
-        }
-        .metric-value-compact {
-            font-size: 12px !important;
-        }
+@media print {
+    @page {
+        margin: 0.3cm !important;
+        size: A4;
     }
+    body {
+        font-size: 10px !important;
+        margin: 0 !important;
+        padding: 5px !important;
+        line-height: 1.2 !important;
+    }
+    .report-container {
+        padding: 5mm !important;
+        max-width: 100% !important;
+    }
+    .header-section {
+        padding: 10px 15px !important;
+        margin-bottom: 10px !important;
+    }
+    .header-title {
+        font-size: 16px !important;
+    }
+    .header-subtitle {
+        font-size: 10px !important;
+    }
+    .compact-section {
+        padding: 8px 10px !important;
+        margin-bottom: 8px !important;
+    }
+    .daily-section {
+        padding: 10px !important;
+        margin: 10px 0 !important;
+        page-break-inside: avoid;
+    }
+    .metric-grid-compact {
+        gap: 5px !important;
+        margin: 8px 0 !important;
+    }
+    .metric-card-compact {
+        padding: 6px 4px !important;
+    }
+    .metric-value-compact {
+        font-size: 12px !important;
+    }
+    .metric-label-compact {
+        font-size: 9px !important;
+    }
+    .daily-header {
+        font-size: 14px !important;
+        margin-bottom: 8px !important;
+    }
+    .metrics-grid {
+        gap: 10px !important;
+        margin: 8px 0 !important;
+    }
+    .metrics-column {
+        padding: 8px !important;
+    }
+    .metric-row {
+        padding: 3px 0 !important;
+    }
+    .metric-name, .metric-value {
+        font-size: 10px !important;
+    }
+    .section-title {
+        font-size: 12px !important;
+        margin-bottom: 8px !important;
+    }
+    .bibliography {
+        padding: 10px !important;
+        font-size: 9px !important;
+    }
+    .footer {
+        padding: 10px !important;
+        font-size: 9px !important;
+        margin-top: 15px !important;
+    }
+    .daily-section {
+        page-break-inside: avoid;
+    }
+}
     </style>
     """
     
-    # FUNZIONE PER FORMATTARE I VALORI
-    def format_value(value):
-        if isinstance(value, (int, float)):
-            return f"{value:.2f}"
-        return str(value)
+    # SEZIONE INIZIALE COMPATTA
+    patient_info = f"""
+    <div class="metric-grid-compact">
+        <div class="metric-card-compact">
+            <div class="metric-value-compact">{user_profile['name']} {user_profile['surname']}</div>
+            <div class="metric-label-compact">Paziente</div>
+        </div>
+        <div class="metric-card-compact">
+            <div class="metric-value-compact">{user_profile['age']}</div>
+            <div class="metric-label-compact">Età</div>
+            <div class="metric-unit-compact">anni</div>
+        </div>
+        <div class="metric-card-compact">
+            <div class="metric-value-compact">{user_profile['gender']}</div>
+            <div class="metric-label-compact">Sesso</div>
+        </div>
+        <div class="metric-card-compact">
+            <div class="metric-value-compact">{timeline['total_duration_hours']:.1f}</div>
+            <div class="metric-label-compact">Durata</div>
+            <div class="metric-unit-compact">ore</div>
+        </div>
+    </div>
+    """
     
-    # GENERA IL CONTENUTO HTML CON I DATI FORMATTATI
-    html_content = f"""
+    # ANALISI GIORNO PER GIORNO COMPLETA
+    daily_analysis = ""
+    if daily_metrics:
+        daily_sections = []
+        for day_date, day_metrics in sorted(daily_metrics.items()):
+            day_dt = datetime.fromisoformat(day_date)
+            
+            # METRICHE HRV COMPLETE
+            hrv_metrics_html = ""
+            hrv_metrics = [
+                ('Battito Cardiaco', day_metrics.get('hr_mean', 0), 'bpm'),
+                ('SDNN', day_metrics.get('sdnn', 0), 'ms'),
+                ('RMSSD', day_metrics.get('rmssd', 0), 'ms'),
+                ('Coerenza', day_metrics.get('coherence', 0), '%'),
+                ('Potenza Totale', day_metrics.get('total_power', 0), 'ms²'),
+                ('VLF', day_metrics.get('vlf', 0), 'ms²'),
+                ('LF', day_metrics.get('lf', 0), 'ms²'),
+                ('HF', day_metrics.get('hf', 0), 'ms²'),
+                ('LF/HF', day_metrics.get('lf_hf_ratio', 0), 'ratio')
+            ]
+            
+            for name, value, unit in hrv_metrics:
+                if isinstance(value, (int, float)):
+                    value_str = f"{value:.1f}"
+                else:
+                    value_str = str(value)
+                hrv_metrics_html += f"""
+                <div class="metric-row">
+                    <span class="metric-name">{name}</span>
+                    <span class="metric-value">{value_str}</span>
+                    <span class="metric-unit">{unit}</span>
+                </div>
+                """
+            
+            # METRICHE SONNO COMPLETE
+            sleep_metrics_html = ""
+            if has_valid_sleep_metrics(day_metrics):
+                sleep_metrics = [
+                    ('Durata Sonno', day_metrics.get('sleep_duration', 0), 'ore'),
+                    ('Efficienza', day_metrics.get('sleep_efficiency', 0), '%'),
+                    ('Battito Riposo', day_metrics.get('sleep_hr', 0), 'bpm'),
+                    ('Sonno Leggero', day_metrics.get('sleep_light', 0), 'ore'),
+                    ('Sonno Profondo', day_metrics.get('sleep_deep', 0), 'ore'),
+                    ('Sonno REM', day_metrics.get('sleep_rem', 0), 'ore'),
+                    ('Risvegli', day_metrics.get('sleep_awake', 0), 'ore')
+                ]
+                
+                for name, value, unit in sleep_metrics:
+                    if isinstance(value, (int, float)):
+                        value_str = f"{value:.1f}"
+                    else:
+                        value_str = str(value)
+                    sleep_metrics_html += f"""
+                    <div class="metric-row">
+                        <span class="metric-name">{name}</span>
+                        <span class="metric-value">{value_str}</span>
+                        <span class="metric-unit">{unit}</span>
+                    </div>
+                    """
+                
+                # Aggiungi visualizzazione fasi sonno
+                total_sleep = day_metrics.get('sleep_duration', 0)
+                if total_sleep > 0:
+                    light_pct = (day_metrics.get('sleep_light', 0) / total_sleep) * 100
+                    deep_pct = (day_metrics.get('sleep_deep', 0) / total_sleep) * 100
+                    rem_pct = (day_metrics.get('sleep_rem', 0) / total_sleep) * 100
+                    awake_pct = (day_metrics.get('sleep_awake', 0) / total_sleep) * 100
+                    
+                    sleep_metrics_html += f"""
+                    <div style="margin-top: 10px;">
+                        <div style="font-size: 10px; color: #666; margin-bottom: 4px;">Distribuzione Fasi Sonno:</div>
+                        <div class="sleep-phase-bar"></div>
+                        <div class="sleep-labels">
+                            <span>Leggero: {light_pct:.0f}%</span>
+                            <span>Profondo: {deep_pct:.0f}%</span>
+                            <span>REM: {rem_pct:.0f}%</span>
+                            <span>Risvegli: {awake_pct:.0f}%</span>
+                        </div>
+                    </div>
+                    """
+            else:
+                sleep_metrics_html = """
+                <div style="text-align: center; color: #868e96; font-size: 11px; padding: 20px;">
+                    Nessun dato sonno disponibile per questo giorno
+                </div>
+                """
+            
+            # RACCOMANDAZIONI SPECIFICHE - PUNTI DI FORZA E DEBOLEZZA
+            recommendations = []
+            warnings = []
+            weaknesses = []
+            
+            # Analisi HRV - PUNTI DI FORZA
+            if day_metrics.get('rmssd', 0) > 50:
+                recommendations.append("RMSSD ottimale - eccellente capacità di recupero")
+            elif day_metrics.get('rmssd', 0) > 35:
+                recommendations.append("RMSSD buono - buona rigenerazione")
+                
+            if day_metrics.get('sdnn', 0) > 60:
+                recommendations.append("Variabilità cardiaca eccellente")
+            elif day_metrics.get('sdnn', 0) > 45:
+                recommendations.append("Variabilità cardiaca buona")
+                
+            if day_metrics.get('hr_mean', 0) < 65:
+                recommendations.append("Battito cardiaco ottimale a riposo")
+            elif day_metrics.get('hr_mean', 0) < 72:
+                recommendations.append("Battito cardiaco nella norma")
+                
+            if 0.8 < day_metrics.get('lf_hf_ratio', 0) < 1.5:
+                recommendations.append("Bilancio simpatico-vagale ottimale")
+                
+            if day_metrics.get('coherence', 0) > 70:
+                recommendations.append("Alta coerenza cardiaca - eccellente equilibrio autonomico")
+            elif day_metrics.get('coherence', 0) > 55:
+                recommendations.append("Buona coerenza cardiaca")
+            
+            # Analisi HRV - PUNTI DI DEBOLEZZA
+            if day_metrics.get('rmssd', 0) < 25:
+                weaknesses.append("RMSSD molto basso - recupero insufficiente")
+            elif day_metrics.get('rmssd', 0) < 35:
+                weaknesses.append("RMSSD basso - capacità di recupero ridotta")
+                
+            if day_metrics.get('sdnn', 0) < 30:
+                weaknesses.append("SDNN molto basso - possibile affaticamento cronico")
+            elif day_metrics.get('sdnn', 0) < 40:
+                weaknesses.append("SDNN basso - variabilità cardiaca ridotta")
+                
+            if day_metrics.get('hr_mean', 0) > 80:
+                weaknesses.append("Battito cardiaco elevato - possibile stress o disidratazione")
+            elif day_metrics.get('hr_mean', 0) > 75:
+                weaknesses.append("Battito cardiaco alto - monitorare lo stress")
+                
+            if day_metrics.get('lf_hf_ratio', 0) > 3.0:
+                weaknesses.append("Rapporto LF/HF elevato - dominanza simpatica eccessiva")
+            elif day_metrics.get('lf_hf_ratio', 0) > 2.0:
+                weaknesses.append("Rapporto LF/HF alto - possibile stato di allerta")
+                
+            if day_metrics.get('lf_hf_ratio', 0) < 0.5:
+                weaknesses.append("Rapporto LF/HF molto basso - possibile astenia")
+                
+            if day_metrics.get('coherence', 0) < 40:
+                weaknesses.append("Coerenza cardiaca bassa - equilibrio autonomico compromesso")
+            elif day_metrics.get('coherence', 0) < 50:
+                weaknesses.append("Coerenza cardiaca ridotta")
+                
+            # Analisi Sonno (se disponibile)
+            if has_valid_sleep_metrics(day_metrics):
+                sleep_duration = day_metrics.get('sleep_duration', 0)
+                sleep_efficiency = day_metrics.get('sleep_efficiency', 0)
+                
+                if sleep_duration < 6:
+                    warnings.append(f"Sonno insufficiente ({sleep_duration:.1f}h) - cerca 7-9 ore")
+                elif sleep_duration >= 7.5:
+                    recommendations.append(f"Durata sonno ottimale ({sleep_duration:.1f}h)")
+                    
+                if sleep_efficiency < 75:
+                    warnings.append(f"Efficienza sonno bassa ({sleep_efficiency:.0f}%) - migliora ambiente sonno")
+                elif sleep_efficiency >= 90:
+                    recommendations.append(f"Efficienza sonno eccellente ({sleep_efficiency:.0f}%)")
+                    
+                if day_metrics.get('sleep_deep', 0) < 1.0:
+                    warnings.append("Sonno profondo insufficiente - crea ambiente più buio e silenzioso")
+
+            # Analisi attività del giorno per punti di debolezza
+            day_activities_list = [a for a in activities if a['start_time'].date().isoformat() == day_date]
+            
+            for activity in day_activities_list:
+                # Analisi ALIMENTAZIONE
+                if activity['type'] == "Alimentazione":
+                    food_items = activity.get('food_items', '').lower()
+                    inflammatory_score = 0
+                    cibi_problematici = []
+                    
+                    for food in food_items.split(','):
+                        food = food.strip()
+                        if food in NUTRITION_DB:
+                            food_data = NUTRITION_DB[food]
+                            score = food_data.get('inflammatory_score', 0)
+                            inflammatory_score += score
+                            if score > 2:
+                                cibi_problematici.append(food)
+                    
+                    if inflammatory_score > 3:
+                        orario = activity['start_time'].strftime('%H:%M')
+                        weaknesses.append(f"Cena infiammatoria alle {orario}: {', '.join(cibi_problematici)}")
+                    elif inflammatory_score < -2:
+                        recommendations.append(f"Pasto salutare alle {activity['start_time'].strftime('%H:%M')}")
+                
+                # Analisi ALLENAMENTI
+                elif activity['type'] == "Allenamento":
+                    nome_attivita = activity['name'].lower()
+                    intensita = activity['intensity'].lower()
+                    
+                    if any(p in intensita for p in ['intensa', 'massimale', 'duro', 'pesante', 'intenso']):
+                        if day_metrics.get('rmssd', 0) < 35:
+                            weaknesses.append(f"Allenamento intenso ({activity['name']}) con RMSSD basso")
+                        elif day_metrics.get('rmssd', 0) > 50:
+                            recommendations.append(f"Buona risposta all'allenamento {activity['name']}")
+                
+                # Analisi SONNO (se non già analizzato dalle metriche)
+                elif activity['type'] == "Sonno":
+                    durata_sonno = activity['duration'] / 60
+                    if durata_sonno < 6 and not has_valid_sleep_metrics(day_metrics):
+                        weaknesses.append(f"Sonno troppo breve: {durata_sonno:.1f}h (registrato)")
+                    elif durata_sonno >= 7.5 and not has_valid_sleep_metrics(day_metrics):
+                        recommendations.append(f"Buona durata sonno: {durata_sonno:.1f}h (registrato)")
+                
+                # Analisi STRESS
+                elif activity['type'] == "Stress":
+                    weaknesses.append(f"Episodio di stress: {activity['name']}")
+            
+            # Costruisci sezione raccomandazioni AFFIANCATA
+            recommendations_html = ""
+            
+            if weaknesses or recommendations:
+                recommendations_html = """
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 12px 0;">
+                """
+                
+                # Colonna sinistra - Punti di Debolezza
+                if weaknesses:
+                    recommendations_html += f"""
+                    <div class="warning-box" style="margin: 0;">
+                        <strong>🔴 Punti di Debolezza:</strong><br>
+                        {''.join([f"• {w}<br>" for w in weaknesses])}
+                    </div>
+                    """
+                else:
+                    recommendations_html += """
+                    <div class="recommendation-box" style="margin: 0; opacity: 0.7;">
+                        <strong>✅ Nessun punto critico</strong><br>
+                        Situazione ottimale
+                    </div>
+                    """
+                
+                # Colonna destra - Punti di Forza
+                if recommendations:
+                    recommendations_html += f"""
+                    <div class="recommendation-box" style="margin: 0;">
+                        <strong>🟢 Punti di Forza:</strong><br>
+                        {''.join([f"• {r}<br>" for r in recommendations])}
+                    </div>
+                    """
+                else:
+                    recommendations_html += """
+                    <div class="warning-box" style="margin: 0; opacity: 0.7;">
+                        <strong>📊 Nessun punto di forza</strong><br>
+                        Monitorare attentamente
+                    </div>
+                    """
+                
+                recommendations_html += "</div>"
+            else:
+                recommendations_html = """
+                <div class="recommendation-box">
+                    <strong>📊 Profilo nella norma</strong><br>
+                    Continua a monitorare e mantenere le buone abitudini
+                </div>
+                """
+            
+            # SEZIONE GIORNO COMPLETA
+            daily_section = f"""
+            <div class="daily-section">
+                <div class="daily-header">
+                    <span class="color-dot dot-green"></span>
+                    Giorno: {day_dt.strftime('%A %d/%m/%Y')}
+                </div>
+                
+                <!-- METRICHE HRV E SONNO -->
+                <div class="metrics-grid">
+                    <div class="metrics-column">
+                        <div class="column-title">
+                            <span class="color-dot dot-blue"></span>
+                            Metriche HRV
+                        </div>
+                        {hrv_metrics_html}
+                    </div>
+                    
+                    <div class="metrics-column">
+                        <div class="column-title">
+                            <span class="color-dot dot-purple"></span>
+                            Analisi Sonno
+                        </div>
+                        {sleep_metrics_html}
+                    </div>
+                </div>
+                
+                <!-- GRAFICO GIORNALIERO -->
+                {generare_grafico_giornaliero(day_date, day_metrics, timeline, st.session_state.activities)}
+                
+                <!-- RACCOMANDAZIONI -->
+                {recommendations_html}
+            </div>
+            """
+            daily_sections.append(daily_section)
+        
+        daily_analysis = "\n".join(daily_sections)
+    else:
+        daily_analysis = """
+        <div style="text-align: center; color: #666; padding: 30px; font-size: 12px;">
+            Analisi giornaliera non disponibile - caricare una registrazione multi-giorno
+        </div>
+        """
+    
+    # Bibliografia compatta
+    bibliography = """
+    <div class="bibliography">
+        <div style="font-weight: 600; margin-bottom: 8px; color: #2c3e50;">Riferimenti Bibliografici</div>
+        
+        <div style="margin-bottom: 6px;">
+            <strong>Task Force (1996)</strong> - Standard di misurazione HRV. Circulation.
+        </div>
+        
+        <div style="margin-bottom: 6px;">
+            <strong>Umetani et al. (1998)</strong> - HRV e invecchiamento. JACC.
+        </div>
+        
+        <div style="margin-bottom: 6px;">
+            <strong>Boudreau et al. (2012)</strong> - HRV durante il sonno. Sleep.
+        </div>
+    </div>
+    """
+    
+    # Report completo
+    report = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Report HRV - {user_profile.get('name', '')} {user_profile.get('surname', '')}</title>
+        <title>Report HRV - {user_profile['name']} {user_profile['surname']}</title>
         {css}
     </head>
     <body>
         <div class="report-container">
-            
-            <!-- HEADER -->
+            <!-- HEADER COMPATTO -->
             <div class="header-section">
                 <div class="header-title">REPORT ANALISI HRV GIORNALIERA</div>
-                <div class="header-subtitle">GABA CURSING - GABA CURSING - Gaba Rust - Genese 1:017/2022</div>
+                <div class="header-subtitle">Analisi Completa Giorno per Giorno</div>
+                <div style="margin-top: 5px; font-size: 10px; opacity: 0.8;">
+                    {user_profile['name']} {user_profile['surname']} - Generato il {datetime.now().strftime('%d/%m/%Y')}
+                </div>
             </div>
             
-            <!-- RIEPILOGO GENERALE -->
+            <!-- INFORMAZIONI COMPATTE -->
             <div class="compact-section">
                 <div class="section-title">
                     <span class="color-dot dot-blue"></span>
                     Riepilogo Generale
                 </div>
-                <div class="metric-grid-compact">
-                    <div class="metric-card-compact">
-                        <div class="metric-value-compact">{user_profile.get('age', 'N/A')}</div>
-                        <div class="metric-label-compact">Età</div>
-                    </div>
-                    <div class="metric-card-compact">
-                        <div class="metric-value-compact">{user_profile.get('gender', 'N/A')}</div>
-                        <div class="metric-label-compact">Sesso</div>
-                    </div>
-                    <div class="metric-card-compact">
-                        <div class="metric-value-compact">{len(daily_metrics) if daily_metrics else 0}</div>
-                        <div class="metric-label-compact">Giorni</div>
-                    </div>
-                    <div class="metric-card-compact">
-                        <div class="metric-value-compact">{format_value(avg_metrics.get('hr_mean', 0)) if avg_metrics else 'N/A'}</div>
-                        <div class="metric-label-compact">Battito Medio</div>
-                        <div class="metric-unit-compact">bpm</div>
-                    </div>
-                </div>
+                {patient_info}
             </div>
             
-            <!-- METRICHE MEDIE -->
-            {f'''
-            <div class="compact-section">
-                <div class="section-title">
-                    <span class="color-dot dot-green"></span>
-                    Metriche Medie del Periodo
-                </div>
-                <div class="metrics-grid">
-                    <div class="metrics-column">
-                        <div class="column-title">Variabilità Cardiaca</div>
-                        <div class="metric-row">
-                            <span class="metric-name">SDNN</span>
-                            <span class="metric-value">{format_value(avg_metrics.get('sdnn', 0))}</span>
-                            <span class="metric-unit">ms</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-name">RMSSD</span>
-                            <span class="metric-value">{format_value(avg_metrics.get('rmssd', 0))}</span>
-                            <span class="metric-unit">ms</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-name">Coerenza</span>
-                            <span class="metric-value">{format_value(avg_metrics.get('coherence', 0))}</span>
-                            <span class="metric-unit">%</span>
-                        </div>
-                    </div>
-                    <div class="metrics-column">
-                        <div class="column-title">Frequenza Cardiaca</div>
-                        <div class="metric-row">
-                            <span class="metric-name">Media</span>
-                            <span class="metric-value">{format_value(avg_metrics.get('hr_mean', 0))}</span>
-                            <span class="metric-unit">bpm</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-name">Potenza Totale</span>
-                            <span class="metric-value">{format_value(avg_metrics.get('total_power', 0))}</span>
-                            <span class="metric-unit">ms²</span>
-                        </div>
-                    </div>
-                </div>
+            <!-- ANALISI GIORNO PER GIORNO -->
+            <div>
+                {daily_analysis}
             </div>
-            ''' if avg_metrics else ''}
             
-            <!-- ATTIVITÀ PROBLEMATICHE -->
-            {f'''
-            <div class="compact-section">
-                <div class="section-title">
-                    <span class="color-dot dot-orange"></span>
-                    Analisi Attività e Impatto
-                </div>
-                <div class="side-by-side-container">
-                    <div class="weakness-column">
-                        <strong>Attività Problematiche:</strong><br>
-                        {attivita_problematiche if attivita_problematiche else "Nessuna attività problematica rilevata"}
-                    </div>
-                    <div class="strength-column">
-                        <strong>Analisi Impatto:</strong><br>
-                        {analisi_impatto if analisi_impatto else "Nessun impatto significativo rilevato"}
-                    </div>
-                </div>
-            </div>
-            ''' if attivita_problematiche or analisi_impatto else ''}
-            
-            <!-- DATI GIORNALIERI -->
-            {f'''
-            <div class="daily-section">
-                <div class="daily-header">Dettaglio Giornaliero</div>
-                {''.join([f'''
-                <div class="compact-section">
-                    <div class="section-title">Data: {data}</div>
-                    <div class="metrics-grid">
-                        <div class="metrics-column">
-                            <div class="metric-row">
-                                <span class="metric-name">SDNN</span>
-                                <span class="metric-value">{format_value(metrics.get('sdnn', 0))}</span>
-                                <span class="metric-unit">ms</span>
-                            </div>
-                            <div class="metric-row">
-                                <span class="metric-name">RMSSD</span>
-                                <span class="metric-value">{format_value(metrics.get('rmssd', 0))}</span>
-                                <span class="metric-unit">ms</span>
-                            </div>
-                            <div class="metric-row">
-                                <span class="metric-name">Battito Medio</span>
-                                <span class="metric-value">{format_value(metrics.get('hr_mean', 0))}</span>
-                                <span class="metric-unit">bpm</span>
-                            </div>
-                        </div>
-                        <div class="metrics-column">
-                            <div class="metric-row">
-                                <span class="metric-name">Coerenza</span>
-                                <span class="metric-value">{format_value(metrics.get('coherence', 0))}</span>
-                                <span class="metric-unit">%</span>
-                            </div>
-                            <div class="metric-row">
-                                <span class="metric-name">Ore Registrazione</span>
-                                <span class="metric-value">{format_value(metrics.get('recording_hours', 0))}</span>
-                                <span class="metric-unit">h</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                ''' for data, metrics in list(daily_metrics.items())[:5]]) if daily_metrics else '<p>Nessun dato giornaliero disponibile</p>'}
-            </div>
-            ''' if daily_metrics else ''}
+            <!-- BIBLIOGRAFIA -->
+            {bibliography}
             
             <!-- FOOTER -->
             <div class="footer">
-                Report generato automaticamente - Sistema di Analisi HRV<br>
-                Data di generazione: {datetime.now().strftime('%d/%m/%Y %H:%M')}
+                <p>Report generato da HRV Analytics - Sistema di Analisi della Variabilità Cardiaca</p>
+                <p><em>Dati a scopo informativo - Non sostituisce il parere medico</em></p>
             </div>
-            
         </div>
     </body>
     </html>
     """
     
-    return html_content
+    return report
 
 def display_compact_metrics(avg_metrics):
     """Mostra le metriche in layout compatto e professionale"""
