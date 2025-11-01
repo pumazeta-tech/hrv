@@ -3618,23 +3618,23 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
             if activity_start.date() == day_start.date():
                 ax1.axvline(x=activity_start_hour, color=color, linestyle='--', alpha=0.8, linewidth=1.5)
             
-                    # Etichetta attività (solo se non troppo lunga)
-                    duration_hours = activity_end_hour - activity_start_hour
-                    if duration_hours > 0.3:  # Solo per attività più lunghe di 18 minuti
-                        label_x = activity_start_hour + duration_hours/2
-                        if start_hour <= label_x <= end_hour:
-                            # Determina se usare testo bianco o nero in base al colore di sfondo
-                            # Per colori scuri (Sonno, Allenamento) usa testo bianco
-                            if activity['type'] in ["Sonno", "Allenamento", "Stress"]:
-                                text_color = 'white'
-                            else:
-                                text_color = 'black'
-                            
-                            ax1.text(label_x, ax1.get_ylim()[1] * 0.95, 
-                                    activity['name'], 
-                                    ha='center', va='top', fontsize=8, color=text_color,
-                                    bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.8),
-                                    rotation=90)
+            # Etichetta attività (solo se non troppo lunga)
+            duration_hours = activity_end_hour - activity_start_hour
+            if duration_hours > 0.3:  # Solo per attività più lunghe di 18 minuti
+                label_x = activity_start_hour + duration_hours/2
+                if start_hour <= label_x <= end_hour:
+                    # Determina se usare testo bianco o nero in base al colore di sfondo
+                    # Per colori scuri (Sonno, Allenamento) usa testo bianco
+                    if activity['type'] in ["Sonno", "Allenamento", "Stress"]:
+                        text_color = 'white'
+                    else:
+                        text_color = 'black'
+                    
+                    ax1.text(label_x, ax1.get_ylim()[1] * 0.95, 
+                            activity['name'], 
+                            ha='center', va='top', fontsize=8, color=text_color,
+                            bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.8),
+                            rotation=90)
         
         # Aggiungi legenda attività
         from matplotlib.patches import Patch
