@@ -2775,9 +2775,22 @@ def crea_pdf_professionale(user_profile, timeline, avg_metrics, daily_metrics):
                 pdf.cell(30, 8, f"{day_metrics.get('lf_hf_ratio', 0):.2f}", 1)
                 pdf.ln()
         
-        # Ritorna il PDF - VERSIONE CORRETTA
-        pdf_output = pdf.output(dest='S')  # Questo restituisce già una stringa
-        return BytesIO(pdf_output.encode('latin-1'))
+        # SOLUZIONE SEMPLICE: Salva in file temporaneo e leggi
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
+            pdf.output(tmp_file.name)
+            tmp_file_path = tmp_file.name
+        
+        # Leggi il file e restituisci come BytesIO
+        with open(tmp_file_path, 'rb') as f:
+            pdf_data = f.read()
+        
+        # Pulisci il file temporaneo
+        os.unlink(tmp_file_path)
+        
+        return BytesIO(pdf_data)
         
     except Exception as e:
         st.error(f"Errore nella creazione del PDF: {str(e)}")
