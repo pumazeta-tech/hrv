@@ -3834,7 +3834,7 @@ def display_daily_summary(daily_metrics):
         st.dataframe(df, use_container_width=True, hide_index=True)
 
 def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
-    """Genera un grafico giornaliero con SDNN, RMSSD e HR sullo stesso plot"""
+    """Genera un grafico giornaliero con SDNN, RMSSD e HR sullo stesso plot - VERSIONE CORRETTA"""
     try:
         import matplotlib.pyplot as plt
         from io import BytesIO
@@ -3944,7 +3944,7 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         labels = [l.get_label() for l in lines]
         ax1.legend(lines, labels, loc='upper left', frameon=True, fancybox=True, shadow=True)
         
-        # Aggiungi aree colorate per le attività - CORREZIONE PER ATTIVITÀ MULTI-GIORNO
+        # CORREZIONE: Gestione corretta delle attività multi-giorno
         day_activities = []
         for activity in activities:
             activity_start = activity['start_time']
@@ -3971,19 +3971,26 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
             activity_start = activity['start_time']
             activity_end = activity_start + timedelta(minutes=activity['duration'])
             
-            # Calcola l'orario nel sistema di coordinate del grafico
+            # CORREZIONE: Calcola l'orario nel sistema di coordinate del grafico
             # Se l'attività inizia prima di questo giorno, usa l'inizio del giorno
             activity_start_hour = max(start_hour, activity_start.hour + activity_start.minute/60)
             
             # Se l'attività finisce dopo questo giorno, usa la fine del giorno
             activity_end_hour = min(end_hour, activity_end.hour + activity_end.minute/60)
             
-            # Se l'attività è in un giorno diverso, aggiusta l'orario
+            # CORREZIONE: Gestione attività che iniziano in un giorno e finiscono in un altro
+            # Se l'attività inizia in un giorno precedente, aggiusta l'orario
             if activity_start.date() < day_start.date():
                 activity_start_hour = start_hour
+            
+            # Se l'attività finisce in un giorno successivo, aggiusta l'orario
             if activity_end.date() > day_end.date():
                 activity_end_hour = end_hour
             
+            # CORREZIONE: Se l'attività è completamente in un altro giorno, salta
+            if activity_start_hour >= activity_end_hour:
+                continue
+                
             color = activity_colors.get(activity['type'], "#95a5a6")
             
             # Area semitrasparente per l'attività
@@ -3999,7 +4006,7 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
                 label_x = activity_start_hour + duration_hours/2
                 if start_hour <= label_x <= end_hour:
                     # Determina se usare testo bianco o nero in base al colore di sfondo
-                    # Per colori scuri (Sonno, Allenamento) usa testo bianco
+                    # Per colori scuri (Sonno, Allenamento, Stress) usa testo bianco
                     if activity['type'] in ["Sonno", "Allenamento", "Stress"]:
                         text_color = 'white'
                     else:
