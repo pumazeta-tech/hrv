@@ -2698,6 +2698,101 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
 # =============================================================================
 
 def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, attivita_problematiche, analisi_impatto, activities):
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Report HRV - {user_profile['name']} {user_profile['surname']}</title>
+        <style>
+        /* STILI PER LA STAMPA - RIDUCI SPAZI BIANCHI */
+        @media print {{
+            @page {{
+                margin: 0.3cm !important;  /* Margini molto ridotti */
+                size: A4;
+            }}
+            body {{
+                font-size: 10px !important;  /* Testo più piccolo */
+                margin: 0 !important;
+                padding: 5px !important;
+                line-height: 1.2 !important;
+            }}
+            h1 {{
+                font-size: 16px !important;
+                margin: 5px 0 !important;
+                padding-bottom: 3px !important;
+            }}
+            h2 {{
+                font-size: 13px !important;
+                margin: 8px 0 4px 0 !important;
+            }}
+            h3 {{
+                font-size: 11px !important;
+                margin: 6px 0 3px 0 !important;
+            }}
+            table {{
+                font-size: 9px !important;  /* Tabelle compatte */
+                margin: 3px 0 !important;
+            }}
+            th, td {{
+                padding: 3px !important;
+            }}
+            .section {{
+                margin-bottom: 8px !important;
+                page-break-inside: avoid;
+            }}
+            /* Elimina spaziature eccessive */
+            div, p, section {{
+                margin: 2px 0 !important;
+                padding: 1px !important;
+            }}
+        }}
+        
+        /* Stili normali per schermo */
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 15px;
+            color: #333;
+            font-size: 12px;
+        }}
+        h1 {{ 
+            color: #2c3e50; 
+            border-bottom: 1px solid #3498db; 
+            padding-bottom: 5px;
+            font-size: 18px;
+        }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 5px 0;
+            font-size: 11px;
+        }}
+        th, td {{
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: left;
+        }}
+        th {{ background-color: #f8f9fa; }}
+        </style>
+    </head>
+    <body>
+        <div class="section">
+            <h1>REPORT ANALISI HRV GIORNALIERA</h1>
+            <p><strong>Paziente:</strong> {user_profile['name']} {user_profile['surname']}</p>
+            <p><strong>Data generazione:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
+        </div>
+        
+        <!-- IL TUO CONTENUTO ESISTENTE VA QUI -->
+        {timeline if timeline else ''}
+        {daily_metrics if daily_metrics else ''}
+        <!-- ... resto del contenuto ... -->
+        
+    </body>
+    </html>
+    """
+    
+    return html_content
     
     # Stile CSS moderno e professionale - COMPATTO
     css = """
