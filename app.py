@@ -1552,7 +1552,7 @@ ACTIVITY_COLORS = {
 # =============================================================================
 
 def import_activities_from_txt(file_content):
-    """Importa attività da file TXT con formato accumulo"""
+    """Importa attività da file TXT con formato accumulo - VERSIONE CORRETTA"""
     try:
         activities = []
         lines = file_content.strip().split('\n')
@@ -1565,14 +1565,8 @@ def import_activities_from_txt(file_content):
             if not line:
                 # Linea vuota - salva l'attività corrente se esiste
                 if current_activity and 'type' in current_activity:
-                    # Completa l'attività con campi mancanti
-                    if 'start_time' not in current_activity:
-                        # Usa un timestamp di default
-                        current_activity['start_time'] = datetime.now() - timedelta(days=len(activities))
-                    
-                    current_activity['timestamp'] = datetime.now()
-                    current_activity['color'] = ACTIVITY_COLORS.get(current_activity['type'], "#95a5a6")
-                    
+                    # Assicurati che tutti i campi obbligatori esistano
+                    current_activity = ensure_activity_fields(current_activity)
                     activities.append(current_activity.copy())
                     current_activity = {}
                 continue
@@ -1589,8 +1583,7 @@ def import_activities_from_txt(file_content):
             elif line.startswith('ATTIVITA_'):
                 if current_activity and 'type' in current_activity:
                     # Salva l'attività precedente
-                    current_activity['timestamp'] = datetime.now()
-                    current_activity['color'] = ACTIVITY_COLORS.get(current_activity['type'], "#95a5a6")
+                    current_activity = ensure_activity_fields(current_activity)
                     activities.append(current_activity.copy())
                 
                 current_activity = {}
@@ -1609,21 +1602,7 @@ def import_activities_from_txt(file_content):
                     current_activity['duration'] = 30  # Default
             elif line.startswith('STARTTIME='):
                 time_str = line.split('=', 1)[1].strip()
-                try:
-                    # Prova formato ISO
-                    if 'T' in time_str:
-                        current_activity['start_time'] = datetime.fromisoformat(time_str.replace('T', ' '))
-                    else:
-                        # Prova altri formati
-                        try:
-                            current_activity['start_time'] = datetime.strptime(time_str, '%d/%m/%Y %H:%M:%S')
-                        except ValueError:
-                            try:
-                                current_activity['start_time'] = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
-                            except ValueError:
-                                current_activity['start_time'] = datetime.now()
-                except:
-                    current_activity['start_time'] = datetime.now()
+                current_activity['start_time'] = parse_datetime(time_str)
             elif line.startswith('FOOD_ITEMS='):
                 current_activity['food_items'] = line.split('=', 1)[1].strip()
             elif line.startswith('NOTES='):
@@ -1631,8 +1610,7 @@ def import_activities_from_txt(file_content):
         
         # Aggiungi l'ultima attività
         if current_activity and 'type' in current_activity:
-            current_activity['timestamp'] = datetime.now()
-            current_activity['color'] = ACTIVITY_COLORS.get(current_activity['type'], "#95a5a6")
+            current_activity = ensure_activity_fields(current_activity)
             activities.append(current_activity)
         
         # Aggiungi info paziente alla prima attività
@@ -1644,6 +1622,59 @@ def import_activities_from_txt(file_content):
     except Exception as e:
         st.error(f"Errore nell'importazione delle attività: {str(e)}")
         return []
+
+def ensure_activity_fields(activity):
+    """Assicura che tutti i campi obbligatori esistano nell'attività"""
+    # Campi obbligatori con valori di default
+    required_fields = {
+        'type': 'Altro',
+        'name': 'Attività senza nome',
+        'intensity': 'Moderata',
+        'duration': 30,
+        'food_items': '',
+        'notes': '',
+        'start_time': datetime.now(),
+        'timestamp': datetime.now(),
+        'color': '#95a5a6'
+    }
+    
+    # Assicura che tutti i campi esistano
+    for field, default_value in required_fields.items():
+        if field not in activity:
+            activity[field] = default_value
+        
+        # Assegna il colore in base al tipo
+        if field == 'color' and 'type' in activity:
+            activity['color'] = ACTIVITY_COLORS.get(activity['type'], "#95a5a6")
+    
+    return activity
+
+def parse_datetime(time_str):
+    """Analizza la stringa datetime in vari formati"""
+    try:
+        # Prova formato ISO
+        if 'T' in time_str:
+            return datetime.fromisoformat(time_str.replace('T', ' '))
+        else:
+            # Prova altri formati
+            formats_to_try = [
+                '%Y-%m-%d %H:%M:%S',
+                '%d/%m/%Y %H:%M:%S', 
+                '%Y-%m-%d %H:%M',
+                '%d/%m/%Y %H:%M'
+            ]
+            
+            for fmt in formats_to_try:
+                try:
+                    return datetime.strptime(time_str, fmt)
+                except ValueError:
+                    continue
+            
+            # Se nessun formato funziona, usa ora corrente
+            return datetime.now()
+            
+    except:
+        return datetime.now()
 
 def create_activity_importer():
     """Crea l'interfaccia per importare attività da file"""
@@ -1824,7 +1855,7 @@ def create_activity_tracker():
             with st.sidebar.expander(display_text, False):
                 st.write(f"**Tipo:** {activity['type']}")
                 st.write(f"**Intensità:** {activity['intensity']}")
-                if activity['food_items']:
+                if activity.get('food_items'):
                     st.write(f"**Cibo:** {activity['food_items']}")
                 st.write(f"**Data/Ora:** {activity['start_time'].strftime('%d/%m/%Y %H:%M')}")
                 st.write(f"**Durata:** {activity['duration']} min")
