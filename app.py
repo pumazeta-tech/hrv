@@ -4483,7 +4483,8 @@ def main():
                     daily_metrics,
                     avg_metrics,
                     attivita_problematiche,
-                    analisi_impatto
+                    analisi_impatto,
+                    st.session_state.activities  # AGGIUNGI QUESTO
                 )
                 
                 # Anteprima del report
