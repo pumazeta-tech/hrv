@@ -3005,10 +3005,14 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
             ]
             
             for name, value, unit in hrv_metrics:
+                if isinstance(value, (int, float)):
+                    value_str = f"{value:.1f}"
+                else:
+                    value_str = str(value)
                 hrv_metrics_html += f"""
                 <div class="metric-row">
                     <span class="metric-name">{name}</span>
-                    <span class="metric-value">{value:.1f if isinstance(value, (int, float)) else value}</span>
+                    <span class="metric-value">{value_str}</span>
                     <span class="metric-unit">{unit}</span>
                 </div>
                 """
@@ -3027,10 +3031,14 @@ def genera_report_completo(user_profile, timeline, daily_metrics, avg_metrics, a
                 ]
                 
                 for name, value, unit in sleep_metrics:
+                    if isinstance(value, (int, float)):
+                        value_str = f"{value:.1f}"
+                    else:
+                        value_str = str(value)
                     sleep_metrics_html += f"""
                     <div class="metric-row">
                         <span class="metric-name">{name}</span>
-                        <span class="metric-value">{value:.1f if isinstance(value, (int, float)) else value}</span>
+                        <span class="metric-value">{value_str}</span>
                         <span class="metric-unit">{unit}</span>
                     </div>
                     """
