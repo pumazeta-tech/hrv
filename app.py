@@ -3213,41 +3213,6 @@ def main():
             # CORREZIONE: Mostra metriche sonno solo se presenti
             has_sleep_metrics = has_valid_sleep_metrics(avg_metrics)
             
-            with col4:
-                if has_sleep_metrics:
-                    st.markdown(f"""
-                    <div class="compact-metric-card">
-                        <div class="metric-value">🛌 {avg_metrics['sleep_duration']:.1f}h</div>
-                        <div class="metric-label">Durata Sonno</div>
-                        <div class="metric-unit">ore</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="compact-metric-card">
-                        <div class="metric-value">☀️ Diurno</div>
-                        <div class="metric-label">Registrazione</div>
-                        <div class="metric-unit">nessun sonno</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            with col5:
-                if has_sleep_metrics:
-                    st.markdown(f"""
-                    <div class="compact-metric-card">
-                        <div class="metric-value">📊 {avg_metrics['sleep_efficiency']:.0f}%</div>
-                        <div class="metric-label">Efficienza Sonno</div>
-                        <div class="metric-unit">percentuale</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="compact-metric-card">
-                        <div class="metric-value">📈 {avg_metrics['vlf']:.0f}</div>
-                        <div class="metric-label">VLF</div>
-                        <div class="metric-unit">ms²</div>
-                    </div>
-                    """, unsafe_allow_html=True)
             
             # ANALISI SONNO DETTAGLIATA - SOLO SE PRESENTE
             if has_sleep_metrics:
