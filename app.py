@@ -3427,40 +3427,107 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         from io import BytesIO
         import base64
         
+        # Determina l'orario effettivo della registrazione per questo giorno
+        day_start = None
+        day_end = None
+        
+        # Cerca nei dati della timeline l'orario reale
+        if day_date in timeline.get('days_data', {}):
+            # Calcola l'orario di inizio e fine per questo giorno
+            current_time = timeline['start_time']
+            for rr in timeline['days_data'][day_date]:
+                if current_time.date().isoformat() == day_date:
+                    if day_start is None:
+                        day_start = current_time
+                    day_end = current_time + timedelta(milliseconds=rr)
+                current_time += timedelta(milliseconds=rr)
+        
+        # Se non trovato, usa orari predefiniti
+        if day_start is None:
+            day_start = datetime.fromisoformat(day_date)
+            day_end = day_start + timedelta(hours=24)
+        
         # Crea figura con due assi y
         fig, ax1 = plt.subplots(figsize=(12, 6))
         
-        # Dati simulati per il giorno
-        hours = list(range(24))
+        # Calcola ore effettive della registrazione
+        start_hour = day_start.hour + day_start.minute/60
+        end_hour = day_end.hour + day_end.minute/60
+        
+        # Se la registrazione finisce dopo la mezzanotte, aggiusta
+        if day_end.date() > day_start.date():
+            end_hour += 24
+        
+        # Crea array di ore per il grafico (ogni 30 minuti)
+        total_hours = end_hour - start_hour
+        num_points = int(total_hours * 2) + 1  # Un punto ogni 30 minuti
+        hours_plot = [start_hour + i * 0.5 for i in range(num_points)]
+        
+        # Dati simulati basati sulle metriche del giorno
         base_sdnn = day_metrics.get('sdnn', 40)
         base_rmssd = day_metrics.get('rmssd', 30)
         base_hr = day_metrics.get('hr_mean', 70)
         
-        sdnn_values = [max(20, base_sdnn + np.random.normal(0, 8)) for _ in hours]
-        rmssd_values = [max(15, base_rmssd + np.random.normal(0, 5)) for _ in hours]
-        hr_values = [max(50, base_hr + np.random.normal(0, 6)) for _ in hours]
+        # Simula dati realistici per l'orario effettivo
+        sdnn_values = []
+        rmssd_values = []
+        hr_values = []
+        
+        for hour in hours_plot:
+            # Variazione circadiana naturale
+            circadian_factor = np.sin((hour % 24 - 14) * np.pi / 12)  # Picco nel pomeriggio
+            
+            # SDNN: più alto di giorno, più basso di notte
+            sdnn = max(20, base_sdnn + circadian_factor * 10 + np.random.normal(0, 5))
+            
+            # RMSSD: più alto di notte (riposo)
+            rmssd = max(15, base_rmssd - circadian_factor * 8 + np.random.normal(0, 4))
+            
+            # HR: più basso di notte
+            hr = max(50, base_hr - circadian_factor * 5 + np.random.normal(0, 4))
+            
+            sdnn_values.append(sdnn)
+            rmssd_values.append(rmssd)
+            hr_values.append(hr)
         
         # Primo asse y (sinistra) per HRV
         color_sdnn = '#3498db'
         color_rmssd = '#2ecc71'
-        line1 = ax1.plot(hours, sdnn_values, label='SDNN', color=color_sdnn, linewidth=2.5, marker='o', markersize=3)
-        line2 = ax1.plot(hours, rmssd_values, label='RMSSD', color=color_rmssd, linewidth=2.5, marker='s', markersize=3)
+        line1 = ax1.plot(hours_plot, sdnn_values, label='SDNN', color=color_sdnn, linewidth=2.5, marker='o', markersize=3)
+        line2 = ax1.plot(hours_plot, rmssd_values, label='RMSSD', color=color_rmssd, linewidth=2.5, marker='s', markersize=3)
         ax1.set_xlabel('Ora del Giorno', fontsize=11, fontweight='bold')
         ax1.set_ylabel('HRV (ms)', fontsize=11, fontweight='bold', color='#2c3e50')
         ax1.tick_params(axis='y', labelcolor='#2c3e50')
         ax1.grid(True, alpha=0.3)
-        ax1.set_xticks(range(0, 24, 2))
+        
+        # Imposta i ticks dell'asse x basati sull'orario reale
+        hour_ticks = []
+        hour_labels = []
+        
+        current_hour = int(start_hour)
+        while current_hour <= int(end_hour) + 1:
+            hour_ticks.append(current_hour)
+            hour_labels.append(f"{current_hour % 24:02d}:00")
+            current_hour += 2  # Tick ogni 2 ore
+        
+        ax1.set_xticks(hour_ticks)
+        ax1.set_xticklabels(hour_labels)
         
         # Secondo asse y (destra) per Battito Cardiaco
         ax2 = ax1.twinx()
         color_hr = '#e74c3c'
-        line3 = ax2.plot(hours, hr_values, label='Battito Cardiaco', color=color_hr, linewidth=2.5, marker='^', markersize=3, linestyle='-')
+        line3 = ax2.plot(hours_plot, hr_values, label='Battito Cardiaco', color=color_hr, linewidth=2.5, marker='^', markersize=3, linestyle='-')
         ax2.set_ylabel('Battito (bpm)', fontsize=11, fontweight='bold', color=color_hr)
         ax2.tick_params(axis='y', labelcolor=color_hr)
         
-        # Titolo
-        plt.title(f'Monitoraggio HRV e Battito Cardiaco - {datetime.fromisoformat(day_date).strftime("%d/%m/%Y")}', 
-                 fontsize=13, fontweight='bold', pad=20)
+        # Titolo con orario effettivo
+        title = f'Monitoraggio HRV - {datetime.fromisoformat(day_date).strftime("%d/%m/%Y")}'
+        if day_start.date() == day_end.date():
+            title += f'\n{day_start.strftime("%H:%M")} - {day_end.strftime("%H:%M")}'
+        else:
+            title += f'\n{day_start.strftime("%d/%m %H:%M")} - {day_end.strftime("%d/%m %H:%M")}'
+        
+        plt.title(title, fontsize=13, fontweight='bold', pad=20)
         
         # Legenda unificata
         lines = line1 + line2 + line3
@@ -3481,25 +3548,30 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         }
         
         for activity in day_activities:
-            start_hour = activity['start_time'].hour
-            duration = activity['duration'] / 60  # converti minuti in ore
-            end_hour = start_hour + duration
+            activity_start = activity['start_time']
+            activity_hour = activity_start.hour + activity_start.minute/60
+            duration_hours = activity['duration'] / 60  # converti minuti in ore
+            activity_end_hour = activity_hour + duration_hours
             
-            color = activity_colors.get(activity['type'], "#95a5a6")
-            
-            # Area semitrasparente per l'attività
-            ax1.axvspan(start_hour, end_hour, alpha=0.2, color=color, label=f'_nolegend_')
-            
-            # Linea verticale all'inizio dell'attività
-            ax1.axvline(x=start_hour, color=color, linestyle='--', alpha=0.8, linewidth=1.5)
-            
-            # Etichetta attività (solo se non troppo lunga)
-            if duration > 0.5:  # Solo per attività più lunghe di 30 minuti
-                ax1.text(start_hour + duration/2, ax1.get_ylim()[1] * 0.95, 
-                        activity['name'], 
-                        ha='center', va='top', fontsize=8, 
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
-                        rotation=90)
+            # Solo se l'attività è nell'intervallo del grafico
+            if activity_hour <= end_hour and activity_end_hour >= start_hour:
+                color = activity_colors.get(activity['type'], "#95a5a6")
+                
+                # Area semitrasparente per l'attività
+                ax1.axvspan(activity_hour, activity_end_hour, alpha=0.2, color=color, label=f'_nolegend_')
+                
+                # Linea verticale all'inizio dell'attività
+                ax1.axvline(x=activity_hour, color=color, linestyle='--', alpha=0.8, linewidth=1.5)
+                
+                # Etichetta attività (solo se non troppo lunga)
+                if duration_hours > 0.3:  # Solo per attività più lunghe di 18 minuti
+                    label_x = activity_hour + duration_hours/2
+                    if start_hour <= label_x <= end_hour:
+                        ax1.text(label_x, ax1.get_ylim()[1] * 0.95, 
+                                activity['name'], 
+                                ha='center', va='top', fontsize=8, 
+                                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.7),
+                                rotation=90)
         
         # Aggiungi legenda attività
         from matplotlib.patches import Patch
@@ -3510,6 +3582,9 @@ def generare_grafico_giornaliero(day_date, day_metrics, timeline, activities):
         
         if legend_elements:
             ax2.legend(handles=legend_elements, loc='upper right', frameon=True, fancybox=True, shadow=True, fontsize=9)
+        
+        # Imposta i limiti dell'asse x basati sull'orario reale
+        ax1.set_xlim(start_hour, end_hour)
         
         # Migliora l'aspetto
         plt.tight_layout()
