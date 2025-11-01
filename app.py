@@ -2718,7 +2718,7 @@ def crea_pdf_professionale(user_profile, timeline, avg_metrics, daily_metrics):
         pdf.cell(0, 10, 'INFORMAZIONI PAZIENTE', 0, 1)
         pdf.set_font('Arial', '', 10)
         pdf.cell(0, 8, f"Nome: {user_profile['name']} {user_profile['surname']}", 0, 1)
-        pdf.cell(0, 8, f"Età: {user_profile['age']} anni", 0, 1)
+        pdf.cell(0, 8, f"Eta: {user_profile['age']} anni", 0, 1)
         pdf.cell(0, 8, f"Sesso: {user_profile['gender']}", 0, 1)
         pdf.ln(5)
         
@@ -2775,11 +2775,9 @@ def crea_pdf_professionale(user_profile, timeline, avg_metrics, daily_metrics):
                 pdf.cell(30, 8, f"{day_metrics.get('lf_hf_ratio', 0):.2f}", 1)
                 pdf.ln()
         
-        # Ritorna il PDF
-        pdf_output = BytesIO()
-        pdf_output.write(pdf.output(dest='S').encode('latin-1'))
-        pdf_output.seek(0)
-        return pdf_output
+        # Ritorna il PDF - VERSIONE CORRETTA
+        pdf_output = pdf.output(dest='S')  # Questo restituisce già una stringa
+        return BytesIO(pdf_output.encode('latin-1'))
         
     except Exception as e:
         st.error(f"Errore nella creazione del PDF: {str(e)}")
