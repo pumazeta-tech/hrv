@@ -4165,143 +4165,143 @@ def main():
                         mime="text/plain",
                         use_container_width=True
                     )
-             
-                # =============================================================================
-                # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA
-                # =============================================================================
-                st.subheader("🔍 Analisi Segmentale Interattiva")
 
-                # Inizializza la selezione
-                selected_data_exists = False
-                selected_start = None
-                selected_end = None
+            # =============================================================================
+            # ANALISI INTERATTIVA PER SELEZIONE - VERSIONE MIGLIORATA (ORA FUORI DALL'EXPANDER)
+            # =============================================================================
+            st.subheader("🔍 Analisi Segmentale Interattiva")
 
-                # INTERFACCIA PER SELEZIONE MANUALE (alternativa alla selezione grafico)
-                st.info("**Seleziona un periodo per l'analisi:**")
+            # Inizializza la selezione
+            selected_data_exists = False
+            selected_start = None
+            selected_end = None
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    # Usa le date dalla timeline reale
-                    min_date = timeline['start_time']
-                    max_date = timeline['end_time']
+            # INTERFACCIA PER SELEZIONE MANUALE (alternativa alla selezione grafico)
+            st.info("**Seleziona un periodo per l'analisi:**")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                # Usa le date dalla timeline reale
+                min_date = timeline['start_time']
+                max_date = timeline['end_time']
+                
+                selection_start_date = st.date_input(
+                    "Data inizio selezione",
+                    value=min_date.date(),
+                    min_value=min_date.date(),
+                    max_value=max_date.date(),
+                    key="selection_start_date"
+                )
+                selection_start_time = st.time_input(
+                    "Ora inizio selezione", 
+                    value=min_date.time(),
+                    key="selection_start_time"
+                )
+
+            with col2:
+                selection_end_date = st.date_input(
+                    "Data fine selezione",
+                    value=max_date.date(),
+                    min_value=min_date.date(),
+                    max_value=max_date.date(),
+                    key="selection_end_date"
+                )
+                selection_end_time = st.time_input(
+                    "Ora fine selezione",
+                    value=max_date.time(),
+                    key="selection_end_time"
+                )
+
+            # Combina date e ore
+            selected_start = datetime.combine(selection_start_date, selection_start_time)
+            selected_end = datetime.combine(selection_end_date, selection_end_time)
+
+            # Pulsante per eseguire l'analisi
+            if st.button("📊 Analizza Periodo Selezionato", use_container_width=True):
+                if selected_start >= selected_end:
+                    st.error("❌ La data/ora di fine deve essere successiva a quella di inizio")
+                elif selected_start < min_date or selected_end > max_date:
+                    st.error("❌ Il periodo selezionato è fuori dalla registrazione")
+                else:
+                    selected_data_exists = True
+
+            # Se c'è una selezione valida, esegui l'analisi
+            if selected_data_exists and selected_start and selected_end:
+                st.success(f"**📅 Periodo selezionato:** {selected_start.strftime('%d/%m/%Y %H:%M')} - {selected_end.strftime('%d/%m/%Y %H:%M')}")
+                
+                # Filtra i dati nel range selezionato
+                selected_indices = []
+                for i, tp in enumerate(time_points):
+                    if selected_start <= tp <= selected_end:
+                        selected_indices.append(i)
+                
+                if selected_indices:
+                    # CONFRONTO TEMPORALE A 3 FASI
+                    st.subheader("⏰ Confronto Temporale: Prima-Durante-Dopo")
                     
-                    selection_start_date = st.date_input(
-                        "Data inizio selezione",
-                        value=min_date.date(),
-                        min_value=min_date.date(),
-                        max_value=max_date.date(),
-                        key="selection_start_date"
+                    # Calcola l'analisi per i tre periodi
+                    comparison_data = calculate_segment_analysis(
+                        time_points, sdnn_values, rmssd_values, hr_values, 
+                        selected_start, selected_end
                     )
-                    selection_start_time = st.time_input(
-                        "Ora inizio selezione", 
-                        value=min_date.time(),
-                        key="selection_start_time"
-                    )
-
-                with col2:
-                    selection_end_date = st.date_input(
-                        "Data fine selezione",
-                        value=max_date.date(),
-                        min_value=min_date.date(),
-                        max_value=max_date.date(),
-                        key="selection_end_date"
-                    )
-                    selection_end_time = st.time_input(
-                        "Ora fine selezione",
-                        value=max_date.time(),
-                        key="selection_end_time"
-                    )
-
-                # Combina date e ore
-                selected_start = datetime.combine(selection_start_date, selection_start_time)
-                selected_end = datetime.combine(selection_end_date, selection_end_time)
-
-                # Pulsante per eseguire l'analisi
-                if st.button("📊 Analizza Periodo Selezionato", use_container_width=True):
-                    if selected_start >= selected_end:
-                        st.error("❌ La data/ora di fine deve essere successiva a quella di inizio")
-                    elif selected_start < min_date or selected_end > max_date:
-                        st.error("❌ Il periodo selezionato è fuori dalla registrazione")
-                    else:
-                        selected_data_exists = True
-
-                # Se c'è una selezione valida, esegui l'analisi
-                if selected_data_exists and selected_start and selected_end:
-                    st.success(f"**📅 Periodo selezionato:** {selected_start.strftime('%d/%m/%Y %H:%M')} - {selected_end.strftime('%d/%m/%Y %H:%M')}")
                     
-                    # Filtra i dati nel range selezionato
-                    selected_indices = []
-                    for i, tp in enumerate(time_points):
-                        if selected_start <= tp <= selected_end:
-                            selected_indices.append(i)
-                    
-                    if selected_indices:
-                        # CONFRONTO TEMPORALE A 3 FASI
-                        st.subheader("⏰ Confronto Temporale: Prima-Durante-Dopo")
+                    # Crea la tabella comparativa
+                    if comparison_data:
+                        comp_df = pd.DataFrame(comparison_data)
                         
-                        # Calcola l'analisi per i tre periodi
-                        comparison_data = calculate_segment_analysis(
-                            time_points, sdnn_values, rmssd_values, hr_values, 
-                            selected_start, selected_end
+                        # Styling per evidenziare la selezione
+                        def highlight_selection(row):
+                            if row['Periodo'] == 'Selezione':
+                                return ['background-color: #e8f5e8'] * len(row)
+                            elif row['Periodo'] == '1h Dopo':
+                                return ['background-color: #fff3cd'] * len(row)
+                            else:
+                                return ['background-color: #f8f9fa'] * len(row)
+                        
+                        styled_df = comp_df.style.apply(highlight_selection, axis=1)
+                        
+                        st.dataframe(
+                            styled_df,
+                            use_container_width=True,
+                            hide_index=True
                         )
                         
-                        # Crea la tabella comparativa
-                        if comparison_data:
-                            comp_df = pd.DataFrame(comparison_data)
+                        # 1. VALUTAZIONE SINTETICA DEL PERIODO SELEZIONATO
+                        st.subheader("🎯 Valutazione Periodo Selezionato")
+                        
+                        selezione_data = comparison_data[1]  # Secondo elemento è "Selezione"
+                        
+                        try:
+                            sdnn_selezione = float(selezione_data['SDNN (ms)']) if selezione_data['SDNN (ms)'] != 'N/D' else None
+                            rmssd_selezione = float(selezione_data['RMSSD (ms)']) if selezione_data['RMSSD (ms)'] != 'N/D' else None
+                            hr_selezione = float(selezione_data['HR (bpm)']) if selezione_data['HR (bpm)'] != 'N/D' else None
                             
-                            # Styling per evidenziare la selezione
-                            def highlight_selection(row):
-                                if row['Periodo'] == 'Selezione':
-                                    return ['background-color: #e8f5e8'] * len(row)
-                                elif row['Periodo'] == '1h Dopo':
-                                    return ['background-color: #fff3cd'] * len(row)
+                            if sdnn_selezione and rmssd_selezione and hr_selezione:
+                                if sdnn_selezione > 50 and rmssd_selezione > 30 and hr_selezione < 75:
+                                    st.success("🌟 **Stato di benessere ottimale** - buon equilibrio autonomico")
+                                elif sdnn_selezione < 30 or rmssd_selezione < 20:
+                                    st.warning("⚠️ **Possibile stato di stress** - ridotta variabilità cardiaca")
                                 else:
-                                    return ['background-color: #f8f9fa'] * len(row)
-                            
-                            styled_df = comp_df.style.apply(highlight_selection, axis=1)
-                            
-                            st.dataframe(
-                                styled_df,
-                                use_container_width=True,
-                                hide_index=True
-                            )
-                            
-                            # 1. VALUTAZIONE SINTETICA DEL PERIODO SELEZIONATO
-                            st.subheader("🎯 Valutazione Periodo Selezionato")
-                            
-                            selezione_data = comparison_data[1]  # Secondo elemento è "Selezione"
-                            
-                            try:
-                                sdnn_selezione = float(selezione_data['SDNN (ms)']) if selezione_data['SDNN (ms)'] != 'N/D' else None
-                                rmssd_selezione = float(selezione_data['RMSSD (ms)']) if selezione_data['RMSSD (ms)'] != 'N/D' else None
-                                hr_selezione = float(selezione_data['HR (bpm)']) if selezione_data['HR (bpm)'] != 'N/D' else None
-                                
-                                if sdnn_selezione and rmssd_selezione and hr_selezione:
-                                    if sdnn_selezione > 50 and rmssd_selezione > 30 and hr_selezione < 75:
-                                        st.success("🌟 **Stato di benessere ottimale** - buon equilibrio autonomico")
-                                    elif sdnn_selezione < 30 or rmssd_selezione < 20:
-                                        st.warning("⚠️ **Possibile stato di stress** - ridotta variabilità cardiaca")
-                                    else:
-                                        st.info("💪 **Stato fisiologico nella norma**")
-                            except:
-                                pass
-                    else:
-                        st.warning("⚠️ Nessun dato trovato nel periodo selezionato")
+                                    st.info("💪 **Stato fisiologico nella norma**")
+                        except:
+                            pass
+                else:
+                    st.warning("⚠️ Nessun dato trovato nel periodo selezionato")
 
-                # SOLO SE NON C'È SELEZIONE, MOSTRA LE STATISTICHE GENERALI
-                if not selected_data_exists:
-                    st.subheader("📈 Statistiche Generali della Registrazione")
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
-                    with col2:
-                        st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
-                    with col3:
-                        st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
-                    with col4:
-                        st.metric("Finestre Totali", len(time_points))
+            # SOLO SE NON C'È SELEZIONE, MOSTRA LE STATISTICHE GENERALI
+            if not selected_data_exists:
+                st.subheader("📈 Statistiche Generali della Registrazione")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("SDNN Medio", f"{np.mean(sdnn_values):.1f} ms")
+                with col2:
+                    st.metric("RMSSD Medio", f"{np.mean(rmssd_values):.1f} ms")
+                with col3:
+                    st.metric("Battito Medio", f"{np.mean(hr_values):.1f} bpm")
+                with col4:
+                    st.metric("Finestre Totali", len(time_points))
 
             # INFO PERIODO (sempre visibile)
             if time_points:
