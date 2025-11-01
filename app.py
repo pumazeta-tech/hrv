@@ -1728,7 +1728,6 @@ def create_activity_tracker():
     """Interfaccia per tracciare attività e alimentazione"""
     st.sidebar.header("🏃‍♂️ Tracker Attività & Alimentazione")
     
-    # Aggiungi l'importatore di attività
     create_activity_importer()
     
     if st.session_state.get('editing_activity_index') is not None:
