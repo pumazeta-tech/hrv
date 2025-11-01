@@ -1547,9 +1547,189 @@ ACTIVITY_COLORS = {
     "Altro": "#95a5a6"
 }
 
+# =============================================================================
+# SISTEMA DI IMPORT ATTIVITÀ DA FILE TXT
+# =============================================================================
+
+def import_activities_from_txt(file_content):
+    """Importa attività da file TXT con formato accumulo"""
+    try:
+        activities = []
+        lines = file_content.strip().split('\n')
+        
+        current_activity = {}
+        patient_info = {}
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                # Linea vuota - salva l'attività corrente se esiste
+                if current_activity and 'type' in current_activity:
+                    # Completa l'attività con campi mancanti
+                    if 'start_time' not in current_activity:
+                        # Usa un timestamp di default
+                        current_activity['start_time'] = datetime.now() - timedelta(days=len(activities))
+                    
+                    current_activity['timestamp'] = datetime.now()
+                    current_activity['color'] = ACTIVITY_COLORS.get(current_activity['type'], "#95a5a6")
+                    
+                    activities.append(current_activity.copy())
+                    current_activity = {}
+                continue
+            
+            # Informazioni paziente
+            if line.startswith('PAZIENTE:'):
+                patient_info['nome_completo'] = line.split(':', 1)[1].strip()
+            elif line.startswith('EMAIL:'):
+                patient_info['email'] = line.split(':', 1)[1].strip()
+            elif line.startswith('TOTALE_ATTIVITA:'):
+                patient_info['totale_attivita'] = line.split(':', 1)[1].strip()
+            
+            # Nuova attività
+            elif line.startswith('ATTIVITA_'):
+                if current_activity and 'type' in current_activity:
+                    # Salva l'attività precedente
+                    current_activity['timestamp'] = datetime.now()
+                    current_activity['color'] = ACTIVITY_COLORS.get(current_activity['type'], "#95a5a6")
+                    activities.append(current_activity.copy())
+                
+                current_activity = {}
+            
+            # Dettagli attività
+            elif line.startswith('TYPE='):
+                current_activity['type'] = line.split('=', 1)[1].strip()
+            elif line.startswith('NAME='):
+                current_activity['name'] = line.split('=', 1)[1].strip()
+            elif line.startswith('INTENSITY='):
+                current_activity['intensity'] = line.split('=', 1)[1].strip()
+            elif line.startswith('DURATION='):
+                try:
+                    current_activity['duration'] = int(line.split('=', 1)[1].strip())
+                except ValueError:
+                    current_activity['duration'] = 30  # Default
+            elif line.startswith('STARTTIME='):
+                time_str = line.split('=', 1)[1].strip()
+                try:
+                    # Prova formato ISO
+                    if 'T' in time_str:
+                        current_activity['start_time'] = datetime.fromisoformat(time_str.replace('T', ' '))
+                    else:
+                        # Prova altri formati
+                        try:
+                            current_activity['start_time'] = datetime.strptime(time_str, '%d/%m/%Y %H:%M:%S')
+                        except ValueError:
+                            try:
+                                current_activity['start_time'] = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                current_activity['start_time'] = datetime.now()
+                except:
+                    current_activity['start_time'] = datetime.now()
+            elif line.startswith('FOOD_ITEMS='):
+                current_activity['food_items'] = line.split('=', 1)[1].strip()
+            elif line.startswith('NOTES='):
+                current_activity['notes'] = line.split('=', 1)[1].strip()
+        
+        # Aggiungi l'ultima attività
+        if current_activity and 'type' in current_activity:
+            current_activity['timestamp'] = datetime.now()
+            current_activity['color'] = ACTIVITY_COLORS.get(current_activity['type'], "#95a5a6")
+            activities.append(current_activity)
+        
+        # Aggiungi info paziente alla prima attività
+        if activities and patient_info:
+            activities[0]['patient_info'] = patient_info
+        
+        return activities
+    
+    except Exception as e:
+        st.error(f"Errore nell'importazione delle attività: {str(e)}")
+        return []
+
+def create_activity_importer():
+    """Crea l'interfaccia per importare attività da file"""
+    st.sidebar.header("📁 Importa Attività da File")
+    
+    with st.sidebar.expander("📤 Carica File Attività TXT", expanded=False):
+        uploaded_activity_file = st.file_uploader(
+            "Carica file attività .txt dal form PHP", 
+            type=['txt'],
+            key="activity_file_uploader"
+        )
+        
+        if uploaded_activity_file is not None:
+            try:
+                content = uploaded_activity_file.getvalue().decode('utf-8')
+                imported_activities = import_activities_from_txt(content)
+                
+                if imported_activities:
+                    # Estrai info paziente se presenti
+                    patient_info = imported_activities[0].get('patient_info', {})
+                    
+                    st.success(f"✅ Trovate {len(imported_activities)} attività")
+                    
+                    if patient_info:
+                        st.info(f"**Paziente:** {patient_info.get('nome_completo', 'N/A')}")
+                        st.info(f"**Email:** {patient_info.get('email', 'N/A')}")
+                    
+                    # Anteprima delle prime 5 attività
+                    st.subheader("📋 Anteprima Attività")
+                    for i, activity in enumerate(imported_activities[:5]):
+                        with st.expander(f"{i+1}. {activity['type']}: {activity['name']}", False):
+                            st.write(f"**Intensità:** {activity.get('intensity', 'N/A')}")
+                            st.write(f"**Durata:** {activity.get('duration', 'N/A')} min")
+                            st.write(f"**Data/Ora:** {activity['start_time'].strftime('%d/%m/%Y %H:%M')}")
+                            if activity.get('food_items'):
+                                st.write(f"**Cibi:** {activity['food_items']}")
+                            if activity.get('notes'):
+                                st.write(f"**Note:** {activity['notes']}")
+                    
+                    if len(imported_activities) > 5:
+                        st.info(f"... e altre {len(imported_activities) - 5} attività")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        if st.button("💾 Importa Tutte le Attività", use_container_width=True, type="primary"):
+                            # Aggiungi le attività importate a quelle esistenti
+                            st.session_state.activities.extend(imported_activities)
+                            st.success(f"✅ {len(imported_activities)} attività importate con successo!")
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("👀 Solo Anteprima", use_container_width=True):
+                            st.info("Anteprima mostrata sopra - clicca 'Importa Tutte' per aggiungere")
+                
+                else:
+                    st.error("❌ Nessuna attività valida trovata nel file")
+                    
+            except Exception as e:
+                st.error(f"❌ Errore durante l'importazione: {str(e)}")
+        
+        # Istruzioni per il paziente
+        st.markdown("---")
+        with st.expander("ℹ️ Istruzioni per il paziente"):
+            st.markdown("""
+            **Come usare il sistema:**
+            
+            1. **Il paziente** usa il form su www.venalinfa.eu
+            2. **Aggiunge attività** giorno per giorno
+            3. **Alla fine** clicca "Invia Tutte le Attività"
+            4. **Tu ricevi** un file .txt via email
+            5. **Carica qui** il file per importare tutto automaticamente
+            
+            **Vantaggi:**
+            - ✅ Nessun inserimento manuale
+            - ✅ Tutte le attività in un unico file
+            - ✅ Informazioni paziente incluse
+            - ✅ Formato standardizzato
+            """)
+
 def create_activity_tracker():
     """Interfaccia per tracciare attività e alimentazione"""
     st.sidebar.header("🏃‍♂️ Tracker Attività & Alimentazione")
+    
+    # Aggiungi l'importatore di attività
+    create_activity_importer()
     
     if st.session_state.get('editing_activity_index') is not None:
         edit_activity_interface()
